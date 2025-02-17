@@ -1,0 +1,31 @@
+class News {
+  final int newsId;
+  final String newsTitle;
+  final String newsDescription;
+  final String newsLink;
+  final String newsSource;
+  final String newsPubDate;
+  final String newsImageLink;
+
+  News({
+    required this.newsId,
+    required this.newsTitle,
+    required this.newsDescription,
+    required this.newsLink,
+    required this.newsSource,
+    required this.newsPubDate,
+    required this.newsImageLink,
+  });
+
+  factory News.fromJson(Map<String, dynamic> json) {
+    return News(
+      newsId: json['news_id'],
+      newsTitle: json['news_title'],
+      newsDescription: json['news_description'],
+      newsLink: json['news_link'],
+      newsSource: json['news_source'],
+      newsPubDate: json['news_pub_date'] ?? 'Unknown',
+      newsImageLink: json['news_image_link'] ?? '',
+    );
+  }
+}
