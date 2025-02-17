@@ -34,9 +34,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Omni News'),
-        actions: [
-          IconButton(onPressed: () {}, icon: const Icon(Icons.refresh)),
-        ],
       ),
       drawer: Drawer(
           child: ListView(
