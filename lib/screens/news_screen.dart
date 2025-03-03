@@ -76,7 +76,7 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
       body: TabBarView(
         controller: _tabController,
         children: categories.map((category) {
-          return NewsListNiew(newsList: newsList[category]!);
+          return NewsListView(newsList: newsList[category]!);
         }).toList(),
       ),
     );
