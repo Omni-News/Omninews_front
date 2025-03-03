@@ -29,3 +29,29 @@ class News {
     );
   }
 }
+
+class NewsApi {
+  final String newsTitle;
+  final String newsDescription;
+  final String newsLink;
+  final String newsOriginalLink;
+  final String newsPubDate;
+
+  NewsApi({
+    required this.newsTitle,
+    required this.newsDescription,
+    required this.newsLink,
+    required this.newsOriginalLink,
+    required this.newsPubDate,
+  });
+
+  factory NewsApi.fromJson(Map<String, dynamic> json) {
+    return NewsApi(
+      newsTitle: json['news_title'],
+      newsDescription: json['news_description'],
+      newsLink: json['news_original_link'],
+      newsOriginalLink: json['news_link'],
+      newsPubDate: json['news_pub_date'],
+    );
+  }
+}

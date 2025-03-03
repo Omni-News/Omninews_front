@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/news.dart';
 import 'package:omninews_flutter/screens/news_detail_screen.dart';
 
-class NewsListNiew extends StatelessWidget {
+class NewsListView extends StatelessWidget {
   final Future<List<News>> newsList;
 
-  const NewsListNiew({super.key, required this.newsList});
+  const NewsListView({super.key, required this.newsList});
 
   @override
   Widget build(BuildContext context) {
