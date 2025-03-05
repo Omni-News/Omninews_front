@@ -36,6 +36,11 @@ dependencies:
   win32: ^5.10.1
   url_launcher: ^6.3.1
   share: ^2.0.4
+  intl: ^0.20.2
+  shared_preferences: ^2.5.2
+  share_plus: ^7.0.2
+  webview_flutter: ^4.2.2
+  cached_network_image: ^3.4.1
 
   # the following adds the cupertino icons font to your application.
   # use with the cupertinoicons class for ios style icons.

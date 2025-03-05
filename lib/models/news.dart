@@ -47,11 +47,21 @@ class NewsApi {
 
   factory NewsApi.fromJson(Map<String, dynamic> json) {
     return NewsApi(
-      newsTitle: json['news_title'],
-      newsDescription: json['news_description'],
-      newsLink: json['news_original_link'],
-      newsOriginalLink: json['news_link'],
-      newsPubDate: json['news_pub_date'],
+      newsTitle: json['news_title'] ?? '',
+      newsDescription: json['news_description'] ?? '',
+      newsLink: json['news_link'] ?? '',
+      newsOriginalLink: json['news_original_link'] ?? '',
+      newsPubDate: json['news_pub_date'] ?? '',
     );
+  }
+
+  // HTML 태그가 제거된 제목
+  String get plainTitle {
+    return newsTitle.replaceAll(RegExp(r'<[^>]*>'), '');
+  }
+
+  // HTML 태그가 제거된 설명
+  String get plainDescription {
+    return newsDescription.replaceAll(RegExp(r'<[^>]*>'), '');
   }
 }
