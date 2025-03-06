@@ -13,10 +13,11 @@ class RssScreen extends StatefulWidget {
   State<RssScreen> createState() => _RssScreenState();
 }
 
-class _RssScreenState extends State<RssScreen> with AutomaticKeepAliveClientMixin {
+class _RssScreenState extends State<RssScreen>
+    with AutomaticKeepAliveClientMixin {
   late Future<List<RssChannel>> subscribedChannels;
   late Future<List<RssChannel>> recommendedChannels;
-  List<RssChannel> _cachedSubscribedChannels = []; // 캐시된 구독 목록
+  List<RssChannel> subscribedChannelsList = [];
 
   @override
   bool get wantKeepAlive => true; // 탭 전환 시 상태 유지
@@ -43,22 +44,18 @@ class _RssScreenState extends State<RssScreen> with AutomaticKeepAliveClientMixi
       subscribedChannels = RssService.fetchSubscribedChannels();
       recommendedChannels = RssService.fetchRecommendedChannels();
     });
-    
-    // 구독 목록 캐시 업데이트
-    _cachedSubscribedChannels = await RssService.fetchSubscribedChannels();
+
+    subscribedChannelsList = await subscribedChannels;
   }
 
-bool _isChannelSubscribed(RssChannel channel) {
-  for (var c in _cachedSubscribedChannels) {
-    debugPrint('Comparing channel: ${c.channelTitle} with ${channel.channelTitle}');
-    
-    // 올바른 필드 이름으로 비교
-    if (c.channelId == channel.channelId || c.channelLink == channel.channelLink) {
-      return true;
+  bool _isChannelSubscribed(RssChannel channel) {
+    for (RssChannel subscribedChannel in subscribedChannelsList) {
+      if (subscribedChannel.channelRssLink == channel.channelRssLink) {
+        return true;
+      }
     }
+    return false;
   }
-  return false;
-}
 
   @override
   Widget build(BuildContext context) {
@@ -138,7 +135,8 @@ bool _isChannelSubscribed(RssChannel channel) {
                 ),
                 const SizedBox(height: 10),
                 FutureBuilder<List<RssChannel>>(
-                  future: subscribedChannels,
+                  future: RssService
+                      .fetchSubscribedChannels(), //subscribedChannels,
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
                       return const SizedBox(
@@ -190,7 +188,7 @@ bool _isChannelSubscribed(RssChannel channel) {
                           borderRadius: BorderRadius.circular(8),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.05),
+                              color: Colors.black.withValues(),
                               blurRadius: 6,
                               offset: const Offset(0, 2),
                             ),
@@ -245,8 +243,8 @@ bool _isChannelSubscribed(RssChannel channel) {
                         itemCount: snapshot.data!.length,
                         itemBuilder: (context, index) {
                           final channel = snapshot.data![index];
-                          // 개선된 구독 체크 로직
-                          final bool isSubscribed = _isChannelSubscribed(channel);
+                          final bool isSubscribed =
+                              _isChannelSubscribed(channel);
 
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 10.0),

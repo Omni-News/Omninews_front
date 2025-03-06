@@ -53,7 +53,7 @@ class CustomNewsListView extends StatelessWidget {
             ],
           ),
         ),
-        
+
         // 뉴스 목록
         Expanded(
           child: FutureBuilder<List<CustomNews>>(
@@ -71,7 +71,8 @@ class CustomNewsListView extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+                        const Icon(Icons.error_outline,
+                            size: 48, color: Colors.grey),
                         const SizedBox(height: 12),
                         Text(
                           'Failed to load news',
@@ -84,7 +85,8 @@ class CustomNewsListView extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${snapshot.error}',
-                          style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                          style:
+                              TextStyle(color: Colors.grey[600], fontSize: 14),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -115,7 +117,8 @@ class CustomNewsListView extends StatelessWidget {
               return ListView.separated(
                 padding: const EdgeInsets.only(top: 4),
                 itemCount: news.length,
-                separatorBuilder: (context, index) => const Divider(height: 1, indent: 16, endIndent: 16),
+                separatorBuilder: (context, index) =>
+                    const Divider(height: 1, indent: 16, endIndent: 16),
                 itemBuilder: (context, index) {
                   final item = news[index];
                   return InkWell(
@@ -187,19 +190,18 @@ class CustomNewsListView extends StatelessWidget {
   }
 
   // 심플하고 모던한 정렬 옵션 버튼 위젯
-  Widget _buildSortOption({
-    required BuildContext context, 
-    required String label, 
-    required bool isSelected, 
-    required VoidCallback onTap
-  }) {
+  Widget _buildSortOption(
+      {required BuildContext context,
+      required String label,
+      required bool isSelected,
+      required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.blue.withOpacity(0.1) : Colors.transparent,
+          color: isSelected ? Colors.blue.withValues() : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(

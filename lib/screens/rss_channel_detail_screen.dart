@@ -3,7 +3,6 @@ import 'package:omninews_flutter/models/rss_channel.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
 import 'package:omninews_flutter/services/rss_service.dart';
 import 'package:omninews_flutter/widgets/rss_item_card.dart';
-import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class RssChannelDetailScreen extends StatefulWidget {
@@ -47,7 +46,8 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
         success =
             await RssService.unsubscribeChannel(widget.channel.channelRssLink);
       } else {
-        success = await RssService.subscribeChannel(widget.channel);
+        success =
+            await RssService.subscribeChannel(widget.channel.channelRssLink);
       }
 
       if (success && mounted) {

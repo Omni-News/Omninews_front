@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:omninews_flutter/models/rss_channel.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:omninews_flutter/utils/rss_manager.dart';
 
 class RssService {
   static const String baseUrl =
@@ -14,7 +14,6 @@ class RssService {
           await http.get(Uri.parse("$baseUrl/rss/recommend/channel"), headers: {
         "Content-Type": "application/json; charset=UTF-8",
       });
-      // 이어지는 코드...
       if (response.statusCode == 200) {
         String decodedResponse = utf8.decode(response.bodyBytes);
         List jsonResponse = json.decode(decodedResponse);
@@ -24,24 +23,6 @@ class RssService {
       }
     } catch (e) {
       // For demo purposes, return mock data
-      return [];
-    }
-  }
-
-  // 사용자 구독 RSS 채널 가져오기
-  static Future<List<RssChannel>> fetchSubscribedChannels() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final String? subscribedJson = prefs.getString('subscribed_channels');
-
-      if (subscribedJson == null || subscribedJson.isEmpty) {
-        return [];
-      }
-
-      List<dynamic> subscribedList = json.decode(subscribedJson);
-      return subscribedList.map((model) => RssChannel.fromJson(model)).toList();
-    } catch (e) {
-      debugPrint('Error fetching subscribed channels: $e');
       return [];
     }
   }
@@ -106,54 +87,32 @@ class RssService {
     }
   }
 
-  // 채널이 이미 구독되어 있는지 확인하는 메서드 추가
-  static Future<bool> isChannelAlreadySubscribed(RssChannel channel) async {
+  // 채널 구독
+  static Future<bool> subscribeChannel(String channelRssLink) async {
     try {
-      final subscribedChannels = await fetchSubscribedChannels();
-
-      // "channelLink"로 비교 (채널 웹사이트 URL)
-      bool isSubscribed = false;
-      for (var c in subscribedChannels) {
-        if (c.channelRssLink == channel.channelRssLink) {
-          isSubscribed = true;
-          break;
-        }
-      }
-
-      return isSubscribed;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  static Future<bool> subscribeChannel(RssChannel channel) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-
-      // 현재 구독 중인 채널 목록 가져오기
-      List<RssChannel> subscribedChannels = await fetchSubscribedChannels();
-
-      // 이미 구독 중인지 확인 - 올바른 필드로 비교
-      bool alreadySubscribed = false;
-      for (var c in subscribedChannels) {
-        if (c.channelLink == channel.channelLink) {
-          alreadySubscribed = true;
-          break;
-        }
-      }
-
-      if (alreadySubscribed) {
+      bool res = await RssManager.subscribeChannel(channelRssLink);
+      if (!res) {
         return false;
       }
 
-      // 채널 추가
-      subscribedChannels.add(channel);
+      final response = await http.post(
+        Uri.parse('$baseUrl/rss/channel/rank'),
+        headers: {
+          "Content-Type": "application/json; charset=UTF-8",
+        },
+        body: json.encode({
+          "rss_link": channelRssLink,
+          "num": 1,
+        }),
+      );
 
-      // 저장
-      await prefs.setString('subscribed_channels',
-          json.encode(subscribedChannels.map((c) => c.toJson()).toList()));
-
-      return true;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return true;
+      } else {
+        debugPrint(
+            'Failed to update rss channel rank: ${response.statusCode} - ${response.body}');
+        return false;
+      }
     } catch (e) {
       debugPrint('Error subscribing to channel: $e');
       return false;
@@ -163,19 +122,29 @@ class RssService {
   // RSS 채널 구독 취소하기
   static Future<bool> unsubscribeChannel(String channelRssLink) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      bool res = await RssManager.unsubscribeChannel(channelRssLink);
+      if (!res) {
+        return false;
+      }
 
-      // 현재 구독 중인 채널 목록 가져오기
-      List<RssChannel> subscribedChannels = await fetchSubscribedChannels();
+      final response = await http.post(
+        Uri.parse('$baseUrl/rss/channel/rank'),
+        headers: {
+          "Content-Type": "application/json; charset=UTF-8",
+        },
+        body: json.encode({
+          "rss_link": channelRssLink,
+          "num": -1,
+        }),
+      );
 
-      // 채널 제거
-      subscribedChannels.removeWhere((c) => c.channelRssLink == channelRssLink);
-
-      // 저장
-      await prefs.setString('subscribed_channels',
-          json.encode(subscribedChannels.map((c) => c.toJson()).toList()));
-
-      return true;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return true;
+      } else {
+        debugPrint(
+            'Failed to update rss channel rank: ${response.statusCode} - ${response.body}');
+        return false;
+      }
     } catch (e) {
       debugPrint('Error unsubscribing from channel: $e');
       return false;
@@ -200,6 +169,44 @@ class RssService {
       }
     } catch (e) {
       debugPrint('Error checking if RSS exists: $e');
+      return false;
+    }
+  }
+
+  // 사용자 구독 RSS 채널 가져오기
+  static Future<List<RssChannel>> fetchSubscribedChannels() async {
+    try {
+      List<String> subscribeList = await RssManager.getSubscribedChannels();
+      debugPrint('subscribeList: $subscribeList');
+
+      List<RssChannel> subscribedChannels = [];
+
+      for (String channelRssLink in subscribeList) {
+        final response = await http.get(
+          Uri.parse('$baseUrl/rss/channel?rss_link=$channelRssLink'),
+          headers: {"Content-Type": "application/json; charset=UTF-8"},
+        );
+
+        if (response.statusCode == 200) {
+          String decodedResponse = utf8.decode(response.bodyBytes);
+          dynamic jsonResponse = json.decode(decodedResponse);
+          subscribedChannels.add(RssChannel.fromJson(jsonResponse));
+        }
+      }
+
+      return subscribedChannels;
+    } catch (e) {
+      debugPrint('Error fetching subscribed channels: $e');
+      return [];
+    }
+  }
+
+  // 채널이 이미 구독되어 있는지 확인하는 메서드 추가
+  static Future<bool> isChannelAlreadySubscribed(String channelRssLink) async {
+    try {
+      bool res = await RssManager.isChannelSubscribed(channelRssLink);
+      return res;
+    } catch (e) {
       return false;
     }
   }

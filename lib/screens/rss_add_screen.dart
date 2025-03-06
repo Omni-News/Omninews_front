@@ -20,7 +20,6 @@ class _RssAddScreenState extends State<RssAddScreen> {
   // RSS가 DB에 존재하는지 여부를 저장하는 변수 추가
   bool _isExistingRss = false;
   // RSS 추가가 완료되었는지 여부 저장
-  bool _isRssAdded = false;
   bool _isAlreadySubscribed = false; // 추가: 이미 구독 중인지 여부
 
   @override
@@ -58,7 +57,6 @@ class _RssAddScreenState extends State<RssAddScreen> {
       _errorMessage = null;
       _previewChannel = null;
       _isExistingRss = false;
-      _isRssAdded = false;
       _isAlreadySubscribed = false;
     });
 
@@ -69,7 +67,7 @@ class _RssAddScreenState extends State<RssAddScreen> {
         final exists = await RssService.checkRssExists(url);
 
         final alreadySubscribed =
-            await RssService.isChannelAlreadySubscribed(preview);
+            await RssService.isChannelAlreadySubscribed(preview.channelRssLink);
 
         setState(() {
           _isLoading = false;
@@ -108,7 +106,6 @@ class _RssAddScreenState extends State<RssAddScreen> {
       if (success) {
         setState(() {
           _isLoading = false;
-          _isRssAdded = true;
           _isExistingRss = true; // 이제 DB에 존재하므로 true로 설정
         });
 
@@ -143,7 +140,8 @@ class _RssAddScreenState extends State<RssAddScreen> {
     });
 
     try {
-      final success = await RssService.subscribeChannel(_previewChannel!);
+      final success =
+          await RssService.subscribeChannel(_previewChannel!.channelRssLink);
 
       if (success) {
         widget.onChannelAdded();

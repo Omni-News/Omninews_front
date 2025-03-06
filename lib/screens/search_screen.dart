@@ -4,7 +4,6 @@ import 'package:omninews_flutter/services/news_api_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/cupertino.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -18,7 +17,7 @@ class SearchScreenState extends State<SearchScreen> {
   List<NewsApi> _searchResult = [];
   bool _isLoading = false;
   bool _hasSearched = false;
-  String _sortOption = 'sim';  // 기본값은 정확도순
+  String _sortOption = 'sim'; // 기본값은 정확도순
 
   @override
   void initState() {
@@ -38,12 +37,12 @@ class SearchScreenState extends State<SearchScreen> {
     });
 
     try {
-      List<NewsApi> result = await NewsApiService.fetchNews(query, 20, _sortOption);
+      List<NewsApi> result =
+          await NewsApiService.fetchNews(query, 20, _sortOption);
       setState(() {
         _searchResult = result;
       });
     } catch (e) {
-      print('Failed to fetch news: $e');
       setState(() {
         _searchResult = [];
       });
@@ -69,46 +68,47 @@ class SearchScreenState extends State<SearchScreen> {
       setState(() {
         _sortOption = sortOption;
       });
-      
+
       // 이미 검색한 결과가 있다면 새 정렬 옵션으로 재검색
       if (_hasSearched && _controller.text.isNotEmpty) {
         _search(_controller.text);
       }
     }
   }
-  
+
   // 검색어를 뉴스 카테고리에 추가
   Future<void> _addToNewsCategories(String query) async {
     // 확인 다이얼로그 표시
     bool shouldAdd = await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('카테고리 추가'),
-        content: Text('\'$query\' 검색어를 뉴스 카테고리에 추가하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('카테고리 추가'),
+            content: Text('\'$query\' 검색어를 뉴스 카테고리에 추가하시겠습니까?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('취소'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('추가'),
+              ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('추가'),
-          ),
-        ],
-      ),
-    ) ?? false;
-    
+        ) ??
+        false;
+
     if (!shouldAdd) return;
-    
+
     try {
       // 기존 저장된 사용자 카테고리 불러오기
       final prefs = await SharedPreferences.getInstance();
       final savedCategories = prefs.getStringList('user_categories') ?? [];
-      
+
       // 이미 존재하는 카테고리인지 확인
       if (savedCategories.contains(query)) {
         if (mounted) {
@@ -121,11 +121,11 @@ class SearchScreenState extends State<SearchScreen> {
         }
         return;
       }
-      
+
       // 새 카테고리 추가
       final newCategories = [...savedCategories, query];
       await prefs.setStringList('user_categories', newCategories);
-      
+
       // 추가 성공 메시지 및 화면 이동
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -134,10 +134,10 @@ class SearchScreenState extends State<SearchScreen> {
             duration: const Duration(seconds: 2),
           ),
         );
-        
+
         // 뉴스 화면으로 이동 (팝업 닫기)
         Navigator.of(context).popUntil((route) => route.isFirst);
-        
+
         // 새로 추가된 카테고리로 이동하기 위한 인덱스를 SharedPreferences에 저장
         // NewsScreen에서 이 값을 확인하여 해당 탭으로 이동
         await prefs.setInt('select_category_index', -1); // -1은 마지막 카테고리를 의미
@@ -209,7 +209,7 @@ class SearchScreenState extends State<SearchScreen> {
               textInputAction: TextInputAction.search,
             ),
           ),
-          
+
           // 카테고리 추가 및 정렬 옵션 (검색 후에만 표시)
           if (_hasSearched && _searchResult.isNotEmpty)
             Padding(
@@ -221,11 +221,13 @@ class SearchScreenState extends State<SearchScreen> {
                     onTap: () => _addToNewsCategories(_controller.text),
                     borderRadius: BorderRadius.circular(16),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.1),
+                        color: Colors.blue.withValues(),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.blue.withOpacity(0.3), width: 1),
+                        border: Border.all(
+                            color: Colors.blue.withValues(), width: 1),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -239,14 +241,15 @@ class SearchScreenState extends State<SearchScreen> {
                             ),
                           ),
                           const SizedBox(width: 4),
-                          Icon(Icons.add_circle_outline, size: 14, color: Colors.blue[700]),
+                          Icon(Icons.add_circle_outline,
+                              size: 14, color: Colors.blue[700]),
                         ],
                       ),
                     ),
                   ),
-                  
+
                   const Spacer(),
-                  
+
                   // 정렬 옵션 (오른쪽에 배치)
                   _buildSortOption(
                     context: context,
@@ -264,11 +267,12 @@ class SearchScreenState extends State<SearchScreen> {
                 ],
               ),
             ),
-          
+
           // 검색 결과
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: Colors.blue))
+                ? const Center(
+                    child: CircularProgressIndicator(color: Colors.blue))
                 : !_hasSearched
                     ? _buildInitialView()
                     : _searchResult.isEmpty
@@ -277,18 +281,17 @@ class SearchScreenState extends State<SearchScreen> {
                             padding: const EdgeInsets.only(top: 4, bottom: 16),
                             itemCount: _searchResult.length,
                             separatorBuilder: (context, index) => const Divider(
-                              height: 1, 
-                              indent: 16, 
-                              endIndent: 16
-                            ),
+                                height: 1, indent: 16, endIndent: 16),
                             itemBuilder: (context, index) {
                               final item = _searchResult[index];
                               return InkWell(
                                 onTap: () => _launchURL(item.newsOriginalLink),
                                 child: Padding(
-                                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                                  padding:
+                                      const EdgeInsets.fromLTRB(16, 12, 16, 12),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       // 뉴스 제목
                                       Text(
@@ -303,10 +306,11 @@ class SearchScreenState extends State<SearchScreen> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 6),
-                                      
+
                                       // 뉴스 내용 요약
                                       Text(
-                                        _truncateDescription(_removeHtmlTags(item.newsDescription)),
+                                        _truncateDescription(_removeHtmlTags(
+                                            item.newsDescription)),
                                         style: TextStyle(
                                           fontSize: 14,
                                           color: Colors.grey[700],
@@ -316,12 +320,13 @@ class SearchScreenState extends State<SearchScreen> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 8),
-                                      
+
                                       // 출처 및 날짜
                                       Row(
                                         children: [
                                           Text(
-                                            _extractDomain(item.newsOriginalLink),
+                                            _extractDomain(
+                                                item.newsOriginalLink),
                                             style: TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.w500,
@@ -398,21 +403,20 @@ class SearchScreenState extends State<SearchScreen> {
       ),
     );
   }
-  
+
   // 심플하고 모던한 정렬 옵션 버튼 위젯
-  Widget _buildSortOption({
-    required BuildContext context, 
-    required String label, 
-    required bool isSelected, 
-    required VoidCallback onTap
-  }) {
+  Widget _buildSortOption(
+      {required BuildContext context,
+      required String label,
+      required bool isSelected,
+      required VoidCallback onTap}) {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.blue.withOpacity(0.1) : Colors.transparent,
+          color: isSelected ? Colors.blue.withValues() : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
