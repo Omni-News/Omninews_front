@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/news.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share/share.dart';
-import 'package:flutter/services.dart';
 
 class RssDetailScreen extends StatelessWidget {
   final News news;
@@ -29,10 +28,11 @@ class RssDetailScreen extends StatelessWidget {
                     icon: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.arrow_back, color: Colors.black87),
+                      child:
+                          const Icon(Icons.arrow_back, color: Colors.black87),
                     ),
                     onPressed: () => Navigator.pop(context),
                   ),
@@ -41,10 +41,11 @@ class RssDetailScreen extends StatelessWidget {
                       icon: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.bookmark_border, color: Colors.black87),
+                        child: const Icon(Icons.bookmark_border,
+                            color: Colors.black87),
                       ),
                       onPressed: () {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -75,7 +76,8 @@ class RssDetailScreen extends StatelessWidget {
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
                                 color: Colors.blue.shade50,
                                 borderRadius: BorderRadius.circular(4),
@@ -99,9 +101,9 @@ class RssDetailScreen extends StatelessWidget {
                             ),
                           ],
                         ),
-                        
+
                         const SizedBox(height: 16),
-                        
+
                         // 제목
                         Text(
                           news.newsTitle,
@@ -112,9 +114,9 @@ class RssDetailScreen extends StatelessWidget {
                             height: 1.3,
                           ),
                         ),
-                        
+
                         const SizedBox(height: 20),
-                        
+
                         // 본문 설명
                         Text(
                           news.newsDescription,
@@ -125,7 +127,7 @@ class RssDetailScreen extends StatelessWidget {
                             letterSpacing: 0.3,
                           ),
                         ),
-                        
+
                         // 원문 링크 표시 부분 제거됨
                       ],
                     ),
@@ -133,19 +135,20 @@ class RssDetailScreen extends StatelessWidget {
                 ),
               ],
             ),
-            
+
             // 하단 고정 버튼 영역 - 두 개의 버튼으로 분할
             Positioned(
               left: 0,
               right: 0,
               bottom: 0,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(),
                       blurRadius: 10,
                       offset: const Offset(0, -4),
                     ),
@@ -159,7 +162,8 @@ class RssDetailScreen extends StatelessWidget {
                         padding: const EdgeInsets.only(right: 8),
                         child: ElevatedButton(
                           onPressed: () {
-                            Share.share('${news.newsTitle}\n\n${news.newsLink}');
+                            Share.share(
+                                '${news.newsTitle}\n\n${news.newsLink}');
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.grey[200],
@@ -176,14 +180,15 @@ class RssDetailScreen extends StatelessWidget {
                               SizedBox(width: 8),
                               Text(
                                 '공유하기',
-                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                                style: TextStyle(
+                                    fontSize: 15, fontWeight: FontWeight.w500),
                               ),
                             ],
                           ),
                         ),
                       ),
                     ),
-                    
+
                     // 원문 보기 버튼
                     Expanded(
                       child: Padding(
@@ -205,7 +210,8 @@ class RssDetailScreen extends StatelessWidget {
                               SizedBox(width: 8),
                               Text(
                                 '원문 보기',
-                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                                style: TextStyle(
+                                    fontSize: 15, fontWeight: FontWeight.w500),
                               ),
                             ],
                           ),
@@ -232,7 +238,7 @@ class RssDetailScreen extends StatelessWidget {
         throw '웹사이트를 열 수 없습니다: $url';
       }
     } catch (e) {
-      print('URL 실행 오류: $e');
+      ();
     }
   }
 
@@ -249,7 +255,11 @@ class RssDetailScreen extends StatelessWidget {
   // 시간 포맷팅 함수
   String _formatTime(int hour, int minute) {
     final isPM = hour >= 12;
-    final formattedHour = hour > 12 ? hour - 12 : hour == 0 ? 12 : hour;
+    final formattedHour = hour > 12
+        ? hour - 12
+        : hour == 0
+            ? 12
+            : hour;
     final formattedMinute = minute.toString().padLeft(2, '0');
     return '$formattedHour:$formattedMinute ${isPM ? '오후' : '오전'}';
   }

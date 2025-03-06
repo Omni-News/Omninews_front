@@ -34,7 +34,8 @@ class _RssChannelCardState extends State<RssChannelCard> {
         success =
             await RssService.unsubscribeChannel(widget.channel.channelRssLink);
       } else {
-        success = await RssService.subscribeChannel(widget.channel);
+        success =
+            await RssService.subscribeChannel(widget.channel.channelRssLink);
       }
 
       if (success && mounted) {

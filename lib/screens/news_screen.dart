@@ -38,7 +38,7 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
   // 기본 카테고리와 사용자 카테고리의 데이터 타입이 다르므로 분리하여 관리
   Map<String, Future<List<News>>> newsList = {};
   Map<String, Future<List<CustomNews>>> customNewsList = {};
-  
+
   // 사용자 추가 카테고리별 정렬 옵션 저장 ("sim" or "date")
   Map<String, String> categorySortOptions = {};
 
@@ -47,43 +47,43 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
   bool _isLoading = true;
 
 // NewsScreen 클래스에 추가할 부분 (initState 메소드 내)
-@override
-void initState() {
-  super.initState();
-  // 먼저 기본 상태로 TabController 초기화
-  _tabController = TabController(length: categories.length, vsync: this);
-  _loadCategories(); // 그 후 저장된 카테고리 비동기적으로 불러오기
+  @override
+  void initState() {
+    super.initState();
+    // 먼저 기본 상태로 TabController 초기화
+    _tabController = TabController(length: categories.length, vsync: this);
+    _loadCategories(); // 그 후 저장된 카테고리 비동기적으로 불러오기
 
-  // TabController 리스너 추가 - 페이지 스와이프 시 카테고리 바 동기화
-  _tabController.addListener(_handleTabIndexChange);
-  
-  // 검색에서 추가된 카테고리로 이동 확인 (약간의 지연 후 실행)
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    _checkAndNavigateToNewCategory();
-  });
-}
+    // TabController 리스너 추가 - 페이지 스와이프 시 카테고리 바 동기화
+    _tabController.addListener(_handleTabIndexChange);
+
+    // 검색에서 추가된 카테고리로 이동 확인 (약간의 지연 후 실행)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAndNavigateToNewCategory();
+    });
+  }
 
 // 새로운 메소드 추가
-Future<void> _checkAndNavigateToNewCategory() async {
-  final prefs = await SharedPreferences.getInstance();
-  final selectIndex = prefs.getInt('select_category_index');
-  
-  // 값이 있으면 해당 인덱스로 이동
-  if (selectIndex != null) {
-    // -1이면 마지막 카테고리로 이동
-    int targetIndex = selectIndex == -1 ? categories.length - 1 : selectIndex;
-    
-    // 인덱스가 범위 내인지 확인
-    if (targetIndex >= 0 && targetIndex < categories.length) {
-      // 탭 선택 및 스크롤
-      _tabController.animateTo(targetIndex);
-      _scrollToCurrentTab();
+  Future<void> _checkAndNavigateToNewCategory() async {
+    final prefs = await SharedPreferences.getInstance();
+    final selectIndex = prefs.getInt('select_category_index');
+
+    // 값이 있으면 해당 인덱스로 이동
+    if (selectIndex != null) {
+      // -1이면 마지막 카테고리로 이동
+      int targetIndex = selectIndex == -1 ? categories.length - 1 : selectIndex;
+
+      // 인덱스가 범위 내인지 확인
+      if (targetIndex >= 0 && targetIndex < categories.length) {
+        // 탭 선택 및 스크롤
+        _tabController.animateTo(targetIndex);
+        _scrollToCurrentTab();
+      }
+
+      // 값 삭제 (일회성)
+      await prefs.remove('select_category_index');
     }
-    
-    // 값 삭제 (일회성)
-    await prefs.remove('select_category_index');
   }
-}
 
   // TabController 인덱스 변경 시 카테고리 바 스크롤 위치 조정
   void _handleTabIndexChange() {
@@ -97,7 +97,6 @@ Future<void> _checkAndNavigateToNewCategory() async {
     if (!mounted || !_tabScrollController.hasClients) return;
 
     // 전체 탭 너비 계산에 필요한 값들
-    const double tabBarPadding = 9.0 * 2; // 양쪽 패딩
     const double tabPadding = 17.0 * 2; // 탭 내부 패딩
     const double screenWidth = 375.0; // 대략적인 화면 너비 (실제로는 동적으로 구해야 함)
 
@@ -132,7 +131,7 @@ Future<void> _checkAndNavigateToNewCategory() async {
       final prefs = await SharedPreferences.getInstance();
       final savedCategories = prefs.getStringList('user_categories');
       final savedSortOptions = prefs.getStringList('category_sort_options');
-      
+
       // 정렬 옵션 로드
       if (savedSortOptions != null && savedSortOptions.isNotEmpty) {
         for (int i = 0; i < savedSortOptions.length; i += 2) {
@@ -147,17 +146,18 @@ Future<void> _checkAndNavigateToNewCategory() async {
           setState(() {
             // 기본 카테고리 + 저장된 사용자 카테고리
             categories = [...defaultCategories, ...savedCategories];
-            
+
             // 로드된 카테고리에 대해 정렬 옵션이 없으면 기본값 설정
             for (var category in savedCategories) {
               if (!categorySortOptions.containsKey(category)) {
                 categorySortOptions[category] = "sim"; // 기본값은 정확순
               }
             }
-            
+
             // TabController 재생성
             _tabController.dispose();
-            _tabController = TabController(length: categories.length, vsync: this);
+            _tabController =
+                TabController(length: categories.length, vsync: this);
             _tabController.addListener(_handleTabIndexChange); // 리스너 다시 추가
             fetchAllNewsLists();
             _isLoading = false;
@@ -177,7 +177,6 @@ Future<void> _checkAndNavigateToNewCategory() async {
           _isLoading = false;
         });
       }
-      print("카테고리 로드 중 오류 발생: $e");
     }
   }
 
@@ -188,7 +187,7 @@ Future<void> _checkAndNavigateToNewCategory() async {
         .where((category) => !defaultCategories.contains(category))
         .toList();
     await prefs.setStringList('user_categories', userCategories);
-    
+
     // 정렬 옵션도 저장
     List<String> sortOptionsList = [];
     categorySortOptions.forEach((category, sortOption) {
@@ -203,9 +202,10 @@ Future<void> _checkAndNavigateToNewCategory() async {
     setState(() {
       categorySortOptions[category] = sortOption;
       // 새로운 정렬 옵션으로 뉴스 다시 불러오기
-      customNewsList[category] = NewsService.fetchCustomNews(category, 20, sortOption);
+      customNewsList[category] =
+          NewsService.fetchCustomNews(category, 20, sortOption);
     });
-    
+
     // 변경된 정렬 옵션 저장
     _saveCategories();
   }
@@ -218,7 +218,8 @@ Future<void> _checkAndNavigateToNewCategory() async {
       } else {
         // 사용자 추가 카테고리는 저장된 정렬 옵션으로 API 호출
         String sortOption = categorySortOptions[category] ?? "sim";
-        customNewsList[category] = NewsService.fetchCustomNews(category, 20, sortOption);
+        customNewsList[category] =
+            NewsService.fetchCustomNews(category, 20, sortOption);
       }
     }
   }
@@ -368,7 +369,7 @@ Future<void> _checkAndNavigateToNewCategory() async {
       categories.add(category);
       // 새로운 카테고리의 기본 정렬 옵션 설정
       categorySortOptions[category] = "sim"; // 기본값은 정확순
-      
+
       // 사용자 추가 카테고리는 커스텀 API 호출
       customNewsList[category] =
           NewsService.fetchCustomNews(category, 20, "sim");
@@ -560,7 +561,7 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
         boxShadow: overlapsContent
             ? [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),

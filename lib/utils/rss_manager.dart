@@ -1,12 +1,11 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:omninews_flutter/models/rss_channel.dart';
 
 class RssManager {
   static const String _subscribedChannelsKey = 'subscribed_channels';
 
   // Get all subscribed channels
-  static Future<List<RssChannel>> getSubscribedChannels() async {
+  static Future<List<String>> getSubscribedChannels() async {
     final prefs = await SharedPreferences.getInstance();
     final String? subscribedJson = prefs.getString(_subscribedChannelsKey);
 
@@ -16,37 +15,37 @@ class RssManager {
 
     try {
       List<dynamic> subscribedList = json.decode(subscribedJson);
-      return subscribedList.map((model) => RssChannel.fromJson(model)).toList();
+      return subscribedList.map((model) => model.toString()).toList();
     } catch (e) {
       return [];
     }
   }
 
   // Check if channel is subscribed
-  static Future<bool> isChannelSubscribed(int channelId) async {
+  static Future<bool> isChannelSubscribed(String channelRssLink) async {
     final channels = await getSubscribedChannels();
-    return channels.any((channel) => channel.channelId == channelId);
+    return channels.any((channel) => channel == channelRssLink);
   }
 
   // Subscribe to a channel
-  static Future<bool> subscribeChannel(RssChannel channel) async {
+  static Future<bool> subscribeChannel(String channelRssLink) async {
     try {
       final prefs = await SharedPreferences.getInstance();
 
       // Get current subscriptions
-      List<RssChannel> channels = await getSubscribedChannels();
+      List<String> channels = await getSubscribedChannels();
 
       // Check if already subscribed
-      if (channels.any((c) => c.channelId == channel.channelId)) {
+      if (channels.any((c) => c == channelRssLink)) {
         return false;
       }
 
       // Add new channel
-      channels.add(channel);
+      channels.add(channelRssLink);
 
       // Save updated list
       await prefs.setString(_subscribedChannelsKey,
-          json.encode(channels.map((c) => c.toJson()).toList()));
+          json.encode(channels.map((c) => c.toString()).toList()));
 
       return true;
     } catch (e) {
@@ -55,38 +54,24 @@ class RssManager {
   }
 
   // Unsubscribe from a channel
-  static Future<bool> unsubscribeChannel(int channelId) async {
+  static Future<bool> unsubscribeChannel(String channelRssLink) async {
     try {
       final prefs = await SharedPreferences.getInstance();
 
       // Get current subscriptions
-      List<RssChannel> channels = await getSubscribedChannels();
+      List<String> channels = await getSubscribedChannels();
 
       // Remove the channel
-      channels.removeWhere((c) => c.channelId == channelId);
+      channels.removeWhere((c) => c == channelRssLink);
 
       // Save updated list
       await prefs.setString(_subscribedChannelsKey,
-          json.encode(channels.map((c) => c.toJson()).toList()));
+          json.encode(channels.map((c) => c.toString()).toList()));
 
       return true;
     } catch (e) {
       return false;
     }
-  }
-
-  // Get recent RSS channels from all subscriptions
-  static Future<List<RssChannel>> getRecentChannels({int limit = 5}) async {
-    final channels = await getSubscribedChannels();
-
-    // Sort by rank (higher rank first)
-    channels.sort((a, b) => b.channelRank.compareTo(a.channelRank));
-
-    // Return limited number
-    if (channels.length > limit) {
-      return channels.sublist(0, limit);
-    }
-    return channels;
   }
 
   // Clear all subscriptions (for testing or reset)
