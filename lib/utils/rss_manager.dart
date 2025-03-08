@@ -5,7 +5,7 @@ class RssManager {
   static const String _subscribedChannelsKey = 'subscribed_channels';
 
   // Get all subscribed channels
-  static Future<List<String>> getSubscribedChannels() async {
+  static Future<List<String>> getSubscribedChannelLinks() async {
     final prefs = await SharedPreferences.getInstance();
     final String? subscribedJson = prefs.getString(_subscribedChannelsKey);
 
@@ -23,7 +23,7 @@ class RssManager {
 
   // Check if channel is subscribed
   static Future<bool> isChannelSubscribed(String channelRssLink) async {
-    final channels = await getSubscribedChannels();
+    final channels = await getSubscribedChannelLinks();
     return channels.any((channel) => channel == channelRssLink);
   }
 
@@ -33,7 +33,7 @@ class RssManager {
       final prefs = await SharedPreferences.getInstance();
 
       // Get current subscriptions
-      List<String> channels = await getSubscribedChannels();
+      List<String> channels = await getSubscribedChannelLinks();
 
       // Check if already subscribed
       if (channels.any((c) => c == channelRssLink)) {
@@ -59,7 +59,7 @@ class RssManager {
       final prefs = await SharedPreferences.getInstance();
 
       // Get current subscriptions
-      List<String> channels = await getSubscribedChannels();
+      List<String> channels = await getSubscribedChannelLinks();
 
       // Remove the channel
       channels.removeWhere((c) => c == channelRssLink);

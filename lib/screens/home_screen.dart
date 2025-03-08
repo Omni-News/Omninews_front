@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_flutter/screens/bookmark_screen.dart';
+import 'package:omninews_flutter/screens/subscribe_screen.dart';
 import 'package:omninews_flutter/screens/explore_screen.dart';
 import 'package:omninews_flutter/screens/news_screen.dart';
 import 'package:omninews_flutter/screens/rss_screen.dart';
@@ -23,7 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     // NewsScreen에 scaffoldKey를 전달합니다
     _pages = [
-      const BookmarkScreen(),
+      const SubscribeScreen(),
       const RssScreen(),
       const NewsScreen(),
       const ExploreScreen(),

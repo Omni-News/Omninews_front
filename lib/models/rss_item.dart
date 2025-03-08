@@ -34,4 +34,19 @@ class RssItem {
       rssImageLink: json['rss_image_link'],
     );
   }
+
+  // JSON으로 변환하는 메서드 추가
+  Map<String, dynamic> toJson() {
+    return {
+      'rss_id': rssId,
+      'channel_id': channelId,
+      'rss_title': rssTitle,
+      'rss_description': rssDescription,
+      'rss_link': rssLink,
+      'rss_author': rssAuthor,
+      'rss_pub_date': rssPubDate,
+      'rss_rank': rssRank,
+      'rss_image_link': rssImageLink,
+    };
+  }
 }
