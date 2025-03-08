@@ -28,10 +28,10 @@ class RssService {
   }
 
   // 특정 채널의 아이템 가져오기
-  static Future<List<RssItem>> fetchChannelItems(String channelTitle) async {
+  static Future<List<RssItem>> fetchChannelItems(String channelRssLink) async {
     try {
       final response = await http
-          .get(Uri.parse('$baseUrl/rss/items?channel_title=$channelTitle'));
+          .get(Uri.parse('$baseUrl/rss/items?channel_link=$channelRssLink'));
 
       if (response.statusCode == 200) {
         String decodedResponse = utf8.decode(response.bodyBytes);
@@ -176,7 +176,7 @@ class RssService {
   // 사용자 구독 RSS 채널 가져오기
   static Future<List<RssChannel>> fetchSubscribedChannels() async {
     try {
-      List<String> subscribeList = await RssManager.getSubscribedChannels();
+      List<String> subscribeList = await RssManager.getSubscribedChannelLinks();
       debugPrint('subscribeList: $subscribeList');
 
       List<RssChannel> subscribedChannels = [];

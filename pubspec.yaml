@@ -41,6 +41,7 @@ dependencies:
   share_plus: ^7.0.2
   webview_flutter: ^4.2.2
   cached_network_image: ^3.4.1
+  sticky_headers: "^0.3.0+2"
 
   # the following adds the cupertino icons font to your application.
   # use with the cupertinoicons class for ios style icons.
