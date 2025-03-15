@@ -4,10 +4,11 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class NewsService {
+  static const String baseUrl = 'http://61.253.113.42:1027';
   static Future<List<News>> fetchNews(String category) async {
     try {
       final response = await http.get(
-        Uri.parse("http://127.0.0.1:8080/news?category=$category"),
+        Uri.parse("$baseUrl/news?category=$category"),
         headers: {
           "Content-Type": "application/json; charset=UTF-8",
         },
@@ -31,7 +32,7 @@ class NewsService {
     try {
       final response = await http.get(
           Uri.parse(
-              'http://127.0.0.1:8080/news/api?query=$category&display=$display&sort=$sort'),
+              '$baseUrl/news/api?query=$category&display=$display&sort=$sort'),
           headers: {
             "Content-Type": "application/json; charset=UTF-8",
           });

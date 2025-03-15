@@ -2,16 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/news.dart';
 import 'package:omninews_flutter/screens/news_detail_screen.dart';
 import 'package:intl/intl.dart'; // 날짜 포맷팅용
+import 'package:omninews_flutter/services/news_bookmark_service.dart';
 
-class NewsListView extends StatelessWidget {
+class NewsListView extends StatefulWidget {
   final Future<List<News>> newsList;
+  final VoidCallback? onBookmarkChanged;
 
-  const NewsListView({super.key, required this.newsList});
+  const NewsListView({
+    super.key, 
+    required this.newsList,
+    this.onBookmarkChanged,
+  });
+
+  @override
+  State<NewsListView> createState() => _NewsListViewState();
+}
+
+class _NewsListViewState extends State<NewsListView> {
+  final Map<String, bool> _bookmarkStatus = {};
+  final Map<String, bool> _loadingStatus = {};
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<News>>(
-      future: newsList,
+      future: widget.newsList,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(
@@ -47,6 +61,14 @@ class NewsListView extends StatelessWidget {
           );
         } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
           List<News> data = snapshot.data!;
+          
+          // 각 뉴스의 북마크 상태 확인
+          for (var news in data) {
+            if (!_bookmarkStatus.containsKey(news.newsLink)) {
+              _checkBookmarkStatus(news.newsLink);
+            }
+          }
+          
           return ListView.builder(
             padding: const EdgeInsets.only(top: 8),
             itemCount: data.length,
@@ -56,7 +78,7 @@ class NewsListView extends StatelessWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => RssDetailScreen(news: data[index]),
+                      builder: (context) => NewsDetailScreen(news: data[index]),
                     ),
                   );
                 },
@@ -71,17 +93,47 @@ class NewsListView extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 뉴스 제목
-                            Text(
-                              data[index].newsTitle,
-                              style: const TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black,
-                                height: 1.3,
-                              ),
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
+                            // 뉴스 제목과 북마크 버튼
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    data[index].newsTitle,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.black,
+                                      height: 1.3,
+                                    ),
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                // 북마크 버튼 추가
+                                IconButton(
+                                  padding: EdgeInsets.zero,
+                                  constraints: const BoxConstraints(),
+                                  icon: _loadingStatus[data[index].newsLink] == true
+                                    ? const SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : Icon(
+                                        _bookmarkStatus[data[index].newsLink] == true
+                                            ? Icons.bookmark
+                                            : Icons.bookmark_border,
+                                        color: _bookmarkStatus[data[index].newsLink] == true
+                                            ? Colors.blue
+                                            : Colors.grey,
+                                        size: 20,
+                                      ),
+                                  onPressed: () => _toggleBookmark(data[index]),
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 6),
 
@@ -157,6 +209,62 @@ class NewsListView extends StatelessWidget {
     );
   }
 
+  // 북마크 상태 확인
+  Future<void> _checkBookmarkStatus(String newsLink) async {
+    final isBookmarked = await NewsBookmarkService.isNewsBookmarked(newsLink);
+    if (mounted) {
+      setState(() {
+        _bookmarkStatus[newsLink] = isBookmarked;
+      });
+    }
+  }
+
+  // 북마크 토글
+  Future<void> _toggleBookmark(News news) async {
+    if (_loadingStatus[news.newsLink] == true) return;
+
+    setState(() {
+      _loadingStatus[news.newsLink] = true;
+    });
+
+    try {
+      bool success;
+      if (_bookmarkStatus[news.newsLink] == true) {
+        success = await NewsBookmarkService.removeNewsBookmark(news.newsLink);
+      } else {
+        success = await NewsBookmarkService.addNewsBookmark(news);
+      }
+
+      if (success && mounted) {
+        setState(() {
+          _bookmarkStatus[news.newsLink] = !(_bookmarkStatus[news.newsLink] ?? false);
+        });
+
+        // 북마크 상태 변경 시 콜백 호출
+        if (widget.onBookmarkChanged != null) {
+          widget.onBookmarkChanged!();
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_bookmarkStatus[news.newsLink] == true
+                ? '북마크에 추가되었습니다'
+                : '북마크에서 제거되었습니다'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error toggling bookmark: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingStatus[news.newsLink] = false;
+        });
+      }
+    }
+  }
+
   // 썸네일 이미지 위젯
   Widget _buildThumbnail(String imageUrl) {
     return SizedBox(
@@ -222,4 +330,3 @@ class NewsListView extends StatelessWidget {
     return description;
   }
 }
-

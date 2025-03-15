@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 class News {
   final int newsId;
   final String newsTitle;
@@ -27,6 +29,18 @@ class News {
       newsPubDate: json['news_pub_date'] ?? 'Unknown',
       newsImageLink: json['news_image_link'] ?? '',
     );
+  }
+
+  toJson() {
+    return {
+      'news_id': newsId,
+      'news_title': newsTitle,
+      'news_description': newsDescription,
+      'news_link': newsLink,
+      'news_source': newsSource,
+      'news_pub_date': newsPubDate,
+      'news_image_link': newsImageLink,
+    };
   }
 }
 
@@ -63,5 +77,15 @@ class NewsApi {
   // HTML 태그가 제거된 설명
   String get plainDescription {
     return newsDescription.replaceAll(RegExp(r'<[^>]*>'), '');
+  }
+
+  toJson() {
+    return {
+      'news_title': newsTitle,
+      'news_description': newsDescription,
+      'news_link': newsLink,
+      'news_original_link': newsOriginalLink,
+      'news_pub_date': newsPubDate,
+    };
   }
 }

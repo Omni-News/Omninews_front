@@ -7,7 +7,7 @@ import 'package:omninews_flutter/utils/rss_manager.dart';
 
 class RssService {
   static const String baseUrl =
-      'http://127.0.0.1:8080'; // Replace with your actual API endpoint
+      'http://61.253.113.42:1027'; // Replace with your actual API endpoint
   static Future<List<RssChannel>> fetchRecommendedChannels() async {
     try {
       final response =

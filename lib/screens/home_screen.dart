@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:omninews_flutter/screens/subscribe_screen.dart';
-import 'package:omninews_flutter/screens/explore_screen.dart';
+import 'package:omninews_flutter/screens/bookmark_screen.dart';
 import 'package:omninews_flutter/screens/news_screen.dart';
 import 'package:omninews_flutter/screens/rss_screen.dart';
 import 'package:omninews_flutter/screens/search_screen.dart';
@@ -26,7 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
       const SubscribeScreen(),
       const RssScreen(),
       const NewsScreen(),
-      const ExploreScreen(),
+      const BookmarkScreen(),
       const SearchScreen(),
     ];
   }
@@ -105,8 +105,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () {},
                   ),
                   ListTile(
-                    leading: const Icon(Icons.bookmark_border),
-                    title: const Text('Bookmarks'),
+                    leading: const Icon(Icons.subscriptions_outlined),
+                    title: const Text('Subscriptions'),
                     dense: true,
                     onTap: () {
                       Navigator.pop(context);
@@ -132,8 +132,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
                   ListTile(
-                    leading: const Icon(Icons.explore_outlined),
-                    title: const Text('Explore'),
+                    leading: const Icon(Icons.bookmark_outline_sharp),
+                    title: const Text('Bookmarks'),
                     dense: true,
                     onTap: () {
                       Navigator.pop(context);
@@ -219,9 +219,9 @@ class _HomeScreenState extends State<HomeScreen> {
           elevation: 9,
           items: const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.bookmark_border),
-              activeIcon: Icon(Icons.bookmark),
-              label: 'Bookmark',
+              icon: Icon(Icons.subscriptions_outlined),
+              activeIcon: Icon(Icons.subscriptions),
+              label: 'Sub',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.rss_feed_outlined),
@@ -234,9 +234,9 @@ class _HomeScreenState extends State<HomeScreen> {
               label: 'News',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.explore_outlined),
-              activeIcon: Icon(Icons.explore),
-              label: 'Explore',
+              icon: Icon(Icons.bookmarks_outlined),
+              activeIcon: Icon(Icons.bookmarks),
+              label: 'Bookmarks',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.search_outlined),
