@@ -1,25 +1,24 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_flutter/models/rss_item.dart';
-import 'package:omninews_flutter/services/subscribe_service.dart';
 import 'package:intl/intl.dart';
+import 'package:omninews_flutter/models/news.dart';
+import 'package:omninews_flutter/services/news_bookmark_service.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
-class RssItemCard extends StatefulWidget {
-  final RssItem item;
-  final VoidCallback? onBookmarkChanged; // 북마크 상태 변경 시 실행할 콜백
+class NewsItemCard extends StatefulWidget {
+  final News news;
+  final VoidCallback? onBookmarkChanged;
 
-  const RssItemCard({
-    super.key, 
-    required this.item,
-    this.onBookmarkChanged, // 콜백 추가
+  const NewsItemCard({
+    super.key,
+    required this.news,
+    this.onBookmarkChanged,
   });
 
   @override
-  State<RssItemCard> createState() => _RssItemCardState();
+  State<NewsItemCard> createState() => _NewsItemCardState();
 }
 
-class _RssItemCardState extends State<RssItemCard> {
+class _NewsItemCardState extends State<NewsItemCard> {
   bool _isBookmarked = false;
   bool _isLoading = false;
 
@@ -31,7 +30,7 @@ class _RssItemCardState extends State<RssItemCard> {
 
   Future<void> _checkBookmarkStatus() async {
     final isBookmarked =
-        await SubscribeService.isBookmarked(widget.item.rssLink);
+        await NewsBookmarkService.isAnyBookmarked(widget.news.newsLink);
     if (mounted) {
       setState(() {
         _isBookmarked = isBookmarked;
@@ -50,9 +49,9 @@ class _RssItemCardState extends State<RssItemCard> {
       bool success;
       if (_isBookmarked) {
         success =
-            await SubscribeService.removeLocalBookmark(widget.item.rssLink);
+            await NewsBookmarkService.removeNewsBookmark(widget.news.newsLink);
       } else {
-        success = await SubscribeService.addLocalBookmark(widget.item);
+        success = await NewsBookmarkService.addNewsBookmark(widget.news);
       }
 
       if (success && mounted) {
@@ -60,7 +59,7 @@ class _RssItemCardState extends State<RssItemCard> {
           _isBookmarked = !_isBookmarked;
         });
 
-        // 북마크 상태가 변경되면 콜백 호출
+        // 북마크 변경 콜백 실행
         if (widget.onBookmarkChanged != null) {
           widget.onBookmarkChanged!();
         }
@@ -76,7 +75,7 @@ class _RssItemCardState extends State<RssItemCard> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('오류가 발생했습니다: $e'),
+            content: Text('북마크 변경 중 오류가 발생했습니다: $e'),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -90,9 +89,12 @@ class _RssItemCardState extends State<RssItemCard> {
     }
   }
 
-  Future<void> _openArticle(BuildContext context) async {
-    if (!await launchUrl(Uri.parse(widget.item.rssLink))) {
-      if (context.mounted) {
+  Future<void> _openNewsLink() async {
+    Uri uri = Uri.parse(widget.news.newsLink);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('링크를 열 수 없습니다'),
@@ -103,55 +105,12 @@ class _RssItemCardState extends State<RssItemCard> {
     }
   }
 
-  // 날짜 포맷팅
-  String _formatDate(String dateStr) {
-    try {
-      final date = DateTime.parse(dateStr);
-      final now = DateTime.now();
-      final difference = now.difference(date);
-
-      if (difference.inMinutes < 60) {
-        return '${difference.inMinutes}분 전';
-      } else if (difference.inHours < 24) {
-        return '${difference.inHours}시간 전';
-      } else if (difference.inDays < 7) {
-        return '${difference.inDays}일 전';
-      } else {
-        return DateFormat('MM/dd').format(date);
-      }
-    } catch (e) {
-      return dateStr;
-    }
-  }
-
-  // URL이 유효한지 확인
-  bool _isValidImageUrl(String? url) {
-    if (url == null || url.isEmpty) {
-      return false;
-    }
-
-    try {
-      final uri = Uri.parse(url);
-      return uri.scheme.isNotEmpty && uri.host.isNotEmpty;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  // 설명 텍스트 자르기
-  String _truncateDescription(String description) {
-    if (description.length > 100) {
-      return '${description.substring(0, 100)}...';
-    }
-    return description;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final bool hasValidImage = _isValidImageUrl(widget.item.rssImageLink);
+    final bool hasValidImage = _isValidImageUrl(widget.news.newsImageLink);
 
     return InkWell(
-      onTap: () => _openArticle(context),
+      onTap: _openNewsLink,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         child: Row(
@@ -169,7 +128,7 @@ class _RssItemCardState extends State<RssItemCard> {
                     children: [
                       Expanded(
                         child: Text(
-                          widget.item.rssTitle,
+                          widget.news.newsTitle,
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -208,7 +167,7 @@ class _RssItemCardState extends State<RssItemCard> {
 
                   // 뉴스 내용 요약
                   Text(
-                    _truncateDescription(widget.item.rssDescription),
+                    _truncateDescription(widget.news.newsDescription),
                     style: TextStyle(
                       fontSize: 14,
                       color: Colors.grey[700],
@@ -222,9 +181,8 @@ class _RssItemCardState extends State<RssItemCard> {
                   // 출처 및 날짜
                   Row(
                     children: [
-                      // 소스 도메인 표시
                       Text(
-                        _getSourceName(widget.item.rssLink),
+                        widget.news.newsSource,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -232,10 +190,8 @@ class _RssItemCardState extends State<RssItemCard> {
                         ),
                       ),
                       const SizedBox(width: 8),
-
-                      // 게시일 표시
                       Text(
-                        _formatDate(widget.item.rssPubDate),
+                        _formatDate(widget.news.newsPubDate),
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[600],
@@ -265,45 +221,64 @@ class _RssItemCardState extends State<RssItemCard> {
       height: 75,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(4),
-        child: CachedNetworkImage(
-          imageUrl: widget.item.rssImageLink!,
+        child: Image.network(
+          widget.news.newsImageLink,
           fit: BoxFit.cover,
-          placeholder: (context, url) => Container(
-            color: Colors.grey[200],
-            child: const Center(
-              child: Icon(
-                Icons.image_outlined,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: Colors.grey[200],
+              child: const Icon(
+                Icons.image_not_supported_outlined,
                 color: Colors.grey,
                 size: 24,
               ),
-            ),
-          ),
-          errorWidget: (context, url, error) => Container(
-            color: Colors.grey[200],
-            child: const Icon(
-              Icons.image_not_supported_outlined,
-              color: Colors.grey,
-              size: 24,
-            ),
-          ),
-          errorListener: (_) => {}, // 로그 출력 억제
+            );
+          },
         ),
       ),
     );
   }
 
-  // URL에서 도메인 이름 추출
-  String _getSourceName(String url) {
+  // URL이 유효한지 확인
+  bool _isValidImageUrl(String? url) {
+    if (url == null || url.isEmpty) {
+      return false;
+    }
+
     try {
       final uri = Uri.parse(url);
-      String domain = uri.host;
-      // www. 제거
-      if (domain.startsWith('www.')) {
-        domain = domain.substring(4);
-      }
-      return domain;
+      return uri.scheme.isNotEmpty && uri.host.isNotEmpty;
     } catch (e) {
-      return 'source';
+      return false;
+    }
+  }
+
+  // 설명 텍스트 자르기
+  String _truncateDescription(String description) {
+    if (description.length > 100) {
+      return '${description.substring(0, 100)}...';
+    }
+    return description;
+  }
+
+  // 날짜 포맷팅
+  String _formatDate(String dateStr) {
+    try {
+      final date = DateTime.parse(dateStr);
+      final now = DateTime.now();
+      final difference = now.difference(date);
+
+      if (difference.inMinutes < 60) {
+        return '${difference.inMinutes}분 전';
+      } else if (difference.inHours < 24) {
+        return '${difference.inHours}시간 전';
+      } else if (difference.inDays < 7) {
+        return '${difference.inDays}일 전';
+      } else {
+        return DateFormat('MM/dd').format(date);
+      }
+    } catch (e) {
+      return dateStr;
     }
   }
 }

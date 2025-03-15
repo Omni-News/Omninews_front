@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_flutter/models/news.dart';
-import 'package:omninews_flutter/services/news_api_service.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:intl/intl.dart';
+import 'package:omninews_flutter/services/unified_search_service.dart';
+import 'package:omninews_flutter/widgets/news_api_item_card.dart';
+import 'package:omninews_flutter/widgets/search_rss_channel_card.dart';
+import 'package:omninews_flutter/widgets/search_rss_item_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -14,52 +14,115 @@ class SearchScreen extends StatefulWidget {
 
 class SearchScreenState extends State<SearchScreen> {
   final TextEditingController _controller = TextEditingController();
-  List<NewsApi> _searchResult = [];
+  final FocusNode _focusNode = FocusNode(); // 검색창 포커스 관리용
+
+  // 검색 결과 상태 관리
+  UnifiedSearchResult? _searchResult;
   bool _isLoading = false;
   bool _hasSearched = false;
-  String _sortOption = 'sim'; // 기본값은 정확도순
+  String _sortOption = 'sim';
+  String _lastQuery = ''; // 마지막 검색어 저장
+
+  // 결과 필터링
+  bool _showNews = true;
+  bool _showRssItems = true;
+  bool _showChannels = true;
 
   @override
   void initState() {
     super.initState();
+    _controller.addListener(_onTextChanged); // 텍스트 변경 리스너 추가
     // 포커스 및 키보드 자동 표시
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      FocusScope.of(context).requestFocus(FocusNode());
+      FocusScope.of(context).requestFocus(_focusNode);
     });
   }
 
+  @override
+  void dispose() {
+    _controller.removeListener(_onTextChanged);
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  // 텍스트 필드 변경 감지
+  void _onTextChanged() {
+    // 필요 시 상태 업데이트 (예: 지우기 버튼 표시/숨김)
+    setState(() {});
+  }
+
+  // 검색 실행 함수
   void _search(String query) async {
+    // 검색어가 비어있을 경우 반환
     if (query.trim().isEmpty) return;
 
+    // 로딩 상태 설정 및 마지막 검색어 저장
     setState(() {
       _isLoading = true;
       _hasSearched = true;
+      _lastQuery = query;
+      // 검색 시작 시 이전 결과 초기화
+      _searchResult = null;
     });
 
     try {
-      List<NewsApi> result =
-          await NewsApiService.fetchNews(query, 20, _sortOption);
-      setState(() {
-        _searchResult = result;
-      });
+      // 새로운 검색 실행
+      final result =
+          await UnifiedSearchService.search(query, sort: _sortOption);
+
+      // UI 업데이트를 확실히 하기 위해 mounted 체크 후 상태 업데이트
+      if (mounted) {
+        setState(() {
+          _searchResult = result;
+          _isLoading = false;
+
+          // 검색 결과가 있으면 기본 필터 설정 (모두 보기)
+          if (result.newsResults.isNotEmpty ||
+              result.rssItemResults.isNotEmpty ||
+              result.rssChannelResults.isNotEmpty) {
+            _showNews = true;
+            _showRssItems = true;
+            _showChannels = true;
+          }
+        });
+      }
     } catch (e) {
-      setState(() {
-        _searchResult = [];
-      });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      // 오류 발생 시 처리
+      if (mounted) {
+        setState(() {
+          _searchResult = UnifiedSearchResult(
+            newsResults: [],
+            rssItemResults: [],
+            rssChannelResults: [],
+          );
+          _isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('검색 중 오류가 발생했습니다: $e')),
+        );
+      }
     }
   }
 
-  void _launchURL(String url) async {
-    final Uri uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      throw 'Could not launch $url';
+  // 검색 버튼 클릭 또는 엔터 키 입력 처리
+  void _handleSearch() {
+    final query = _controller.text;
+    if (query.isNotEmpty) {
+      _search(query);
+      // 키보드 숨기기
+      FocusScope.of(context).unfocus();
     }
+  }
+
+  // 검색 필드 초기화
+  void _clearSearch() {
+    _controller.clear();
+    // 포커스 주기
+    _focusNode.requestFocus();
+    // UI 갱신
+    setState(() {});
   }
 
   // 정렬 옵션 변경
@@ -70,8 +133,8 @@ class SearchScreenState extends State<SearchScreen> {
       });
 
       // 이미 검색한 결과가 있다면 새 정렬 옵션으로 재검색
-      if (_hasSearched && _controller.text.isNotEmpty) {
-        _search(_controller.text);
+      if (_hasSearched && _lastQuery.isNotEmpty) {
+        _search(_lastQuery);
       }
     }
   }
@@ -139,7 +202,6 @@ class SearchScreenState extends State<SearchScreen> {
         Navigator.of(context).popUntil((route) => route.isFirst);
 
         // 새로 추가된 카테고리로 이동하기 위한 인덱스를 SharedPreferences에 저장
-        // NewsScreen에서 이 값을 확인하여 해당 탭으로 이동
         await prefs.setInt('select_category_index', -1); // -1은 마지막 카테고리를 의미
       }
     } catch (e) {
@@ -162,7 +224,7 @@ class SearchScreenState extends State<SearchScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         title: const Text(
-          'Search News',
+          'Search Contents',
           style: TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.bold,
@@ -176,97 +238,74 @@ class SearchScreenState extends State<SearchScreen> {
           // 검색창
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-            child: TextField(
-              controller: _controller,
-              decoration: InputDecoration(
-                hintText: '뉴스를 검색하세요...',
-                prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                suffixIcon: _controller.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear, color: Colors.grey),
-                        onPressed: () {
-                          _controller.clear();
-                        },
-                      )
-                    : null,
-                filled: true,
-                fillColor: Colors.grey[100],
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
+            child: Row(
+              children: [
+                // 검색 입력 필드
+                Expanded(
+                  child: TextField(
+                    controller: _controller,
+                    focusNode: _focusNode,
+                    decoration: InputDecoration(
+                      hintText: '뉴스, RSS 피드, 채널을 검색하세요...',
+                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                      suffixIcon: _controller.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, color: Colors.grey),
+                              onPressed: _clearSearch,
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: Colors.grey[100],
+                      contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide.none,
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide:
+                            const BorderSide(color: Colors.blue, width: 1),
+                      ),
+                    ),
+                    onSubmitted: _search, // 직접 search 메서드 호출
+                    textInputAction: TextInputAction.search,
+                  ),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: const BorderSide(color: Colors.blue, width: 1),
-                ),
-              ),
-              onSubmitted: _search,
-              textInputAction: TextInputAction.search,
+
+                // 검색 버튼 추가 (텍스트가 있을 때만)
+                if (_controller.text.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _handleSearch,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                    ),
+                    child: const Text('검색'),
+                  ),
+                ],
+              ],
             ),
           ),
 
-          // 카테고리 추가 및 정렬 옵션 (검색 후에만 표시)
-          if (_hasSearched && _searchResult.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-              child: Row(
-                children: [
-                  // 카테고리 추가 버튼 (왼쪽에 배치)
-                  InkWell(
-                    onTap: () => _addToNewsCategories(_controller.text),
-                    borderRadius: BorderRadius.circular(16),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.withValues(),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                            color: Colors.blue.withValues(), width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            "카테고리에 추가",
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.blue[700],
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(Icons.add_circle_outline,
-                              size: 14, color: Colors.blue[700]),
-                        ],
-                      ),
-                    ),
-                  ),
+          // 검색 결과가 있을 때의 옵션 바
+          if (_hasSearched && _searchResult != null && !_isLoading)
+            _buildSearchOptionsBar(),
 
-                  const Spacer(),
-
-                  // 정렬 옵션 (오른쪽에 배치)
-                  _buildSortOption(
-                    context: context,
-                    label: "정확순",
-                    isSelected: _sortOption == "sim",
-                    onTap: () => _updateSortOption("sim"),
-                  ),
-                  const SizedBox(width: 16),
-                  _buildSortOption(
-                    context: context,
-                    label: "최신순",
-                    isSelected: _sortOption == "date",
-                    onTap: () => _updateSortOption("date"),
-                  ),
-                ],
-              ),
-            ),
+          // 결과 필터 칩
+          if (_hasSearched &&
+              _searchResult != null &&
+              !_isLoading &&
+              _hasResults())
+            _buildFilterChips(),
 
           // 검색 결과
           Expanded(
@@ -275,80 +314,300 @@ class SearchScreenState extends State<SearchScreen> {
                     child: CircularProgressIndicator(color: Colors.blue))
                 : !_hasSearched
                     ? _buildInitialView()
-                    : _searchResult.isEmpty
+                    : !_hasResults()
                         ? _buildEmptyResultView()
-                        : ListView.separated(
-                            padding: const EdgeInsets.only(top: 4, bottom: 16),
-                            itemCount: _searchResult.length,
-                            separatorBuilder: (context, index) => const Divider(
-                                height: 1, indent: 16, endIndent: 16),
-                            itemBuilder: (context, index) {
-                              final item = _searchResult[index];
-                              return InkWell(
-                                onTap: () => _launchURL(item.newsOriginalLink),
-                                child: Padding(
-                                  padding:
-                                      const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      // 뉴스 제목
-                                      Text(
-                                        _removeHtmlTags(item.newsTitle),
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.black,
-                                          height: 1.3,
-                                        ),
-                                        maxLines: 3,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 6),
+                        : _buildSearchResultsList(),
+          ),
+        ],
+      ),
+    );
+  }
 
-                                      // 뉴스 내용 요약
-                                      Text(
-                                        _truncateDescription(_removeHtmlTags(
-                                            item.newsDescription)),
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: Colors.grey[700],
-                                          height: 1.2,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 8),
+  // 검색 옵션 바
+  Widget _buildSearchOptionsBar() {
+    bool hasResults = _hasResults();
 
-                                      // 출처 및 날짜
-                                      Row(
-                                        children: [
-                                          Text(
-                                            _extractDomain(
-                                                item.newsOriginalLink),
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w500,
-                                              color: Colors.blue[700],
-                                            ),
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            _formatDate(item.newsPubDate),
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey[600],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 4, 16, hasResults ? 0 : 4),
+      child: Row(
+        children: [
+          // 카테고리 추가 버튼 (왼쪽에 배치)
+          InkWell(
+            onTap: () => _addToNewsCategories(_lastQuery), // _lastQuery 사용
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.blue[100]!, width: 1),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    "카테고리에 추가",
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.blue[700],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(Icons.add_circle_outline,
+                      size: 14, color: Colors.blue[700]),
+                ],
+              ),
+            ),
+          ),
+
+          const Spacer(),
+
+          // 정렬 옵션 (오른쪽에 배치)
+          _buildSortOption(
+            context: context,
+            label: "정확순",
+            isSelected: _sortOption == "sim",
+            onTap: () => _updateSortOption("sim"),
+          ),
+          const SizedBox(width: 16),
+          _buildSortOption(
+            context: context,
+            label: "인기순",
+            isSelected: _sortOption == "pop",
+            onTap: () => _updateSortOption("pop"),
+          ),
+          const SizedBox(width: 16),
+          _buildSortOption(
+            context: context,
+            label: "최신순",
+            isSelected: _sortOption == "date",
+            onTap: () => _updateSortOption("date"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 검색 결과 필터 칩
+  Widget _buildFilterChips() {
+    // 모든 필터가 꺼져있으면 하나라도 활성화 (최소 하나는 항상 선택되도록)
+    if (!_showNews && !_showRssItems && !_showChannels) {
+      setState(() {
+        _showNews = true; // 기본적으로 뉴스는 항상 표시
+      });
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            _buildFilterChip(
+              label: '뉴스',
+              count: _searchResult!.newsResults.length,
+              isSelected: _showNews,
+              onTap: () => setState(() => _showNews = !_showNews),
+            ),
+            const SizedBox(width: 8),
+            _buildFilterChip(
+              label: 'RSS 피드',
+              count: _searchResult!.rssItemResults.length,
+              isSelected: _showRssItems,
+              onTap: () => setState(() => _showRssItems = !_showRssItems),
+            ),
+            const SizedBox(width: 8),
+            _buildFilterChip(
+              label: '채널',
+              count: _searchResult!.rssChannelResults.length,
+              isSelected: _showChannels,
+              onTap: () => setState(() => _showChannels = !_showChannels),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 필터 칩 위젯
+  Widget _buildFilterChip({
+    required String label,
+    required int count,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.blue[50] : Colors.grey[100],
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? Colors.blue[300]! : Colors.grey[300]!,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: isSelected ? Colors.blue[700] : Colors.grey[700],
+              ),
+            ),
+            const SizedBox(width: 4),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isSelected ? Colors.blue[100] : Colors.grey[200],
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                count.toString(),
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.blue[700] : Colors.grey[700],
+                ),
+              ),
+            ),
+            const SizedBox(width: 2),
+            Icon(
+              isSelected ? Icons.check_circle : Icons.circle_outlined,
+              size: 16,
+              color: isSelected ? Colors.blue[400] : Colors.grey[400],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 검색 결과 리스트 구성
+  Widget _buildSearchResultsList() {
+    List<Widget> resultWidgets = [];
+
+    // 뉴스 결과
+    if (_showNews && _searchResult!.newsResults.isNotEmpty) {
+      // 뉴스 섹션 헤더 (필요한 경우)
+      if ((_showRssItems && _searchResult!.rssItemResults.isNotEmpty) ||
+          (_showChannels && _searchResult!.rssChannelResults.isNotEmpty)) {
+        resultWidgets
+            .add(_buildSectionHeader('뉴스', _searchResult!.newsResults.length));
+      }
+
+      // 뉴스 결과 목록
+      for (var i = 0; i < _searchResult!.newsResults.length; i++) {
+        resultWidgets.add(NewsApiItemCard(
+          news: _searchResult!.newsResults[i],
+          onBookmarkChanged: () {
+            setState(() {});
+          },
+        ));
+
+        if (i < _searchResult!.newsResults.length - 1 ||
+            (_showRssItems && _searchResult!.rssItemResults.isNotEmpty) ||
+            (_showChannels && _searchResult!.rssChannelResults.isNotEmpty)) {
+          resultWidgets
+              .add(const Divider(height: 1, indent: 16, endIndent: 16));
+        }
+      }
+    }
+
+    // RSS 피드 결과
+    if (_showRssItems && _searchResult!.rssItemResults.isNotEmpty) {
+      // RSS 피드 섹션 헤더 (필요한 경우)
+      if ((_showNews && _searchResult!.newsResults.isNotEmpty) ||
+          (_showChannels && _searchResult!.rssChannelResults.isNotEmpty)) {
+        resultWidgets.add(_buildSectionHeader(
+            'RSS 피드', _searchResult!.rssItemResults.length));
+      }
+
+      // RSS 피드 결과 목록
+      for (var i = 0; i < _searchResult!.rssItemResults.length; i++) {
+        resultWidgets.add(SearchRssItemCard(
+          item: _searchResult!.rssItemResults[i],
+          onBookmarkChanged: () {
+            setState(() {});
+          },
+        ));
+
+        if (i < _searchResult!.rssItemResults.length - 1 ||
+            (_showChannels && _searchResult!.rssChannelResults.isNotEmpty)) {
+          resultWidgets
+              .add(const Divider(height: 1, indent: 16, endIndent: 16));
+        }
+      }
+    }
+
+    // 채널 결과
+    if (_showChannels && _searchResult!.rssChannelResults.isNotEmpty) {
+      // 채널 섹션 헤더 (필요한 경우)
+      if ((_showNews && _searchResult!.newsResults.isNotEmpty) ||
+          (_showRssItems && _searchResult!.rssItemResults.isNotEmpty)) {
+        resultWidgets.add(
+            _buildSectionHeader('채널', _searchResult!.rssChannelResults.length));
+      }
+
+      // 채널 결과 목록
+      for (var i = 0; i < _searchResult!.rssChannelResults.length; i++) {
+        resultWidgets.add(SearchRssChannelCard(
+          channel: _searchResult!.rssChannelResults[i],
+          onSubscriptionChanged: () {
+            setState(() {});
+          },
+        ));
+
+        if (i < _searchResult!.rssChannelResults.length - 1) {
+          resultWidgets
+              .add(const Divider(height: 1, indent: 16, endIndent: 16));
+        }
+      }
+    }
+
+    return ListView(
+      padding: const EdgeInsets.only(top: 4, bottom: 16),
+      children: resultWidgets,
+    );
+  }
+
+  // 섹션 헤더 위젯
+  Widget _buildSectionHeader(String title, int count) {
+    return Container(
+      color: Colors.grey[50],
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.grey[800],
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              count.toString(),
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey[700],
+              ),
+            ),
           ),
         ],
       ),
@@ -370,6 +629,14 @@ class SearchScreenState extends State<SearchScreen> {
               color: Colors.grey[700],
             ),
           ),
+          const SizedBox(height: 8),
+          Text(
+            '뉴스, RSS 피드, 채널을 모두 검색할 수 있습니다',
+            style: TextStyle(
+              fontSize: 14,
+              color: Colors.grey[500],
+            ),
+          ),
         ],
       ),
     );
@@ -381,10 +648,10 @@ class SearchScreenState extends State<SearchScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.newspaper, size: 64, color: Colors.grey[400]),
+          Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
           const SizedBox(height: 16),
           Text(
-            '\'${_controller.text}\' 검색 결과가 없습니다',
+            '\'${_lastQuery}\' 검색 결과가 없습니다',
             style: TextStyle(
               fontSize: 16,
               color: Colors.grey[700],
@@ -416,7 +683,7 @@ class SearchScreenState extends State<SearchScreen> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.blue.withValues() : Colors.transparent,
+          color: isSelected ? Colors.blue[50] : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -444,58 +711,16 @@ class SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // HTML 태그 제거 유틸리티 함수
-  String _removeHtmlTags(String htmlString) {
-    RegExp exp = RegExp(r"<[^>]*>", multiLine: true, caseSensitive: true);
-    return htmlString.replaceAll(exp, '');
-  }
+  // 검색 결과가 있는지 확인
+  bool _hasResults() {
+    if (_searchResult == null) return false;
 
-  // 설명 텍스트 자르기
-  String _truncateDescription(String description) {
-    if (description.length > 100) {
-      return '${description.substring(0, 100)}...';
-    }
-    return description;
-  }
+    final hasNewsResults = _showNews && _searchResult!.newsResults.isNotEmpty;
+    final hasRssItemResults =
+        _showRssItems && _searchResult!.rssItemResults.isNotEmpty;
+    final hasChannelResults =
+        _showChannels && _searchResult!.rssChannelResults.isNotEmpty;
 
-  // 도메인 추출
-  String _extractDomain(String url) {
-    try {
-      final uri = Uri.parse(url);
-      String domain = uri.host;
-      if (domain.startsWith('www.')) {
-        domain = domain.substring(4);
-      }
-      return domain;
-    } catch (e) {
-      return url;
-    }
-  }
-
-  // 날짜 포맷팅
-  String _formatDate(String dateStr) {
-    try {
-      final date = DateTime.parse(dateStr);
-      final now = DateTime.now();
-      final difference = now.difference(date);
-
-      if (difference.inMinutes < 60) {
-        return '${difference.inMinutes}분 전';
-      } else if (difference.inHours < 24) {
-        return '${difference.inHours}시간 전';
-      } else if (difference.inDays < 7) {
-        return '${difference.inDays}일 전';
-      } else {
-        return DateFormat('MM/dd').format(date);
-      }
-    } catch (e) {
-      return dateStr;
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
+    return hasNewsResults || hasRssItemResults || hasChannelResults;
   }
 }

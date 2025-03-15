@@ -44,23 +44,29 @@ class SubscribeDateView extends StatelessWidget {
             itemBuilder: (context, index) {
               final date = itemsByDate.keys.elementAt(index);
               final items = itemsByDate[date]!;
+              final formattedDate = _formatDate(date);
 
               return StickyHeader(
-                header: _buildDateHeader(date, items.length),
+                header: _buildDateHeader(formattedDate, items.length),
                 content: Column(
                   children: [
                     // 아이템 목록
                     ...items.map((item) => Column(
-                      children: [
-                        RssItemCard(item: item),
-                        // 마지막 아이템이 아니면 구분선 추가
-                        if (items.indexOf(item) != items.length - 1)
-                          const Divider(height: 1, indent: 16, endIndent: 16),
-                      ],
-                    )).toList(),
-                    
+                          children: [
+                            RssItemCard(item: item),
+                            // 마지막 아이템이 아니면 구분선 추가
+                            if (items.indexOf(item) != items.length - 1)
+                              Divider(
+                                height: 1,
+                                indent: 16,
+                                endIndent: 16,
+                                color: Colors.grey.shade200,
+                              ),
+                          ],
+                        )),
+
                     // 날짜 섹션 구분선 - 마지막 날짜가 아니면 추가
-                    if (index < itemsByDate.length - 1) 
+                    if (index < itemsByDate.length - 1)
                       Container(
                         height: 8,
                         color: Colors.grey[100],
@@ -116,46 +122,73 @@ class SubscribeDateView extends StatelessWidget {
 
     return {for (var key in sortedKeys) key: grouped[key]!};
   }
-  
+
+  // 날짜 형식을 더 깔끔하게 변환하는 함수
+  String _formatDate(String dateString) {
+    if (dateString == '날짜 없음') {
+      return dateString;
+    }
+
+    try {
+      final now = DateTime.now();
+      final date = DateFormat('yyyy년 MM월 dd일').parse(dateString);
+      final difference = now.difference(date).inDays;
+
+      // 오늘, 어제만 특별히 처리
+      if (difference == 0) {
+        return '오늘';
+      } else if (difference == 1) {
+        return '어제';
+      }
+      // 나머지는 모두 yyyy년 MM월 dd일 형식으로 표현
+      return dateString;
+    } catch (e) {
+      return dateString;
+    }
+  }
+
   Widget _buildDateHeader(String date, int itemCount) {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.symmetric(
         horizontal: 16,
-        vertical: 12,
+        vertical: 14,
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 6,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Text(
-              date,
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.blue.shade700,
-              ),
+          Text(
+            date,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 17,
+              letterSpacing: -0.5,
+              color: Colors.indigo[700], // 진한 남색으로 변경하여 본문과 구분
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
           Text(
-            '${itemCount}개의 항목',
+            '·',
+            style: TextStyle(
+              color: Colors.grey[400],
+              fontSize: 15,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '$itemCount개의 항목',
             style: TextStyle(
               color: Colors.grey[600],
               fontSize: 14,
+              letterSpacing: -0.3,
             ),
           ),
         ],
       ),
     );
   }
-  
+
   Widget _buildErrorState(String message, BuildContext context) {
     return Center(
       child: Column(
@@ -185,7 +218,7 @@ class SubscribeDateView extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildEmptyState(String message, IconData icon) {
     return Center(
       child: Column(

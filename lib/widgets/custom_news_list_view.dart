@@ -189,20 +189,27 @@ class CustomNewsListView extends StatelessWidget {
     );
   }
 
-  // 심플하고 모던한 정렬 옵션 버튼 위젯
-  Widget _buildSortOption(
-      {required BuildContext context,
-      required String label,
-      required bool isSelected,
-      required VoidCallback onTap}) {
+  // 개선된 정렬 옵션 버튼 위젯
+  Widget _buildSortOption({
+    required BuildContext context,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.blue.withValues() : Colors.transparent,
+          // 선택된 상태와 선택되지 않은 상태의 배경 색상 구분
+          color: isSelected ? Colors.blue[50] : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
+          // 테두리 추가로 구분감 강화
+          border: Border.all(
+            color: isSelected ? Colors.blue : Colors.transparent,
+            width: 1,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -212,7 +219,8 @@ class CustomNewsListView extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? Colors.blue : Colors.black54,
+                // 텍스트 색상을 더 선명하게 구분
+                color: isSelected ? Colors.blue[700] : Colors.black54,
               ),
             ),
             if (isSelected) ...[
@@ -220,7 +228,7 @@ class CustomNewsListView extends StatelessWidget {
               Icon(
                 Icons.check_circle,
                 size: 14,
-                color: Colors.blue,
+                color: Colors.blue[700], // 아이콘 색상도 조정
               ),
             ],
           ],

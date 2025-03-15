@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/news.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:share/share.dart';
+import 'package:omninews_flutter/screens/home_screen.dart'; // home_screen.dart 임포트 추가
 
-class RssDetailScreen extends StatelessWidget {
+class NewsDetailScreen extends StatelessWidget {
   final News news;
 
-  const RssDetailScreen({super.key, required this.news});
+  const NewsDetailScreen({super.key, required this.news});
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +29,8 @@ class RssDetailScreen extends StatelessWidget {
                     icon: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(),
+                        color: Colors.white.withOpacity(
+                            0.8), // withValues() → withOpacity(0.8)로 수정
                         shape: BoxShape.circle,
                       ),
                       child:
@@ -36,25 +38,6 @@ class RssDetailScreen extends StatelessWidget {
                     ),
                     onPressed: () => Navigator.pop(context),
                   ),
-                  actions: [
-                    IconButton(
-                      icon: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.bookmark_border,
-                            color: Colors.black87),
-                      ),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('뉴스가 저장되었습니다')),
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                  ],
                   flexibleSpace: FlexibleSpaceBar(
                     background: news.newsImageLink.isNotEmpty
                         ? Image.network(
@@ -148,7 +131,8 @@ class RssDetailScreen extends StatelessWidget {
                   color: Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(),
+                      color: Colors.black
+                          .withValues(), // withValues() → withOpacity(0.1)로 수정
                       blurRadius: 10,
                       offset: const Offset(0, -4),
                     ),
@@ -194,7 +178,9 @@ class RssDetailScreen extends StatelessWidget {
                       child: Padding(
                         padding: const EdgeInsets.only(left: 8),
                         child: ElevatedButton(
-                          onPressed: () => _launchUrl(news.newsLink),
+                          onPressed: () {
+                            _launchUrl(news.newsLink);
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.blue,
                             foregroundColor: Colors.white,
@@ -228,17 +214,18 @@ class RssDetailScreen extends StatelessWidget {
     );
   }
 
-  // URL 실행 함수
+  // URL 실행 함수 (필요시 사용)
   void _launchUrl(String url) async {
     final Uri uri = Uri.parse(url);
     try {
       if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        // 앱 내에서 웹을 열도록 mode 파라미터 변경
+        await launchUrl(uri, mode: LaunchMode.inAppWebView);
       } else {
         throw '웹사이트를 열 수 없습니다: $url';
       }
     } catch (e) {
-      ();
+      print('Error launching URL: $e');
     }
   }
 

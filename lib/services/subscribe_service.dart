@@ -8,9 +8,8 @@ import 'package:omninews_flutter/utils/rss_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SubscribeService {
-  static const String baseUrl = 'http://127.0.0.1:8080'; // API 서버 주소로 변경
+  static const String baseUrl = 'http://61.253.113.42:1027 '; // API 서버 주소로 변경
 
-  // 북마크된 모든 아이템 가져오기
   static Future<List<RssItem>> getSubscribedItems() async {
     try {
       List<String> subscribedLinks =
@@ -42,14 +41,12 @@ class SubscribeService {
     }
   }
 
-  // 채널별로 북마크된 아이템 가져오기
   static Future<Map<RssChannel, List<RssItem>>> getItemsByChannel() async {
     try {
       // 먼저 구독 중인 채널 목록 가져오기
       final subscribedChannels = await RssService.fetchSubscribedChannels();
       final Map<RssChannel, List<RssItem>> result = {};
 
-      // 채널별로 북마크된 아이템 가져오기
       for (var channel in subscribedChannels) {
         final response = await http.get(
           Uri.parse(
@@ -78,33 +75,25 @@ class SubscribeService {
     }
   }
 
-  // 북마크 항목 검색
   static Future<List<RssItem>> searchBookmarkedItems(String query) async {
     try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/bookmarks/search?q=$query'),
-        headers: {"Content-Type": "application/json; charset=UTF-8"},
-      );
+      final allItems = await getItemsByChannel();
+      List<RssItem> result = [];
 
-      if (response.statusCode == 200) {
-        String decodedResponse = utf8.decode(response.bodyBytes);
-        List jsonResponse = json.decode(decodedResponse);
-        return jsonResponse.map((item) => RssItem.fromJson(item)).toList();
-      } else {
-        // API 호출 실패 시 로컬 검색
-        final items = await _getLocalBookmarks();
-        return _filterItemsByQuery(items, query);
+      for (var entry in allItems.entries) {
+        final filteredItems = _filterItemsByQuery(entry.value, query);
+        if (filteredItems.isNotEmpty) {
+          result = filteredItems;
+        }
       }
-    } catch (e) {
-      debugPrint('Error searching bookmarks: $e');
 
-      // API 오류 시 로컬 검색
-      final items = await _getLocalBookmarks();
-      return _filterItemsByQuery(items, query);
+      return result;
+    } catch (e) {
+      debugPrint('Error searching items by channel: $e');
+      return [];
     }
   }
 
-  // 채널별 북마크 항목 검색
   static Future<Map<RssChannel, List<RssItem>>> searchItemsByChannel(
       String query) async {
     try {
@@ -122,61 +111,6 @@ class SubscribeService {
     } catch (e) {
       debugPrint('Error searching items by channel: $e');
       return {};
-    }
-  }
-
-  // 아이템을 북마크에 추가
-  static Future<bool> addBookmark(RssItem item) async {
-    try {
-      // API 호출로 북마크 추가
-      final response = await http.post(
-        Uri.parse('$baseUrl/bookmarks'),
-        headers: {"Content-Type": "application/json; charset=UTF-8"},
-        body: json.encode(item.toJson()),
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        // API 성공 시 로컬에도 저장
-        await _addLocalBookmark(item);
-        return true;
-      } else {
-        // API 실패 시 로컬만 저장
-        await _addLocalBookmark(item);
-        return true;
-      }
-    } catch (e) {
-      debugPrint('Error adding bookmark: $e');
-
-      // API 오류 시 로컬에만 저장
-      await _addLocalBookmark(item);
-      return true;
-    }
-  }
-
-  // 북마크에서 아이템 제거
-  static Future<bool> removeBookmark(String itemLink) async {
-    try {
-      // API 호출로 북마크 제거
-      final response = await http.delete(
-        Uri.parse('$baseUrl/bookmarks?link=$itemLink'),
-        headers: {"Content-Type": "application/json; charset=UTF-8"},
-      );
-
-      if (response.statusCode == 200) {
-        // API 성공 시 로컬에서도 제거
-        await _removeLocalBookmark(itemLink);
-        return true;
-      } else {
-        // API 실패 시 로컬에서만 제거
-        await _removeLocalBookmark(itemLink);
-        return true;
-      }
-    } catch (e) {
-      debugPrint('Error removing bookmark: $e');
-
-      // API 오류 시 로컬에서만 제거
-      await _removeLocalBookmark(itemLink);
-      return true;
     }
   }
 
@@ -201,7 +135,7 @@ class SubscribeService {
   }
 
   // 로컬 저장소에서 북마크 가져오기
-  static Future<List<RssItem>> _getLocalBookmarks() async {
+  static Future<List<RssItem>> getLocalBookmarks() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final bookmarksJson = prefs.getStringList('bookmarks') ?? [];
@@ -225,7 +159,7 @@ class SubscribeService {
   }
 
   // 로컬에 북마크 추가
-  static Future<void> _addLocalBookmark(RssItem item) async {
+  static Future<bool> addLocalBookmark(RssItem item) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final bookmarksJson = prefs.getStringList('bookmarks') ?? [];
@@ -240,13 +174,15 @@ class SubscribeService {
         bookmarksJson.add(jsonEncode(item.toJson()));
         await prefs.setStringList('bookmarks', bookmarksJson);
       }
+      return true;
     } catch (e) {
       debugPrint('Error adding local bookmark: $e');
+      return false;
     }
   }
 
   // 로컬에서 북마크 제거
-  static Future<void> _removeLocalBookmark(String itemLink) async {
+  static Future<bool> removeLocalBookmark(String itemLink) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final bookmarksJson = prefs.getStringList('bookmarks') ?? [];
@@ -257,8 +193,10 @@ class SubscribeService {
       });
 
       await prefs.setStringList('bookmarks', bookmarksJson);
+      return true;
     } catch (e) {
       debugPrint('Error removing local bookmark: $e');
+      return false;
     }
   }
 
@@ -273,5 +211,54 @@ class SubscribeService {
       return item.rssTitle.toLowerCase().contains(lowercaseQuery) ||
           item.rssDescription.toLowerCase().contains(lowercaseQuery);
     }).toList();
+  }
+
+// 북마크 추가 (SearchRssItemCard에서 호출하는 메서드)
+  static Future<bool> addBookmark(RssItem item) async {
+    return addLocalBookmark(item);
+  }
+
+// 북마크 제거 (SearchRssItemCard에서 호출하는 메서드)
+  static Future<bool> removeBookmark(String itemLink) async {
+    return removeLocalBookmark(itemLink);
+  }
+
+// RSS 채널 구독 여부 확인
+  static Future<bool> isSubscribed(String channelUrl) async {
+    try {
+      final subscribedLinks = await RssManager.getSubscribedChannelLinks();
+      return subscribedLinks.contains(channelUrl);
+    } catch (e) {
+      debugPrint('Error checking subscription status: $e');
+      return false;
+    }
+  }
+
+// RSS 채널 구독
+  static Future<bool> subscribe(RssChannel channel) async {
+    try {
+      // API 호출 (필요한 경우)
+      // ...
+
+      // 로컬에 저장
+      return await RssService.subscribeChannel(channel.channelRssLink);
+    } catch (e) {
+      debugPrint('Error subscribing to channel: $e');
+      return false;
+    }
+  }
+
+// RSS 채널 구독 취소
+  static Future<bool> unsubscribe(String channelUrl) async {
+    try {
+      // API 호출 (필요한 경우)
+      // ...
+
+      // 로컬에서 제거
+      return await RssService.unsubscribeChannel(channelUrl);
+    } catch (e) {
+      debugPrint('Error unsubscribing from channel: $e');
+      return false;
+    }
   }
 }
