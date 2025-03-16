@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
 import 'package:omninews_flutter/models/rss_channel.dart';
+import 'package:omninews_flutter/provider/settings_provider.dart';
 import 'package:omninews_flutter/widgets/rss_item_card.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
+import 'package:omninews_flutter/models/app_setting.dart';
+import 'package:provider/provider.dart'; // 추가
 
 class SubscribeChannelView extends StatefulWidget {
   final Future<Map<RssChannel, List<RssItem>>> channelItems;
@@ -26,13 +30,13 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    
+
     return RefreshIndicator(
       onRefresh: () async {
         widget.onRefresh();
       },
       color: theme.primaryColor,
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       child: FutureBuilder<Map<RssChannel, List<RssItem>>>(
         future: widget.channelItems,
         builder: (context, snapshot) {
@@ -68,48 +72,58 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
     );
   }
 
-  Widget _buildChannelCard(BuildContext context, RssChannel channel, List<RssItem> items) {
+  Widget _buildChannelCard(
+      BuildContext context, RssChannel channel, List<RssItem> items) {
+    final theme = Theme.of(context);
+
     final isExpanded = _expandedChannels[channel.channelRssLink] ?? false;
     final itemsToShow = isExpanded ? items : items.take(3).toList();
-    
+
+    // 이미지 표시 여부 결정 (뷰 모드에 따름)
+    final showImage = true;
+
     return Card(
       margin: EdgeInsets.zero,
       elevation: 0,
+      color: theme.cardColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade100),
+        side: BorderSide(
+          color: theme.dividerColor.withOpacity(0.5),
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: Theme(
-        data: ThemeData(
+        data: Theme.of(context).copyWith(
           dividerColor: Colors.transparent,
-          splashColor: Colors.grey.shade50,
-          highlightColor: Colors.grey.shade50,
+          splashColor: theme.highlightColor,
+          highlightColor: theme.highlightColor,
         ),
         child: ExpansionTile(
           tilePadding: const EdgeInsets.all(16),
           childrenPadding: EdgeInsets.zero,
           expandedAlignment: Alignment.topLeft,
           maintainState: true,
-          backgroundColor: Colors.white,
-          collapsedBackgroundColor: Colors.white,
+          backgroundColor: theme.cardColor,
+          collapsedBackgroundColor: theme.cardColor,
           shape: const Border(),
           collapsedShape: const Border(),
           title: Row(
             children: [
-              _buildChannelImage(channel),
-              const SizedBox(width: 16),
+              // 채널 이미지는 뷰 모드에 따라 표시 여부 결정
+              if (showImage) ...[
+                _buildChannelImage(channel),
+                const SizedBox(width: 16),
+              ],
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       channel.channelTitle,
-                      style: const TextStyle(
+                      style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
-                        fontSize: 16,
                         letterSpacing: -0.2,
-                        color: Colors.black87,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -117,8 +131,7 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
                     const SizedBox(height: 2),
                     Text(
                       '${items.length}개의 항목',
-                      style: TextStyle(
-                        color: Colors.grey[600],
+                      style: theme.textTheme.bodyMedium?.copyWith(
                         fontSize: 13,
                         fontWeight: FontWeight.w400,
                       ),
@@ -132,20 +145,22 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: Colors.grey.shade50,
+              color: theme.brightness == Brightness.dark
+                  ? theme.cardColor.withOpacity(0.3)
+                  : theme.cardColor.withOpacity(0.8),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(
               Icons.keyboard_arrow_down_rounded,
               size: 22,
-              color: Colors.grey[700],
+              color: theme.iconTheme.color?.withOpacity(0.7),
             ),
           ),
           onExpansionChanged: (expanded) {
             // 애니메이션 효과를 위한 콜백
           },
           children: [
-            Divider(height: 1, thickness: 1, color: Colors.grey.shade100),
+            Divider(height: 1, thickness: 1, color: theme.dividerColor),
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: AnimatedSize(
@@ -155,13 +170,16 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
                   children: itemsToShow.map((item) {
                     return Column(
                       children: [
-                        RssItemCard(item: item),
+                        // RssItemCard에 설정 전달
+                        RssItemCard(
+                          item: item,
+                        ),
                         if (itemsToShow.indexOf(item) != itemsToShow.length - 1)
                           Divider(
                             height: 1,
                             indent: 16,
                             endIndent: 16,
-                            color: Colors.grey.shade100,
+                            color: theme.dividerColor.withOpacity(0.5),
                           ),
                       ],
                     );
@@ -180,9 +198,11 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
+                    color: theme.brightness == Brightness.dark
+                        ? theme.cardColor.withOpacity(0.3)
+                        : theme.cardColor.withOpacity(0.8),
                     border: Border(
-                      top: BorderSide(color: Colors.grey.shade100),
+                      top: BorderSide(color: theme.dividerColor),
                     ),
                   ),
                   child: Center(
@@ -192,7 +212,7 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
                         Text(
                           '${items.length - 3}개 더보기',
                           style: TextStyle(
-                            color: Theme.of(context).primaryColor,
+                            color: theme.primaryColor,
                             fontWeight: FontWeight.w500,
                             letterSpacing: -0.2,
                           ),
@@ -201,7 +221,7 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
                         Icon(
                           Icons.arrow_forward_ios_rounded,
                           size: 12,
-                          color: Theme.of(context).primaryColor,
+                          color: theme.primaryColor,
                         ),
                       ],
                     ),
@@ -219,9 +239,11 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
+                    color: theme.brightness == Brightness.dark
+                        ? theme.cardColor.withOpacity(0.3)
+                        : theme.cardColor.withOpacity(0.8),
                     border: Border(
-                      top: BorderSide(color: Colors.grey.shade100),
+                      top: BorderSide(color: theme.dividerColor),
                     ),
                   ),
                   child: Center(
@@ -230,8 +252,7 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
                       children: [
                         Text(
                           '접기',
-                          style: TextStyle(
-                            color: Colors.grey[600],
+                          style: theme.textTheme.bodyMedium?.copyWith(
                             fontWeight: FontWeight.w500,
                             letterSpacing: -0.2,
                           ),
@@ -240,7 +261,7 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
                         Icon(
                           Icons.keyboard_arrow_up_rounded,
                           size: 18,
-                          color: Colors.grey[600],
+                          color: theme.iconTheme.color?.withOpacity(0.7),
                         ),
                       ],
                     ),
@@ -254,23 +275,28 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
   }
 
   Widget _buildChannelImage(RssChannel channel) {
+    final theme = Theme.of(context);
+    final rssTheme = AppTheme.rssThemeOf(context);
+
     return Hero(
       tag: 'channel_${channel.channelRssLink}',
       child: Container(
         width: 48,
         height: 48,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius:
+              BorderRadius.circular(rssTheme.channelImageBorderRadius),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: theme.shadowColor.withOpacity(0.06),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius:
+              BorderRadius.circular(rssTheme.channelImageBorderRadius),
           child: channel.channelImageUrl != null &&
                   channel.channelImageUrl!.isNotEmpty
               ? Image.network(
@@ -283,7 +309,9 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
                     return Container(
                       width: 48,
                       height: 48,
-                      color: Colors.grey.shade100,
+                      color: theme.brightness == Brightness.dark
+                          ? theme.cardColor.withOpacity(0.5)
+                          : theme.cardColor.withOpacity(0.8),
                       child: Center(
                         child: SizedBox(
                           width: 24,
@@ -295,7 +323,7 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
                                 : null,
                             strokeWidth: 2,
                             valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.blue.shade300),
+                                theme.primaryColor),
                           ),
                         ),
                       ),
@@ -312,6 +340,8 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
   }
 
   Widget _buildDefaultChannelIcon() {
+    final rssTheme = AppTheme.rssThemeOf(context);
+
     return Container(
       width: 48,
       height: 48,
@@ -319,7 +349,7 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Colors.blue[400]!, Colors.blue[700]!],
+          colors: rssTheme.channelImageGradientColors,
         ),
       ),
       child: const Center(
@@ -333,6 +363,9 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
   }
 
   Widget _buildErrorState(String message, BuildContext context) {
+    final theme = Theme.of(context);
+    final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -342,14 +375,14 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
             Icon(
               Icons.error_outline_rounded,
               size: 56,
-              color: Colors.grey[300],
+              color: subscribeStyle.errorIconColor,
             ),
             const SizedBox(height: 20),
             Text(
               message,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.grey[800],
+                color: subscribeStyle.emptyTextColor,
                 fontSize: 16,
                 fontWeight: FontWeight.w500,
                 letterSpacing: -0.3,
@@ -361,8 +394,8 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
               icon: const Icon(Icons.refresh_rounded),
               label: const Text('다시 시도'),
               style: ElevatedButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: Theme.of(context).primaryColor,
+                foregroundColor: theme.colorScheme.onPrimary,
+                backgroundColor: theme.primaryColor,
                 elevation: 0,
                 padding:
                     const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -378,6 +411,9 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
   }
 
   Widget _buildEmptyState(String message, IconData icon) {
+    final theme = Theme.of(context);
+    final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -387,7 +423,7 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
             Icon(
               icon,
               size: 64,
-              color: Colors.grey[200],
+              color: subscribeStyle.emptyIconColor,
             ),
             const SizedBox(height: 20),
             Text(
@@ -395,7 +431,7 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 17,
-                color: Colors.grey[700],
+                color: subscribeStyle.emptyTextColor,
                 fontWeight: FontWeight.w500,
                 letterSpacing: -0.3,
               ),
@@ -406,23 +442,30 @@ class _SubscribeChannelViewState extends State<SubscribeChannelView> {
               Text(
                 '아직 구독한 채널이 없습니다.',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, color: Colors.grey[500], letterSpacing: -0.2),
+                style: TextStyle(
+                  fontSize: 15,
+                  color: subscribeStyle.hintTextColor,
+                  letterSpacing: -0.2,
+                ),
               ),
               const SizedBox(height: 16),
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 32),
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                padding:
+                    const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                 decoration: BoxDecoration(
-                  color: Colors.grey[50],
+                  color: theme.brightness == Brightness.dark
+                      ? theme.cardColor.withOpacity(0.3)
+                      : theme.cardColor.withOpacity(0.8),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade100),
+                  border: Border.all(color: theme.dividerColor),
                 ),
                 child: Text(
                   'RSS 화면에서 채널을 구독해보세요.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 14, 
-                    color: Colors.grey[600],
+                    fontSize: 14,
+                    color: subscribeStyle.hintTextColor,
                     fontWeight: FontWeight.w500,
                   ),
                 ),

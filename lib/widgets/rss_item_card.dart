@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:omninews_flutter/models/app_setting.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
+import 'package:omninews_flutter/provider/settings_provider.dart';
 import 'package:omninews_flutter/services/subscribe_service.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:omninews_flutter/utils/url_launcher_helper.dart';
+import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
 
 class RssItemCard extends StatefulWidget {
   final RssItem item;
-  final VoidCallback? onBookmarkChanged; // 북마크 상태 변경 시 실행할 콜백
+  final VoidCallback? onBookmarkChanged;
 
   const RssItemCard({
-    super.key, 
+    super.key,
     required this.item,
-    this.onBookmarkChanged, // 콜백 추가
+    this.onBookmarkChanged,
   });
 
   @override
@@ -69,6 +73,8 @@ class _RssItemCardState extends State<RssItemCard> {
           SnackBar(
             content: Text(_isBookmarked ? '북마크에 추가되었습니다' : '북마크에서 제거되었습니다'),
             duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).primaryColor,
           ),
         );
       }
@@ -78,6 +84,8 @@ class _RssItemCardState extends State<RssItemCard> {
           SnackBar(
             content: Text('오류가 발생했습니다: $e'),
             duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -86,19 +94,6 @@ class _RssItemCardState extends State<RssItemCard> {
         setState(() {
           _isLoading = false;
         });
-      }
-    }
-  }
-
-  Future<void> _openArticle(BuildContext context) async {
-    if (!await launchUrl(Uri.parse(widget.item.rssLink))) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('링크를 열 수 없습니다'),
-            duration: Duration(seconds: 2),
-          ),
-        );
       }
     }
   }
@@ -148,145 +143,87 @@ class _RssItemCardState extends State<RssItemCard> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cardStyle = AppTheme.newsCardStyleOf(context);
+    final rssTheme = AppTheme.rssThemeOf(context);
     final bool hasValidImage = _isValidImageUrl(widget.item.rssImageLink);
+    final settings = Provider.of<SettingsProvider>(context).settings;
+    final showImage =
+        hasValidImage && settings.viewMode == ViewMode.textAndImage;
 
     return InkWell(
-      onTap: () => _openArticle(context),
+      onTap: () {
+        UrlLauncherHelper.openUrl(
+            context, widget.item.rssLink, settings.webOpenMode);
+      },
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 좌측: 텍스트 정보
-            Expanded(
-              flex: 3,
-              child: Column(
+        padding: cardStyle.cardPadding,
+        child: settings.viewMode == ViewMode.textOnly
+            ? _buildTextOnlyLayout(cardStyle, rssTheme, theme)
+            : Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 제목과 북마크 버튼
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          widget.item.rssTitle,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black,
-                            height: 1.3,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      IconButton(
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                        icon: _isLoading
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Icon(
-                                _isBookmarked
-                                    ? Icons.bookmark
-                                    : Icons.bookmark_border,
-                                color:
-                                    _isBookmarked ? Colors.blue : Colors.grey,
-                                size: 20,
-                              ),
-                        onPressed: _toggleBookmark,
-                      ),
-                    ],
+                  Expanded(
+                    flex: 3,
+                    child: _buildTextContent(cardStyle, rssTheme, theme),
                   ),
 
-                  const SizedBox(height: 6),
+                  // 여백
+                  if (showImage) const SizedBox(width: 12),
 
-                  // 뉴스 내용 요약
-                  Text(
-                    _truncateDescription(widget.item.rssDescription),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[700],
-                      height: 1.2,
-                    ),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-
-                  // 출처 및 날짜
-                  Row(
-                    children: [
-                      // 소스 도메인 표시
-                      Text(
-                        _getSourceName(widget.item.rssLink),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.blue[700],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-
-                      // 게시일 표시
-                      Text(
-                        _formatDate(widget.item.rssPubDate),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
+                  // 우측: 썸네일 이미지 (있을 경우)
+                  if (showImage) _buildThumbnail(),
                 ],
               ),
-            ),
-
-            // 여백
-            if (hasValidImage) const SizedBox(width: 12),
-
-            // 우측: 썸네일 이미지 (있을 경우)
-            if (hasValidImage) _buildThumbnail(),
-          ],
-        ),
       ),
     );
   }
 
   // 썸네일 이미지 위젯
   Widget _buildThumbnail() {
+    final theme = Theme.of(context);
+
+    // 고유한 Hero 태그 생성
+    final String heroTag = 'rss_image_${widget.item.rssLink}';
+
     return SizedBox(
       width: 100,
       height: 75,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: CachedNetworkImage(
-          imageUrl: widget.item.rssImageLink!,
-          fit: BoxFit.cover,
-          placeholder: (context, url) => Container(
-            color: Colors.grey[200],
-            child: const Center(
+      child: Hero(
+        tag: heroTag,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(4),
+          child: CachedNetworkImage(
+            imageUrl: widget.item.rssImageLink!,
+            fit: BoxFit.cover,
+            placeholder: (context, url) => Container(
+              color: theme.brightness == Brightness.dark
+                  ? Colors.grey[800]
+                  : Colors.grey[200],
+              child: Center(
+                child: Icon(
+                  Icons.image_outlined,
+                  color: theme.brightness == Brightness.dark
+                      ? Colors.grey[600]
+                      : Colors.grey,
+                  size: 24,
+                ),
+              ),
+            ),
+            errorWidget: (context, url, error) => Container(
+              color: theme.brightness == Brightness.dark
+                  ? Colors.grey[800]
+                  : Colors.grey[200],
               child: Icon(
-                Icons.image_outlined,
-                color: Colors.grey,
+                Icons.image_not_supported_outlined,
+                color: theme.brightness == Brightness.dark
+                    ? Colors.grey[600]
+                    : Colors.grey,
                 size: 24,
               ),
             ),
+            errorListener: (_) => {}, // 로그 출력 억제
           ),
-          errorWidget: (context, url, error) => Container(
-            color: Colors.grey[200],
-            child: const Icon(
-              Icons.image_not_supported_outlined,
-              color: Colors.grey,
-              size: 24,
-            ),
-          ),
-          errorListener: (_) => {}, // 로그 출력 억제
         ),
       ),
     );
@@ -305,5 +242,87 @@ class _RssItemCardState extends State<RssItemCard> {
     } catch (e) {
       return 'source';
     }
+  }
+
+// 텍스트 전용 레이아웃
+  Widget _buildTextOnlyLayout(NewsCardStyleExtension cardStyle,
+      RssThemeExtension rssTheme, ThemeData theme) {
+    return _buildTextContent(cardStyle, rssTheme, theme);
+  }
+
+// 텍스트 콘텐츠 부분
+  Widget _buildTextContent(NewsCardStyleExtension cardStyle,
+      RssThemeExtension rssTheme, ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 제목과 북마크 버튼
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                widget.item.rssTitle,
+                style: cardStyle.titleStyle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              icon: _isLoading
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: theme.primaryColor,
+                      ),
+                    )
+                  : Icon(
+                      _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                      color: _isBookmarked
+                          ? cardStyle.bookmarkActiveColor
+                          : cardStyle.bookmarkInactiveColor,
+                      size: 20,
+                    ),
+              onPressed: _toggleBookmark,
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 6),
+
+        // 뉴스 내용 요약
+        Text(
+          _truncateDescription(widget.item.rssDescription),
+          style: cardStyle.descriptionStyle,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 8),
+
+        // 출처 및 날짜
+        Row(
+          children: [
+            // 소스 도메인 표시
+            Text(
+              _getSourceName(widget.item.rssLink),
+              style: cardStyle.sourceStyle.copyWith(
+                color: rssTheme.linkColor,
+              ),
+            ),
+            const SizedBox(width: 8),
+
+            // 게시일 표시
+            Text(
+              _formatDate(widget.item.rssPubDate),
+              style: cardStyle.dateStyle,
+            ),
+          ],
+        ),
+      ],
+    );
   }
 }

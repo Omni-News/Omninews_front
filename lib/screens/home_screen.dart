@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:omninews_flutter/screens/settings_screen.dart';
 import 'package:omninews_flutter/screens/subscribe_screen.dart';
 import 'package:omninews_flutter/screens/bookmark_screen.dart';
 import 'package:omninews_flutter/screens/news_screen.dart';
 import 'package:omninews_flutter/screens/rss_screen.dart';
 import 'package:omninews_flutter/screens/search_screen.dart';
+import 'package:omninews_flutter/theme/theme_selection_dialog.dart';
 
 // 전역 키를 선언하여 어디서든 접근할 수 있게 합니다
 final GlobalKey<ScaffoldState> homeScaffoldKey = GlobalKey<ScaffoldState>();
@@ -21,7 +23,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // NewsScreen에 scaffoldKey를 전달합니다
     _pages = [
       const SubscribeScreen(),
       const RssScreen(),
@@ -37,40 +38,57 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  // 테마 선택 다이얼로그 표시
+  void _showThemeSelectionDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => const ThemeSelectionDialog(),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    // 모던 색상 테마
-    const primaryColor = Color(0xFF2979FF);
-    const backgroundColor = Color(0xFFFAFAFA);
-    const cardColor = Colors.white;
-    const secondaryColor = Color(0xFF546E7A);
+    // 테마 속성 가져오기
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
 
     return Scaffold(
-      key: homeScaffoldKey, // 글로벌 키를 Scaffold에 할당
-      backgroundColor: backgroundColor,
+      key: homeScaffoldKey,
+      backgroundColor: theme.scaffoldBackgroundColor,
       drawer: Drawer(
+        backgroundColor: theme.drawerTheme.backgroundColor,
         child: Column(
           children: [
+            // 헤더 부분 - 다크 모드에서는 어두운 색상 사용
             Container(
-              height: 125,
+              height: 130,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: primaryColor,
+                // 다크 모드일 때 어두운 색상, 라이트 모드일 때는 기존 primaryColor 사용
+                color: theme.brightness == Brightness.dark
+                    ? const Color(0xFF1A2038) // 다크 모드용 어두운 색상
+                    : theme.primaryColor,
+                boxShadow: [
+                  BoxShadow(
+                    color: theme.shadowColor,
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              padding: const EdgeInsets.fromLTRB(16, 50, 16, 16),
-              child: const Column(
+              padding: const EdgeInsets.fromLTRB(20, 50, 16, 16),
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     'Omni News',
-                    style: TextStyle(
+                    style: textTheme.headlineMedium?.copyWith(
                       color: Colors.white,
                       fontSize: 22,
-                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  SizedBox(height: 4),
-                  Text(
+                  const SizedBox(height: 4),
+                  const Text(
                     'Your News, Your Way',
                     style: TextStyle(
                       color: Colors.white70,
@@ -80,109 +98,106 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 9),
+
             Expanded(
               child: ListView(
                 padding: EdgeInsets.zero,
                 children: [
-                  // 카테고리 섹션
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(17, 16, 16, 8),
-                    child: Text(
-                      'MY FEEDS',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: secondaryColor,
-                        letterSpacing: 2.2,
-                      ),
-                    ),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.access_time),
-                    title: const Text('Recently Read'),
-                    dense: true,
-                    onTap: () {},
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.subscriptions_outlined),
-                    title: const Text('Subscriptions'),
-                    dense: true,
+                  // 피드 섹션
+                  _buildSectionHeader('MY FEEDS', theme.colorScheme.secondary),
+
+                  _buildDrawerItem(
+                    icon: Icons.access_time,
+                    title: 'Recently Read',
                     onTap: () {
                       Navigator.pop(context);
-                      _onItemTapped(0); // BookmarkScreen 인덱스
                     },
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.rss_feed_outlined),
-                    title: const Text('RSS Feeds'),
-                    dense: true,
+
+                  _buildDrawerItem(
+                    icon: Icons.subscriptions_outlined,
+                    title: 'Subscriptions',
                     onTap: () {
                       Navigator.pop(context);
-                      _onItemTapped(1); // RssScreen 인덱스
+                      _onItemTapped(0);
                     },
+                    isSelected: _selectedIndex == 0,
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.newspaper_outlined),
-                    title: const Text('News'),
-                    dense: true,
+
+                  _buildDrawerItem(
+                    icon: Icons.rss_feed_outlined,
+                    title: 'RSS Feeds',
                     onTap: () {
                       Navigator.pop(context);
-                      _onItemTapped(2); // NewsScreen 인덱스
+                      _onItemTapped(1);
                     },
+                    isSelected: _selectedIndex == 1,
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.bookmark_outline_sharp),
-                    title: const Text('Bookmarks'),
-                    dense: true,
+
+                  _buildDrawerItem(
+                    icon: Icons.newspaper_outlined,
+                    title: 'News',
                     onTap: () {
                       Navigator.pop(context);
-                      _onItemTapped(3); // ExploreScreen 인덱스
+                      _onItemTapped(2);
                     },
+                    isSelected: _selectedIndex == 2,
+                  ),
+
+                  _buildDrawerItem(
+                    icon: Icons.bookmark_outline_sharp,
+                    title: 'Bookmarks',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _onItemTapped(3);
+                    },
+                    isSelected: _selectedIndex == 3,
                   ),
 
                   const Divider(),
 
                   // 설정 섹션
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(17, 8, 16, 8),
-                    child: Text(
-                      'PREFERENCES',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: secondaryColor,
-                        letterSpacing: 2.2,
-                      ),
-                    ),
+                  _buildSectionHeader(
+                      'PREFERENCES', theme.colorScheme.secondary),
+
+                  _buildDrawerItem(
+                    icon: Icons.color_lens_outlined,
+                    title: 'Choose Theme',
+                    onTap: () {
+                      Navigator.pop(context);
+                      _showThemeSelectionDialog();
+                    },
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.color_lens_outlined),
-                    title: const Text('Choose Theme'),
-                    dense: true,
-                    onTap: () {},
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.settings_outlined),
-                    title: const Text('Settings'),
-                    dense: true,
-                    onTap: () {},
+
+                  _buildDrawerItem(
+                    icon: Icons.settings_outlined,
+                    title: 'Settings',
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) => const SettingsScreen()));
+                    },
                   ),
 
                   const Divider(),
 
-                  // 추가 섹션
-                  ListTile(
-                    leading: const Icon(Icons.info_outline),
-                    title: const Text('About'),
-                    dense: true,
-                    onTap: () {},
+                  // 추가 섹션 - About & Help
+                  _buildDrawerItem(
+                    icon: Icons.info_outline,
+                    title: 'About',
+                    onTap: () {
+                      Navigator.pop(context);
+                    },
                   ),
-                  ListTile(
-                    leading: const Icon(Icons.help_outline),
-                    title: const Text('Help & Feedback'),
-                    dense: true,
-                    onTap: () {},
+
+                  _buildDrawerItem(
+                    icon: Icons.help_outline,
+                    title: 'Help & Feedback',
+                    onTap: () {
+                      Navigator.pop(context);
+                    },
                   ),
                 ],
               ),
@@ -193,9 +208,10 @@ class _HomeScreenState extends State<HomeScreen> {
       body: _pages[_selectedIndex],
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
+          color: theme.cardColor,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(),
+              color: theme.shadowColor,
               blurRadius: 6,
               spreadRadius: 2,
             ),
@@ -205,9 +221,10 @@ class _HomeScreenState extends State<HomeScreen> {
           currentIndex: _selectedIndex,
           onTap: _onItemTapped,
           type: BottomNavigationBarType.fixed,
-          backgroundColor: cardColor,
-          selectedItemColor: primaryColor,
-          unselectedItemColor: Colors.grey,
+          backgroundColor: theme.bottomNavigationBarTheme.backgroundColor,
+          selectedItemColor: theme.bottomNavigationBarTheme.selectedItemColor,
+          unselectedItemColor:
+              theme.bottomNavigationBarTheme.unselectedItemColor,
           selectedLabelStyle: const TextStyle(
             fontWeight: FontWeight.w500,
             fontSize: 12,
@@ -216,36 +233,91 @@ class _HomeScreenState extends State<HomeScreen> {
             fontWeight: FontWeight.w500,
             fontSize: 12,
           ),
-          elevation: 9,
+          elevation: 0,
           items: const [
             BottomNavigationBarItem(
               icon: Icon(Icons.subscriptions_outlined),
               activeIcon: Icon(Icons.subscriptions),
               label: 'Sub',
+              tooltip: 'Subscriptions',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.rss_feed_outlined),
               activeIcon: Icon(Icons.rss_feed),
               label: 'RSS',
+              tooltip: 'RSS Feeds',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.article_outlined),
               activeIcon: Icon(Icons.article),
               label: 'News',
+              tooltip: 'News',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.bookmarks_outlined),
               activeIcon: Icon(Icons.bookmarks),
               label: 'Bookmarks',
+              tooltip: 'Bookmarks',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.search_outlined),
               activeIcon: Icon(Icons.search),
               label: 'Search',
+              tooltip: 'Search',
             ),
           ],
         ),
       ),
+    );
+  }
+
+  // 드로어 섹션 헤더를 위한 위젯
+  Widget _buildSectionHeader(String title, Color color) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(17, 16, 16, 8),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.bold,
+          color: color,
+          letterSpacing: 1.5,
+        ),
+      ),
+    );
+  }
+
+  // 드로어 아이템을 위한 위젯
+  Widget _buildDrawerItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    bool isSelected = false,
+  }) {
+    final theme = Theme.of(context);
+
+    return ListTile(
+      leading: Icon(
+        icon,
+        color: isSelected ? theme.primaryColor : null,
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+          color: isSelected ? theme.primaryColor : null,
+        ),
+      ),
+      dense: true,
+      onTap: onTap,
+      selected: isSelected,
+      selectedTileColor:
+          isSelected ? theme.colorScheme.primary.withOpacity(0.12) : null,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+      minLeadingWidth: 24,
     );
   }
 }

@@ -74,14 +74,21 @@ class _SubscribeScreenState extends State<SubscribeScreen>
   Widget build(BuildContext context) {
     super.build(context); // AutomaticKeepAliveClientMixin 필수
 
+    // 테마 및 스타일 속성 가져오기
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: NestedScrollView(
         headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
           return [
             SliverAppBar(
               leading: IconButton(
-                icon: const Icon(Icons.menu, color: Colors.black87),
+                icon: Icon(
+                  Icons.menu,
+                  color: theme.appBarTheme.iconTheme?.color,
+                ),
                 onPressed: () {
                   homeScaffoldKey.currentState?.openDrawer();
                 },
@@ -89,27 +96,26 @@ class _SubscribeScreenState extends State<SubscribeScreen>
               pinned: true,
               elevation: 0,
               centerTitle: true,
-              backgroundColor: Colors.white,
+              backgroundColor: theme.appBarTheme.backgroundColor,
               title: _isSearching
                   ? _buildSearchField()
-                  : const Text(
+                  : Text(
                       'Subscribe',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                      ),
+                      style: textTheme.headlineMedium,
                     ),
               actions: [
                 IconButton(
                   icon: Icon(
                     _isSearching ? Icons.close : Icons.search,
-                    color: Colors.black87,
+                    color: theme.appBarTheme.iconTheme?.color,
                   ),
                   onPressed: _toggleSearch,
                 ),
                 IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.black87),
+                  icon: Icon(
+                    Icons.refresh,
+                    color: theme.appBarTheme.iconTheme?.color,
+                  ),
                   onPressed: _refreshData,
                 ),
               ],
@@ -118,20 +124,15 @@ class _SubscribeScreenState extends State<SubscribeScreen>
               delegate: _SliverAppBarDelegate(
                 TabBar(
                   controller: _tabController,
-                  indicatorColor: Colors.blue,
-                  labelColor: Colors.blue,
-                  unselectedLabelColor: Colors.black87,
+                  indicatorColor: theme.primaryColor,
+                  labelColor: theme.primaryColor,
+                  unselectedLabelColor: textTheme.bodyLarge?.color,
                   indicatorWeight: 3,
-                  labelStyle: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 17,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontWeight: FontWeight.normal,
-                    fontSize: 15,
-                  ),
+                  labelStyle: textTheme.labelLarge,
+                  unselectedLabelStyle: textTheme.labelMedium,
                   tabs: _tabs.map((String tab) => Tab(text: tab)).toList(),
                 ),
+                theme: theme,
               ),
               floating: true,
               pinned: true,
@@ -161,15 +162,21 @@ class _SubscribeScreenState extends State<SubscribeScreen>
   }
 
   Widget _buildSearchField() {
+    final theme = Theme.of(context);
+
     return TextField(
       controller: _searchController,
       autofocus: true,
       decoration: InputDecoration(
         hintText: '검색어를 입력하세요',
-        hintStyle: TextStyle(color: Colors.grey[400]),
+        hintStyle: TextStyle(color: theme.hintColor),
         border: InputBorder.none,
+        contentPadding: const EdgeInsets.symmetric(vertical: 15),
       ),
-      style: const TextStyle(color: Colors.black, fontSize: 16),
+      style: TextStyle(
+        color: theme.textTheme.bodyLarge?.color,
+        fontSize: 16,
+      ),
       onChanged: _handleSearch,
     );
   }
@@ -178,19 +185,20 @@ class _SubscribeScreenState extends State<SubscribeScreen>
 // TabBar를 SliverPersistentHeader로 만들기 위한 delegate 클래스
 class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   final Widget child;
+  final ThemeData theme;
 
-  _SliverAppBarDelegate(this.child);
+  _SliverAppBarDelegate(this.child, {required this.theme});
 
   @override
   Widget build(
       BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         boxShadow: overlapsContent
             ? [
                 BoxShadow(
-                  color: Colors.black.withValues(),
+                  color: theme.shadowColor.withOpacity(0.1),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),

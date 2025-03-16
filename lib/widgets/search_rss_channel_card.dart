@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/rss_channel.dart';
 import 'package:omninews_flutter/services/subscribe_service.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
+import 'package:omninews_flutter/models/app_setting.dart'; // 추가
 
 class SearchRssChannelCard extends StatefulWidget {
   final RssChannel channel;
@@ -27,7 +29,6 @@ class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
   }
 
   Future<void> _checkSubscriptionStatus() async {
-    // null 체크 추가
     final channelUrl = widget.channel.channelRssLink ?? '';
     if (channelUrl.isEmpty) return;
 
@@ -48,7 +49,6 @@ class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
 
     try {
       bool success;
-      // null 체크 추가
       final channelUrl = widget.channel.channelRssLink ?? '';
       if (channelUrl.isEmpty) throw Exception('구독 URL이 없습니다');
 
@@ -71,6 +71,8 @@ class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
           SnackBar(
             content: Text(_isSubscribed ? '구독이 추가되었습니다' : '구독이 취소되었습니다'),
             duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).primaryColor,
           ),
         );
       }
@@ -80,6 +82,8 @@ class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
           SnackBar(
             content: Text('구독 변경 중 오류가 발생했습니다: $e'),
             duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -99,6 +103,13 @@ class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final rssTheme = AppTheme.rssThemeOf(context);
+    final searchStyle = AppTheme.searchStyleOf(context);
+
+    // 이미지 표시 여부 결정 (뷰 모드에 따름)
+    final showImage = true;
+
     return InkWell(
       onTap: _navigateToChannelDetail,
       child: Padding(
@@ -106,35 +117,44 @@ class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // 채널 아이콘/이미지
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: Colors.orange[50],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: (widget.channel.channelImageUrl ?? '').isNotEmpty // null 체크 추가
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.network(
-                        widget.channel.channelImageUrl ?? '', // null 체크 추가
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Icon(
+            // 채널 아이콘/이미지 (뷰 모드에 따라 표시 여부 결정)
+            if (showImage) ...[
+              Hero(
+                tag: 'channel_${widget.channel.channelRssLink ?? "unknown"}',
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: theme.brightness == Brightness.dark
+                        ? Colors.orange.withOpacity(0.2)
+                        : Colors.orange[50],
+                    borderRadius: BorderRadius.circular(
+                        rssTheme.channelImageBorderRadius),
+                  ),
+                  child: (widget.channel.channelImageUrl ?? '').isNotEmpty
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(
+                              rssTheme.channelImageBorderRadius),
+                          child: Image.network(
+                            widget.channel.channelImageUrl ?? '',
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) => Icon(
+                              Icons.rss_feed,
+                              color: rssTheme.channelIconColor,
+                              size: 24,
+                            ),
+                          ),
+                        )
+                      : Icon(
                           Icons.rss_feed,
-                          color: Colors.orange[300],
+                          color: rssTheme.channelIconColor,
                           size: 24,
                         ),
-                      ),
-                    )
-                  : Icon(
-                      Icons.rss_feed,
-                      color: Colors.orange[300],
-                      size: 24,
-                    ),
-            ),
-            const SizedBox(width: 12),
-            
+                ),
+              ),
+              const SizedBox(width: 12),
+            ],
+
             // 채널 정보
             Expanded(
               child: Column(
@@ -142,42 +162,42 @@ class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
                 children: [
                   // 태그 표시 (채널)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     margin: const EdgeInsets.only(bottom: 4),
                     decoration: BoxDecoration(
-                      color: Colors.green[50],
+                      color: searchStyle.channelTagBackground,
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.green.shade200, width: 1),
+                      border: Border.all(
+                          color: searchStyle.channelTagBorder, width: 1),
                     ),
                     child: Text(
                       '채널',
                       style: TextStyle(
                         fontSize: 10,
-                        color: Colors.green[700],
+                        color: searchStyle.channelTagText,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                   ),
-                  
+
                   // 채널 제목
                   Text(
-                    widget.channel.channelTitle ?? '제목 없음', // null 체크 추가
-                    style: const TextStyle(
+                    widget.channel.channelTitle ?? '제목 없음',
+                    style: theme.textTheme.titleMedium?.copyWith(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
-                      color: Colors.black,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  
+
                   // 채널 설명
                   Text(
-                    widget.channel.channelDescription ?? '설명 없음', // null 체크 추가
-                    style: TextStyle(
+                    widget.channel.channelDescription ?? '설명 없음',
+                    style: theme.textTheme.bodyMedium?.copyWith(
                       fontSize: 13,
-                      color: Colors.grey[600],
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -186,20 +206,25 @@ class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
               ),
             ),
             const SizedBox(width: 8),
-            
+
             // 구독 버튼
             _isLoading
-                ? const SizedBox(
+                ? SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
+                      color: theme.primaryColor,
                     ),
                   )
                 : IconButton(
                     icon: Icon(
-                      _isSubscribed ? Icons.check_circle : Icons.add_circle_outline,
-                      color: _isSubscribed ? Colors.green : Colors.grey[700],
+                      _isSubscribed
+                          ? Icons.check_circle
+                          : Icons.add_circle_outline,
+                      color: _isSubscribed
+                          ? rssTheme.subscribeButtonActiveText
+                          : theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
                       size: 24,
                     ),
                     onPressed: _toggleSubscription,

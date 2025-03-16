@@ -4,6 +4,7 @@ import 'package:omninews_flutter/widgets/news_api_item_card.dart';
 import 'package:omninews_flutter/widgets/search_rss_channel_card.dart';
 import 'package:omninews_flutter/widgets/search_rss_item_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -31,8 +32,7 @@ class SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
-    _controller.addListener(_onTextChanged); // 텍스트 변경 리스너 추가
-    // 포커스 및 키보드 자동 표시
+    _controller.addListener(_onTextChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FocusScope.of(context).requestFocus(_focusNode);
     });
@@ -46,38 +46,29 @@ class SearchScreenState extends State<SearchScreen> {
     super.dispose();
   }
 
-  // 텍스트 필드 변경 감지
   void _onTextChanged() {
-    // 필요 시 상태 업데이트 (예: 지우기 버튼 표시/숨김)
     setState(() {});
   }
 
-  // 검색 실행 함수
   void _search(String query) async {
-    // 검색어가 비어있을 경우 반환
     if (query.trim().isEmpty) return;
 
-    // 로딩 상태 설정 및 마지막 검색어 저장
     setState(() {
       _isLoading = true;
       _hasSearched = true;
       _lastQuery = query;
-      // 검색 시작 시 이전 결과 초기화
       _searchResult = null;
     });
 
     try {
-      // 새로운 검색 실행
       final result =
           await UnifiedSearchService.search(query, sort: _sortOption);
 
-      // UI 업데이트를 확실히 하기 위해 mounted 체크 후 상태 업데이트
       if (mounted) {
         setState(() {
           _searchResult = result;
           _isLoading = false;
 
-          // 검색 결과가 있으면 기본 필터 설정 (모두 보기)
           if (result.newsResults.isNotEmpty ||
               result.rssItemResults.isNotEmpty ||
               result.rssChannelResults.isNotEmpty) {
@@ -88,7 +79,6 @@ class SearchScreenState extends State<SearchScreen> {
         });
       }
     } catch (e) {
-      // 오류 발생 시 처리
       if (mounted) {
         setState(() {
           _searchResult = UnifiedSearchResult(
@@ -100,63 +90,82 @@ class SearchScreenState extends State<SearchScreen> {
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('검색 중 오류가 발생했습니다: $e')),
+          SnackBar(
+            content: Text('검색 중 오류가 발생했습니다: $e'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
         );
       }
     }
   }
 
-  // 검색 버튼 클릭 또는 엔터 키 입력 처리
   void _handleSearch() {
     final query = _controller.text;
     if (query.isNotEmpty) {
       _search(query);
-      // 키보드 숨기기
       FocusScope.of(context).unfocus();
     }
   }
 
-  // 검색 필드 초기화
   void _clearSearch() {
     _controller.clear();
-    // 포커스 주기
     _focusNode.requestFocus();
-    // UI 갱신
     setState(() {});
   }
 
-  // 정렬 옵션 변경
   void _updateSortOption(String sortOption) {
     if (_sortOption != sortOption) {
       setState(() {
         _sortOption = sortOption;
       });
 
-      // 이미 검색한 결과가 있다면 새 정렬 옵션으로 재검색
       if (_hasSearched && _lastQuery.isNotEmpty) {
         _search(_lastQuery);
       }
     }
   }
 
-  // 검색어를 뉴스 카테고리에 추가
   Future<void> _addToNewsCategories(String query) async {
-    // 확인 다이얼로그 표시
+    final theme = Theme.of(context);
+
     bool shouldAdd = await showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('카테고리 추가'),
-            content: Text('\'$query\' 검색어를 뉴스 카테고리에 추가하시겠습니까?'),
+            title: Text(
+              '카테고리 추가',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: theme.textTheme.headlineMedium?.color,
+              ),
+            ),
+            backgroundColor: theme.dialogBackgroundColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            content: Text(
+              '\'$query\' 검색어를 뉴스 카테고리에 추가하시겠습니까?',
+              style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('취소'),
+                child: Text(
+                  '취소',
+                  style: TextStyle(
+                      color:
+                          theme.textTheme.bodyLarge?.color?.withOpacity(0.7)),
+                ),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
+                  backgroundColor: theme.primaryColor,
                   foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  elevation: 0,
                 ),
                 child: const Text('추가'),
               ),
@@ -168,41 +177,38 @@ class SearchScreenState extends State<SearchScreen> {
     if (!shouldAdd) return;
 
     try {
-      // 기존 저장된 사용자 카테고리 불러오기
       final prefs = await SharedPreferences.getInstance();
       final savedCategories = prefs.getStringList('user_categories') ?? [];
 
-      // 이미 존재하는 카테고리인지 확인
       if (savedCategories.contains(query)) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('\'$query\' 카테고리가 이미 존재합니다'),
               duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: theme.colorScheme.error,
             ),
           );
         }
         return;
       }
 
-      // 새 카테고리 추가
       final newCategories = [...savedCategories, query];
       await prefs.setStringList('user_categories', newCategories);
 
-      // 추가 성공 메시지 및 화면 이동
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('\'$query\' 카테고리가 추가되었습니다'),
             duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: theme.primaryColor,
           ),
         );
 
-        // 뉴스 화면으로 이동 (팝업 닫기)
         Navigator.of(context).popUntil((route) => route.isFirst);
-
-        // 새로 추가된 카테고리로 이동하기 위한 인덱스를 SharedPreferences에 저장
-        await prefs.setInt('select_category_index', -1); // -1은 마지막 카테고리를 의미
+        await prefs.setInt('select_category_index', -1);
       }
     } catch (e) {
       if (mounted) {
@@ -210,6 +216,8 @@ class SearchScreenState extends State<SearchScreen> {
           SnackBar(
             content: Text('카테고리 추가 중 오류가 발생했습니다: $e'),
             duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: theme.colorScheme.error,
           ),
         );
       }
@@ -218,20 +226,19 @@ class SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
-        title: const Text(
+        title: Text(
           'Search Contents',
-          style: TextStyle(
-            color: Colors.black,
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
+          style: textTheme.headlineMedium,
         ),
-        iconTheme: const IconThemeData(color: Colors.black87),
+        iconTheme: theme.appBarTheme.iconTheme,
       ),
       body: Column(
         children: [
@@ -247,15 +254,21 @@ class SearchScreenState extends State<SearchScreen> {
                     focusNode: _focusNode,
                     decoration: InputDecoration(
                       hintText: '뉴스, RSS 피드, 채널을 검색하세요...',
-                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                      hintStyle: TextStyle(color: theme.hintColor),
+                      prefixIcon: Icon(Icons.search,
+                          color: theme.iconTheme.color?.withOpacity(0.6)),
                       suffixIcon: _controller.text.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear, color: Colors.grey),
+                              icon: Icon(Icons.clear,
+                                  color:
+                                      theme.iconTheme.color?.withOpacity(0.6)),
                               onPressed: _clearSearch,
                             )
                           : null,
                       filled: true,
-                      fillColor: Colors.grey[100],
+                      fillColor: theme.brightness == Brightness.dark
+                          ? theme.cardColor
+                          : Colors.grey[100],
                       contentPadding: const EdgeInsets.symmetric(vertical: 0),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
@@ -268,21 +281,24 @@ class SearchScreenState extends State<SearchScreen> {
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
                         borderSide:
-                            const BorderSide(color: Colors.blue, width: 1),
+                            BorderSide(color: theme.primaryColor, width: 1),
                       ),
                     ),
-                    onSubmitted: _search, // 직접 search 메서드 호출
+                    style: TextStyle(color: textTheme.bodyLarge?.color),
+                    onSubmitted: _search,
                     textInputAction: TextInputAction.search,
                   ),
                 ),
 
-                // 검색 버튼 추가 (텍스트가 있을 때만)
+                // 검색 버튼
                 if (_controller.text.isNotEmpty) ...[
                   const SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: _handleSearch,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
+                      backgroundColor: theme.primaryColor,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -310,8 +326,8 @@ class SearchScreenState extends State<SearchScreen> {
           // 검색 결과
           Expanded(
             child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: Colors.blue))
+                ? Center(
+                    child: CircularProgressIndicator(color: theme.primaryColor))
                 : !_hasSearched
                     ? _buildInitialView()
                     : !_hasResults()
@@ -323,24 +339,26 @@ class SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // 검색 옵션 바
   Widget _buildSearchOptionsBar() {
-    bool hasResults = _hasResults();
+    final theme = Theme.of(context);
+    final hasResults = _hasResults();
 
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 4, 16, hasResults ? 0 : 4),
       child: Row(
         children: [
-          // 카테고리 추가 버튼 (왼쪽에 배치)
+          // 카테고리 추가 버튼
           InkWell(
-            onTap: () => _addToNewsCategories(_lastQuery), // _lastQuery 사용
+            onTap: () => _addToNewsCategories(_lastQuery),
             borderRadius: BorderRadius.circular(16),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.blue[50],
+                color: theme.colorScheme.primaryContainer,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.blue[100]!, width: 1),
+                border: Border.all(
+                    color: theme.colorScheme.primary.withOpacity(0.3),
+                    width: 1),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -349,13 +367,13 @@ class SearchScreenState extends State<SearchScreen> {
                     "카테고리에 추가",
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.blue[700],
+                      color: theme.colorScheme.onPrimaryContainer,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   const SizedBox(width: 4),
                   Icon(Icons.add_circle_outline,
-                      size: 14, color: Colors.blue[700]),
+                      size: 14, color: theme.colorScheme.onPrimaryContainer),
                 ],
               ),
             ),
@@ -363,7 +381,7 @@ class SearchScreenState extends State<SearchScreen> {
 
           const Spacer(),
 
-          // 정렬 옵션 (오른쪽에 배치)
+          // 정렬 옵션
           _buildSortOption(
             context: context,
             label: "정확순",
@@ -389,12 +407,11 @@ class SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // 검색 결과 필터 칩
   Widget _buildFilterChips() {
-    // 모든 필터가 꺼져있으면 하나라도 활성화 (최소 하나는 항상 선택되도록)
+    // 모든 필터가 꺼져있으면 하나라도 활성화
     if (!_showNews && !_showRssItems && !_showChannels) {
       setState(() {
-        _showNews = true; // 기본적으로 뉴스는 항상 표시
+        _showNews = true;
       });
     }
 
@@ -430,25 +447,54 @@ class SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // 필터 칩 위젯
   Widget _buildFilterChip({
     required String label,
     required int count,
     required bool isSelected,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+    final searchStyle = AppTheme.searchStyleOf(context);
+
+    Color chipBackground;
+    Color chipBorderColor;
+    Color chipTextColor;
+
+    if (isSelected) {
+      if (label == '뉴스') {
+        chipBackground = theme.primaryColor.withOpacity(0.1);
+        chipBorderColor = theme.primaryColor.withOpacity(0.3);
+        chipTextColor = theme.primaryColor;
+      } else if (label == 'RSS 피드') {
+        chipBackground = searchStyle.rssTagBackground.withOpacity(0.8);
+        chipBorderColor = searchStyle.rssTagBorder;
+        chipTextColor = searchStyle.rssTagText;
+      } else {
+        chipBackground = searchStyle.channelTagBackground.withOpacity(0.8);
+        chipBorderColor = searchStyle.channelTagBorder;
+        chipTextColor = searchStyle.channelTagText;
+      }
+    } else {
+      chipBackground = theme.brightness == Brightness.dark
+          ? Colors.grey[800]!.withOpacity(0.5)
+          : Colors.grey[100]!;
+      chipBorderColor = theme.brightness == Brightness.dark
+          ? Colors.grey[700]!
+          : Colors.grey[300]!;
+      chipTextColor = theme.brightness == Brightness.dark
+          ? Colors.grey[300]!
+          : Colors.grey[700]!;
+    }
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.blue[50] : Colors.grey[100],
+          color: chipBackground,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: isSelected ? Colors.blue[300]! : Colors.grey[300]!,
-            width: 1,
-          ),
+          border: Border.all(color: chipBorderColor, width: 1),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -458,14 +504,18 @@ class SearchScreenState extends State<SearchScreen> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: isSelected ? Colors.blue[700] : Colors.grey[700],
+                color: chipTextColor,
               ),
             ),
             const SizedBox(width: 4),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: isSelected ? Colors.blue[100] : Colors.grey[200],
+                color: isSelected
+                    ? chipTextColor.withOpacity(0.2)
+                    : theme.brightness == Brightness.dark
+                        ? Colors.grey[700]
+                        : Colors.grey[200],
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
@@ -473,7 +523,7 @@ class SearchScreenState extends State<SearchScreen> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: isSelected ? Colors.blue[700] : Colors.grey[700],
+                  color: chipTextColor,
                 ),
               ),
             ),
@@ -481,7 +531,7 @@ class SearchScreenState extends State<SearchScreen> {
             Icon(
               isSelected ? Icons.check_circle : Icons.circle_outlined,
               size: 16,
-              color: isSelected ? Colors.blue[400] : Colors.grey[400],
+              color: chipTextColor,
             ),
           ],
         ),
@@ -489,20 +539,18 @@ class SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // 검색 결과 리스트 구성
   Widget _buildSearchResultsList() {
+    final theme = Theme.of(context);
     List<Widget> resultWidgets = [];
 
     // 뉴스 결과
     if (_showNews && _searchResult!.newsResults.isNotEmpty) {
-      // 뉴스 섹션 헤더 (필요한 경우)
       if ((_showRssItems && _searchResult!.rssItemResults.isNotEmpty) ||
           (_showChannels && _searchResult!.rssChannelResults.isNotEmpty)) {
         resultWidgets
             .add(_buildSectionHeader('뉴스', _searchResult!.newsResults.length));
       }
 
-      // 뉴스 결과 목록
       for (var i = 0; i < _searchResult!.newsResults.length; i++) {
         resultWidgets.add(NewsApiItemCard(
           news: _searchResult!.newsResults[i],
@@ -514,22 +562,24 @@ class SearchScreenState extends State<SearchScreen> {
         if (i < _searchResult!.newsResults.length - 1 ||
             (_showRssItems && _searchResult!.rssItemResults.isNotEmpty) ||
             (_showChannels && _searchResult!.rssChannelResults.isNotEmpty)) {
-          resultWidgets
-              .add(const Divider(height: 1, indent: 16, endIndent: 16));
+          resultWidgets.add(Divider(
+            height: 1,
+            indent: 16,
+            endIndent: 16,
+            color: theme.dividerTheme.color,
+          ));
         }
       }
     }
 
     // RSS 피드 결과
     if (_showRssItems && _searchResult!.rssItemResults.isNotEmpty) {
-      // RSS 피드 섹션 헤더 (필요한 경우)
       if ((_showNews && _searchResult!.newsResults.isNotEmpty) ||
           (_showChannels && _searchResult!.rssChannelResults.isNotEmpty)) {
         resultWidgets.add(_buildSectionHeader(
             'RSS 피드', _searchResult!.rssItemResults.length));
       }
 
-      // RSS 피드 결과 목록
       for (var i = 0; i < _searchResult!.rssItemResults.length; i++) {
         resultWidgets.add(SearchRssItemCard(
           item: _searchResult!.rssItemResults[i],
@@ -540,22 +590,24 @@ class SearchScreenState extends State<SearchScreen> {
 
         if (i < _searchResult!.rssItemResults.length - 1 ||
             (_showChannels && _searchResult!.rssChannelResults.isNotEmpty)) {
-          resultWidgets
-              .add(const Divider(height: 1, indent: 16, endIndent: 16));
+          resultWidgets.add(Divider(
+            height: 1,
+            indent: 16,
+            endIndent: 16,
+            color: theme.dividerTheme.color,
+          ));
         }
       }
     }
 
     // 채널 결과
     if (_showChannels && _searchResult!.rssChannelResults.isNotEmpty) {
-      // 채널 섹션 헤더 (필요한 경우)
       if ((_showNews && _searchResult!.newsResults.isNotEmpty) ||
           (_showRssItems && _searchResult!.rssItemResults.isNotEmpty)) {
         resultWidgets.add(
             _buildSectionHeader('채널', _searchResult!.rssChannelResults.length));
       }
 
-      // 채널 결과 목록
       for (var i = 0; i < _searchResult!.rssChannelResults.length; i++) {
         resultWidgets.add(SearchRssChannelCard(
           channel: _searchResult!.rssChannelResults[i],
@@ -565,8 +617,12 @@ class SearchScreenState extends State<SearchScreen> {
         ));
 
         if (i < _searchResult!.rssChannelResults.length - 1) {
-          resultWidgets
-              .add(const Divider(height: 1, indent: 16, endIndent: 16));
+          resultWidgets.add(Divider(
+            height: 1,
+            indent: 16,
+            endIndent: 16,
+            color: theme.dividerTheme.color,
+          ));
         }
       }
     }
@@ -577,10 +633,15 @@ class SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // 섹션 헤더 위젯
   Widget _buildSectionHeader(String title, int count) {
+    final theme = Theme.of(context);
+
+    Color backgroundColor = theme.brightness == Brightness.dark
+        ? theme.cardColor.withOpacity(0.3)
+        : Colors.grey[50]!;
+
     return Container(
-      color: Colors.grey[50],
+      color: backgroundColor,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
         children: [
@@ -589,7 +650,7 @@ class SearchScreenState extends State<SearchScreen> {
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: Colors.grey[800],
+              color: theme.textTheme.titleSmall?.color,
               letterSpacing: -0.5,
             ),
           ),
@@ -597,7 +658,9 @@ class SearchScreenState extends State<SearchScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: Colors.grey[200],
+              color: theme.brightness == Brightness.dark
+                  ? Colors.grey[800]
+                  : Colors.grey[200],
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
@@ -605,7 +668,9 @@ class SearchScreenState extends State<SearchScreen> {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey[700],
+                color: theme.brightness == Brightness.dark
+                    ? Colors.grey[300]
+                    : Colors.grey[700],
               ),
             ),
           ),
@@ -614,19 +679,21 @@ class SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // 검색 전 초기 화면
   Widget _buildInitialView() {
+    final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.search, size: 64, color: Colors.grey),
+          Icon(Icons.search, size: 64, color: subscribeStyle.emptyIconColor),
           const SizedBox(height: 16),
           Text(
             '검색어를 입력하세요',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey[700],
+              color: subscribeStyle.emptyTextColor,
+              fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: 8),
@@ -634,7 +701,7 @@ class SearchScreenState extends State<SearchScreen> {
             '뉴스, RSS 피드, 채널을 모두 검색할 수 있습니다',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey[500],
+              color: subscribeStyle.hintTextColor,
             ),
           ),
         ],
@@ -642,19 +709,21 @@ class SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // 검색 결과 없음 화면
   Widget _buildEmptyResultView() {
+    final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+          Icon(Icons.search_off,
+              size: 64, color: subscribeStyle.emptyIconColor),
           const SizedBox(height: 16),
           Text(
             '\'${_lastQuery}\' 검색 결과가 없습니다',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey[700],
+              color: subscribeStyle.emptyTextColor,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -663,7 +732,7 @@ class SearchScreenState extends State<SearchScreen> {
             '다른 검색어로 시도해보세요',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey[600],
+              color: subscribeStyle.hintTextColor,
             ),
           ),
         ],
@@ -671,19 +740,22 @@ class SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // 심플하고 모던한 정렬 옵션 버튼 위젯
   Widget _buildSortOption(
       {required BuildContext context,
       required String label,
       required bool isSelected,
       required VoidCallback onTap}) {
+    final theme = Theme.of(context);
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.blue[50] : Colors.transparent,
+          color: isSelected
+              ? theme.primaryColor.withOpacity(0.1)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -694,7 +766,9 @@ class SearchScreenState extends State<SearchScreen> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? Colors.blue : Colors.black54,
+                color: isSelected
+                    ? theme.primaryColor
+                    : theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
               ),
             ),
             if (isSelected) ...[
@@ -702,7 +776,7 @@ class SearchScreenState extends State<SearchScreen> {
               Icon(
                 Icons.check_circle,
                 size: 14,
-                color: Colors.blue,
+                color: theme.primaryColor,
               ),
             ],
           ],
@@ -711,7 +785,6 @@ class SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  // 검색 결과가 있는지 확인
   bool _hasResults() {
     if (_searchResult == null) return false;
 

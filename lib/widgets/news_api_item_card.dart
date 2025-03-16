@@ -1,19 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:omninews_flutter/models/news.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:omninews_flutter/provider/settings_provider.dart';
 import 'package:omninews_flutter/services/news_bookmark_service.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
+import 'package:omninews_flutter/models/app_setting.dart';
+import 'package:omninews_flutter/utils/url_launcher_helper.dart';
+import 'package:provider/provider.dart';
 
 class NewsApiItemCard extends StatefulWidget {
   final NewsApi news;
   final VoidCallback? onBookmarkChanged;
-  final bool isAlreadyBookmarked; // 추가된 속성
+  final bool isAlreadyBookmarked;
 
   const NewsApiItemCard({
     super.key,
     required this.news,
     this.onBookmarkChanged,
-    this.isAlreadyBookmarked = false, // 기본값은 false
+    this.isAlreadyBookmarked = false,
   });
 
   @override
@@ -27,7 +31,6 @@ class _NewsApiItemCardState extends State<NewsApiItemCard> {
   @override
   void initState() {
     super.initState();
-    // 이미 북마크된 상태라면 상태 변수를 true로 설정
     if (widget.isAlreadyBookmarked) {
       _isBookmarked = true;
     } else {
@@ -36,7 +39,6 @@ class _NewsApiItemCardState extends State<NewsApiItemCard> {
   }
 
   Future<void> _checkBookmarkStatus() async {
-    // 기존 확인 방식 대신 통합 확인 메서드 사용
     final isBookmarked =
         await NewsBookmarkService.isAnyBookmarked(widget.news.newsOriginalLink);
     if (mounted) {
@@ -67,7 +69,6 @@ class _NewsApiItemCardState extends State<NewsApiItemCard> {
           _isBookmarked = !_isBookmarked;
         });
 
-        // 북마크 상태가 변경되면 콜백 호출
         if (widget.onBookmarkChanged != null) {
           widget.onBookmarkChanged!();
         }
@@ -76,6 +77,8 @@ class _NewsApiItemCardState extends State<NewsApiItemCard> {
           SnackBar(
             content: Text(_isBookmarked ? '북마크에 추가되었습니다' : '북마크에서 제거되었습니다'),
             duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).primaryColor,
           ),
         );
       }
@@ -85,6 +88,8 @@ class _NewsApiItemCardState extends State<NewsApiItemCard> {
           SnackBar(
             content: Text('북마크 변경 중 오류가 발생했습니다: $e'),
             duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -97,28 +102,25 @@ class _NewsApiItemCardState extends State<NewsApiItemCard> {
     }
   }
 
-  Future<void> _launchURL() async {
-    final Uri uri = Uri.parse(widget.news.newsOriginalLink);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('링크를 열 수 없습니다'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    }
+  void _openNewsLink(AppSettings settings) {
+    // 설정된 웹 열기 방식을 사용하여 URL 열기
+    UrlLauncherHelper.openUrl(
+        context, widget.news.newsOriginalLink, settings.webOpenMode);
   }
 
   @override
   Widget build(BuildContext context) {
+    final cardStyle = AppTheme.newsCardStyleOf(context);
+    final theme = Theme.of(context);
+    final settings = Provider.of<SettingsProvider>(context).settings;
+
+    // NewsApi 클래스에 이미지 URL이 있는지 확인하고, 있다면 뷰 모드에 따라 처리할 수 있음
+    // 현재는 텍스트만 표시하는 방식으로 구현
+
     return InkWell(
-      onTap: _launchURL,
+      onTap: () => _openNewsLink(settings), // 설정에 따라 URL 열기
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        padding: cardStyle.cardPadding,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -129,12 +131,7 @@ class _NewsApiItemCardState extends State<NewsApiItemCard> {
                 Expanded(
                   child: Text(
                     _removeHtmlTags(widget.news.newsTitle),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                      height: 1.3,
-                    ),
+                    style: cardStyle.titleStyle,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -143,18 +140,21 @@ class _NewsApiItemCardState extends State<NewsApiItemCard> {
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   icon: _isLoading
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
+                            color: theme.primaryColor,
                           ),
                         )
                       : Icon(
                           _isBookmarked
                               ? Icons.bookmark
                               : Icons.bookmark_border,
-                          color: _isBookmarked ? Colors.blue : Colors.grey,
+                          color: _isBookmarked
+                              ? cardStyle.bookmarkActiveColor
+                              : cardStyle.bookmarkInactiveColor,
                           size: 20,
                         ),
                   onPressed: _toggleBookmark,
@@ -167,11 +167,7 @@ class _NewsApiItemCardState extends State<NewsApiItemCard> {
             Text(
               _truncateDescription(
                   _removeHtmlTags(widget.news.newsDescription)),
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[700],
-                height: 1.2,
-              ),
+              style: cardStyle.descriptionStyle,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
@@ -182,19 +178,12 @@ class _NewsApiItemCardState extends State<NewsApiItemCard> {
               children: [
                 Text(
                   _extractDomain(widget.news.newsOriginalLink),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    color: Colors.blue[700],
-                  ),
+                  style: cardStyle.sourceStyle,
                 ),
                 const SizedBox(width: 8),
                 Text(
                   _formatDate(widget.news.newsPubDate),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
+                  style: cardStyle.dateStyle,
                 ),
               ],
             ),

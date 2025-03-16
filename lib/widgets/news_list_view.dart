@@ -1,15 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:omninews_flutter/models/app_setting.dart';
 import 'package:omninews_flutter/models/news.dart';
+import 'package:omninews_flutter/provider/settings_provider.dart';
 import 'package:omninews_flutter/screens/news_detail_screen.dart';
-import 'package:intl/intl.dart'; // 날짜 포맷팅용
+import 'package:intl/intl.dart';
 import 'package:omninews_flutter/services/news_bookmark_service.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
+import 'package:provider/provider.dart';
 
 class NewsListView extends StatefulWidget {
   final Future<List<News>> newsList;
   final VoidCallback? onBookmarkChanged;
 
   const NewsListView({
-    super.key, 
+    super.key,
     required this.newsList,
     this.onBookmarkChanged,
   });
@@ -24,14 +28,20 @@ class _NewsListViewState extends State<NewsListView> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cardStyle = AppTheme.newsCardStyleOf(context);
+    final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
+    final settings = Provider.of<SettingsProvider>(context).settings;
+
     return FutureBuilder<List<News>>(
       future: widget.newsList,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-              child: CircularProgressIndicator(
-            color: Colors.blue,
-          ));
+          return Center(
+            child: CircularProgressIndicator(
+              color: theme.primaryColor,
+            ),
+          );
         } else if (snapshot.hasError) {
           return Center(
             child: Padding(
@@ -39,12 +49,16 @@ class _NewsListViewState extends State<NewsListView> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+                  Icon(
+                    Icons.error_outline,
+                    size: 48,
+                    color: subscribeStyle.errorIconColor,
+                  ),
                   const SizedBox(height: 12),
                   Text(
                     'Failed to load news',
                     style: TextStyle(
-                      color: Colors.grey[800],
+                      color: subscribeStyle.emptyTextColor,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
@@ -52,7 +66,10 @@ class _NewsListViewState extends State<NewsListView> {
                   const SizedBox(height: 4),
                   Text(
                     '${snapshot.error}',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                    style: TextStyle(
+                      color: subscribeStyle.hintTextColor,
+                      fontSize: 14,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -61,127 +78,54 @@ class _NewsListViewState extends State<NewsListView> {
           );
         } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
           List<News> data = snapshot.data!;
-          
+
           // 각 뉴스의 북마크 상태 확인
           for (var news in data) {
             if (!_bookmarkStatus.containsKey(news.newsLink)) {
               _checkBookmarkStatus(news.newsLink);
             }
           }
-          
+
           return ListView.builder(
             padding: const EdgeInsets.only(top: 8),
             itemCount: data.length,
             itemBuilder: (context, index) {
+              final news = data[index];
+              final hasImage = news.newsImageLink.isNotEmpty;
+              final showImage =
+                  hasImage && settings.viewMode == ViewMode.textAndImage;
+
               return InkWell(
                 onTap: () {
+                  // NewsDetailScreen으로 이동하며 webOpenMode 설정도 함께 전달
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => NewsDetailScreen(news: data[index]),
+                      builder: (context) => NewsDetailScreen(news: news),
                     ),
                   );
                 },
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // 좌측: 텍스트 정보
-                      Expanded(
-                        flex: 3,
-                        child: Column(
+                  padding: cardStyle.cardPadding,
+                  child: settings.viewMode == ViewMode.textOnly
+                      ? _buildTextOnlyLayout(news, cardStyle, theme)
+                      : Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 뉴스 제목과 북마크 버튼
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    data[index].newsTitle,
-                                    style: const TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.black,
-                                      height: 1.3,
-                                    ),
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                // 북마크 버튼 추가
-                                IconButton(
-                                  padding: EdgeInsets.zero,
-                                  constraints: const BoxConstraints(),
-                                  icon: _loadingStatus[data[index].newsLink] == true
-                                    ? const SizedBox(
-                                        width: 16,
-                                        height: 16,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                        ),
-                                      )
-                                    : Icon(
-                                        _bookmarkStatus[data[index].newsLink] == true
-                                            ? Icons.bookmark
-                                            : Icons.bookmark_border,
-                                        color: _bookmarkStatus[data[index].newsLink] == true
-                                            ? Colors.blue
-                                            : Colors.grey,
-                                        size: 20,
-                                      ),
-                                  onPressed: () => _toggleBookmark(data[index]),
-                                ),
-                              ],
+                            // 좌측: 텍스트 정보
+                            Expanded(
+                              flex: 3,
+                              child: _buildNewsContent(news, cardStyle, theme),
                             ),
-                            const SizedBox(height: 6),
 
-                            // 뉴스 내용 요약
-                            Text(
-                              _truncateDescription(data[index].newsDescription),
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[700],
-                                height: 1.2,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 8),
-
-                            // 출처 및 날짜
-                            Row(
-                              children: [
-                                Text(
-                                  data[index].newsSource,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.blue[700],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Text(
-                                  _formatDate(data[index].newsPubDate),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ],
-                            ),
+                            // 여백과 이미지 (이미지 모드일 때만)
+                            if (showImage) ...[
+                              const SizedBox(width: 12),
+                              _buildThumbnail(
+                                  news.newsImageLink, news.newsLink),
+                            ],
                           ],
                         ),
-                      ),
-
-                      // 여백
-                      const SizedBox(width: 12),
-
-                      // 우측: 썸네일 이미지
-                      _buildThumbnail(data[index].newsImageLink),
-                    ],
-                  ),
                 ),
               );
             },
@@ -191,12 +135,16 @@ class _NewsListViewState extends State<NewsListView> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.newspaper, size: 48, color: Colors.grey[400]),
+                Icon(
+                  Icons.newspaper,
+                  size: 48,
+                  color: subscribeStyle.emptyIconColor,
+                ),
                 const SizedBox(height: 12),
                 Text(
                   '뉴스가 없습니다',
                   style: TextStyle(
-                    color: Colors.grey[700],
+                    color: subscribeStyle.emptyTextColor,
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
                   ),
@@ -206,6 +154,85 @@ class _NewsListViewState extends State<NewsListView> {
           );
         }
       },
+    );
+  }
+
+  // 텍스트 전용 레이아웃
+  Widget _buildTextOnlyLayout(
+      News news, NewsCardStyleExtension cardStyle, ThemeData theme) {
+    return _buildNewsContent(news, cardStyle, theme);
+  }
+
+  // 뉴스 내용 위젯 (텍스트만)
+  Widget _buildNewsContent(
+      News news, NewsCardStyleExtension cardStyle, ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 뉴스 제목과 북마크 버튼
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                news.newsTitle,
+                style: cardStyle.titleStyle,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            // 북마크 버튼
+            IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              icon: _loadingStatus[news.newsLink] == true
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: theme.primaryColor,
+                      ),
+                    )
+                  : Icon(
+                      _bookmarkStatus[news.newsLink] == true
+                          ? Icons.bookmark
+                          : Icons.bookmark_border,
+                      color: _bookmarkStatus[news.newsLink] == true
+                          ? cardStyle.bookmarkActiveColor
+                          : cardStyle.bookmarkInactiveColor,
+                      size: 20,
+                    ),
+              onPressed: () => _toggleBookmark(news),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+
+        // 뉴스 내용 요약
+        Text(
+          _truncateDescription(news.newsDescription),
+          style: cardStyle.descriptionStyle,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 8),
+
+        // 출처 및 날짜
+        Row(
+          children: [
+            Text(
+              news.newsSource,
+              style: cardStyle.sourceStyle,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _formatDate(news.newsPubDate),
+              style: cardStyle.dateStyle,
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -237,7 +264,8 @@ class _NewsListViewState extends State<NewsListView> {
 
       if (success && mounted) {
         setState(() {
-          _bookmarkStatus[news.newsLink] = !(_bookmarkStatus[news.newsLink] ?? false);
+          _bookmarkStatus[news.newsLink] =
+              !(_bookmarkStatus[news.newsLink] ?? false);
         });
 
         // 북마크 상태 변경 시 콜백 호출
@@ -251,11 +279,23 @@ class _NewsListViewState extends State<NewsListView> {
                 ? '북마크에 추가되었습니다'
                 : '북마크에서 제거되었습니다'),
             duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).primaryColor,
           ),
         );
       }
     } catch (e) {
       debugPrint('Error toggling bookmark: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('북마크 변경 중 오류가 발생했습니다: $e'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -266,35 +306,49 @@ class _NewsListViewState extends State<NewsListView> {
   }
 
   // 썸네일 이미지 위젯
-  Widget _buildThumbnail(String imageUrl) {
+  Widget _buildThumbnail(String imageUrl, String newsLink) {
+    final theme = Theme.of(context);
+
     return SizedBox(
       width: 100,
       height: 75,
       child: imageUrl.isNotEmpty
-          ? ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey[200],
-                    child: const Icon(
-                      Icons.image_not_supported_outlined,
-                      color: Colors.grey,
-                    ),
-                  );
-                },
+          ? Hero(
+              tag: 'news_image_$newsLink', // Hero 애니메이션 추가
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: theme.brightness == Brightness.dark
+                          ? Colors.grey[800]
+                          : Colors.grey[200],
+                      child: Icon(
+                        Icons.image_not_supported_outlined,
+                        color: theme.brightness == Brightness.dark
+                            ? Colors.grey[600]
+                            : Colors.grey[400],
+                        size: 24,
+                      ),
+                    );
+                  },
+                ),
               ),
             )
           : Container(
               decoration: BoxDecoration(
-                color: Colors.grey[200],
+                color: theme.brightness == Brightness.dark
+                    ? Colors.grey[800]
+                    : Colors.grey[200],
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.image_outlined,
-                color: Colors.grey,
+                color: theme.brightness == Brightness.dark
+                    ? Colors.grey[600]
+                    : Colors.grey[400],
                 size: 30,
               ),
             ),
