@@ -4,6 +4,7 @@ import 'package:omninews_flutter/screens/home_screen.dart';
 import 'package:omninews_flutter/services/rss_service.dart';
 import 'package:omninews_flutter/screens/rss_add_screen.dart';
 import 'package:omninews_flutter/screens/rss_channel_detail_screen.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
 
 class RssScreen extends StatefulWidget {
   const RssScreen({super.key});
@@ -79,7 +80,7 @@ class _RssScreenState extends State<RssScreen>
         .toList();
   }
 
-  // 채널 구독 처리 함수 - 추가
+  // 채널 구독 처리 함수
   Future<void> _subscribeToChannel(RssChannel channel) async {
     // 이미 구독 처리 중인 채널은 중복 실행 방지
     if (_subscribingStatus[channel.channelRssLink] == true) {
@@ -98,18 +99,23 @@ class _RssScreenState extends State<RssScreen>
           SnackBar(
             content: Text('${channel.channelTitle} 구독되었습니다'),
             duration: const Duration(seconds: 2),
+            backgroundColor: Theme.of(context).primaryColor,
+            behavior: SnackBarBehavior.floating,
           ),
         );
 
         // 데이터 갱신
         _refreshData();
 
+        // 첫번째 탭(구독 중)으로 이동
         _tabController.animateTo(0);
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('구독 처리 중 오류가 발생했습니다'),
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: const Text('구독 처리 중 오류가 발생했습니다'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -119,6 +125,8 @@ class _RssScreenState extends State<RssScreen>
           SnackBar(
             content: Text('오류가 발생했습니다: $e'),
             duration: const Duration(seconds: 2),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -131,7 +139,7 @@ class _RssScreenState extends State<RssScreen>
     }
   }
 
-  // 채널 구독 취소 처리 함수 - 추가
+  // 채널 구독 취소 처리 함수
   Future<void> _unsubscribeFromChannel(RssChannel channel) async {
     // 이미 구독 취소 처리 중인 채널은 중복 실행 방지
     if (_subscribingStatus[channel.channelRssLink] == true) {
@@ -151,6 +159,8 @@ class _RssScreenState extends State<RssScreen>
           SnackBar(
             content: Text('${channel.channelTitle} 구독 취소되었습니다'),
             duration: const Duration(seconds: 2),
+            backgroundColor: Theme.of(context).primaryColor,
+            behavior: SnackBarBehavior.floating,
           ),
         );
 
@@ -158,9 +168,11 @@ class _RssScreenState extends State<RssScreen>
         _refreshData();
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('구독 취소 처리 중 오류가 발생했습니다'),
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: const Text('구독 취소 처리 중 오류가 발생했습니다'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -170,6 +182,8 @@ class _RssScreenState extends State<RssScreen>
           SnackBar(
             content: Text('오류가 발생했습니다: $e'),
             duration: const Duration(seconds: 2),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -192,32 +206,38 @@ class _RssScreenState extends State<RssScreen>
   Widget build(BuildContext context) {
     super.build(context); // AutomaticKeepAliveClientMixin 필수
 
+    // 테마 속성 가져오기
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: NestedScrollView(
         headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
           return [
             SliverAppBar(
               leading: IconButton(
-                icon: const Icon(Icons.menu, color: Colors.black87),
+                icon: Icon(
+                  Icons.menu,
+                  color: theme.appBarTheme.iconTheme?.color,
+                ),
                 onPressed: () {
                   homeScaffoldKey.currentState?.openDrawer();
                 },
               ),
               pinned: true,
               elevation: 0,
-              backgroundColor: Colors.white,
-              title: const Text(
+              backgroundColor: theme.appBarTheme.backgroundColor,
+              title: Text(
                 'RSS Feeds',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 20,
-                ),
+                style: textTheme.headlineMedium,
               ),
               actions: [
                 IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.black87),
+                  icon: Icon(
+                    Icons.refresh,
+                    color: theme.appBarTheme.iconTheme?.color,
+                  ),
                   onPressed: _refreshData,
                 ),
               ],
@@ -226,20 +246,15 @@ class _RssScreenState extends State<RssScreen>
               delegate: _SliverAppBarDelegate(
                 TabBar(
                   controller: _tabController,
-                  indicatorColor: Colors.blue,
-                  labelColor: Colors.blue,
-                  unselectedLabelColor: Colors.black87,
+                  indicatorColor: theme.primaryColor,
+                  labelColor: theme.primaryColor,
+                  unselectedLabelColor: textTheme.bodyLarge?.color,
                   indicatorWeight: 3,
-                  labelStyle: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 17,
-                  ),
-                  unselectedLabelStyle: const TextStyle(
-                    fontWeight: FontWeight.normal,
-                    fontSize: 15,
-                  ),
+                  labelStyle: textTheme.labelLarge,
+                  unselectedLabelStyle: textTheme.labelMedium,
                   tabs: _tabs.map((String tab) => Tab(text: tab)).toList(),
                 ),
+                theme: theme,
               ),
               floating: true,
               pinned: true,
@@ -247,7 +262,8 @@ class _RssScreenState extends State<RssScreen>
           ];
         },
         body: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? Center(
+                child: CircularProgressIndicator(color: theme.primaryColor))
             : TabBarView(
                 controller: _tabController,
                 children: [
@@ -274,7 +290,9 @@ class _RssScreenState extends State<RssScreen>
           // 화면으로 돌아왔을 때 새로고침
           _refreshData();
         },
-        backgroundColor: Colors.blue,
+        backgroundColor: theme.primaryColor,
+        foregroundColor: Colors.white,
+        elevation: 4,
         child: const Icon(Icons.add),
       ),
     );
@@ -282,26 +300,37 @@ class _RssScreenState extends State<RssScreen>
 
   // 구독 중인 RSS 탭 빌드
   Widget _buildSubscribedTab() {
+    final theme = Theme.of(context);
+    final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
+
     return RefreshIndicator(
       onRefresh: () async {
         _refreshData();
       },
+      color: theme.primaryColor,
+      backgroundColor: theme.cardColor,
       child: FutureBuilder<List<RssChannel>>(
         future: subscribedChannels,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(
+              child: CircularProgressIndicator(color: theme.primaryColor),
+            );
           } else if (snapshot.hasError) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+                  Icon(
+                    Icons.error_outline,
+                    size: 48,
+                    color: subscribeStyle.errorIconColor,
+                  ),
                   const SizedBox(height: 12),
                   Text(
                     '데이터를 불러올 수 없습니다',
                     style: TextStyle(
-                      color: Colors.grey[800],
+                      color: subscribeStyle.emptyTextColor,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
@@ -313,8 +342,12 @@ class _RssScreenState extends State<RssScreen>
             return ListView.separated(
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: snapshot.data!.length,
-              separatorBuilder: (context, index) =>
-                  const Divider(height: 1, indent: 16, endIndent: 16),
+              separatorBuilder: (context, index) => Divider(
+                height: 1,
+                indent: 16,
+                endIndent: 16,
+                color: theme.dividerTheme.color,
+              ),
               itemBuilder: (context, index) {
                 final channel = snapshot.data![index];
                 return _buildChannelListItem(
@@ -333,26 +366,37 @@ class _RssScreenState extends State<RssScreen>
 
   // 추천 RSS 탭 빌드 - 구독 중인 채널은 제외됨
   Widget _buildRecommendedTab() {
+    final theme = Theme.of(context);
+    final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
+
     return RefreshIndicator(
       onRefresh: () async {
         _refreshData();
       },
+      color: theme.primaryColor,
+      backgroundColor: theme.cardColor,
       child: FutureBuilder<List<RssChannel>>(
         future: recommendedChannels,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(
+              child: CircularProgressIndicator(color: theme.primaryColor),
+            );
           } else if (snapshot.hasError) {
             return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+                  Icon(
+                    Icons.error_outline,
+                    size: 48,
+                    color: subscribeStyle.errorIconColor,
+                  ),
                   const SizedBox(height: 12),
                   Text(
                     '추천 채널을 불러오는데 실패했습니다',
                     style: TextStyle(
-                      color: Colors.grey[800],
+                      color: subscribeStyle.emptyTextColor,
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
                     ),
@@ -364,8 +408,12 @@ class _RssScreenState extends State<RssScreen>
             return ListView.separated(
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: snapshot.data!.length,
-              separatorBuilder: (context, index) =>
-                  const Divider(height: 1, indent: 16, endIndent: 16),
+              separatorBuilder: (context, index) => Divider(
+                height: 1,
+                indent: 16,
+                endIndent: 16,
+                color: theme.dividerTheme.color,
+              ),
               itemBuilder: (context, index) {
                 final channel = snapshot.data![index];
                 // 필터링된 목록이므로 모두 구독되지 않은 상태
@@ -384,11 +432,14 @@ class _RssScreenState extends State<RssScreen>
     );
   }
 
-  // 채널 리스트 아이템 위젯 - 수정: 구독 버튼 동작 추가
+  // 채널 리스트 아이템 위젯
   Widget _buildChannelListItem({
     required RssChannel channel,
     required bool isSubscribed,
   }) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
     return InkWell(
       onTap: () {
         Navigator.push(
@@ -407,8 +458,11 @@ class _RssScreenState extends State<RssScreen>
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // 채널 아이콘/이미지
-            _buildChannelImage(channel),
+            // 채널 아이콘/이미지 - Hero 애니메이션 추가
+            Hero(
+              tag: 'channel_${channel.channelRssLink}',
+              child: _buildChannelImage(channel),
+            ),
             const SizedBox(width: 16),
 
             // 채널 정보
@@ -418,10 +472,8 @@ class _RssScreenState extends State<RssScreen>
                 children: [
                   Text(
                     channel.channelTitle,
-                    style: const TextStyle(
+                    style: textTheme.titleLarge?.copyWith(
                       fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
                       height: 1.3,
                     ),
                     maxLines: 1,
@@ -430,35 +482,33 @@ class _RssScreenState extends State<RssScreen>
                   const SizedBox(height: 4),
                   Text(
                     channel.channelDescription,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[700],
-                      height: 1.2,
-                    ),
+                    style: textTheme.bodyMedium?.copyWith(height: 1.2),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      Icon(Icons.language, size: 12, color: Colors.grey[600]),
+                      Icon(
+                        Icons.language,
+                        size: 12,
+                        color: textTheme.bodySmall?.color,
+                      ),
                       const SizedBox(width: 4),
                       Text(
-                        channel.channelLanguage!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        channel.channelLanguage ?? 'Unknown',
+                        style: textTheme.bodySmall,
                       ),
                       const SizedBox(width: 12),
-                      const Icon(Icons.star, size: 12, color: Colors.amber),
+                      const Icon(
+                        Icons.star,
+                        size: 12,
+                        color: Colors.amber,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         '${channel.channelRank}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
+                        style: textTheme.bodySmall,
                       ),
                     ],
                   ),
@@ -466,7 +516,7 @@ class _RssScreenState extends State<RssScreen>
               ),
             ),
 
-            // 구독 상태 표시 - 수정: 클릭 가능하게 변경
+            // 구독 버튼
             const SizedBox(width: 8),
             InkWell(
               onTap: () {
@@ -476,6 +526,7 @@ class _RssScreenState extends State<RssScreen>
                   _subscribeToChannel(channel);
                 }
               },
+              borderRadius: BorderRadius.circular(16),
               child: _buildSubscriptionIndicator(
                   isSubscribed, channel.channelRssLink),
             ),
@@ -487,8 +538,10 @@ class _RssScreenState extends State<RssScreen>
 
   // 채널 이미지 위젯
   Widget _buildChannelImage(RssChannel channel) {
+    final rssTheme = AppTheme.rssThemeOf(context);
+
     return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
+      borderRadius: BorderRadius.circular(rssTheme.channelImageBorderRadius),
       child:
           channel.channelImageUrl != null && channel.channelImageUrl!.isNotEmpty
               ? Image.network(
@@ -506,10 +559,19 @@ class _RssScreenState extends State<RssScreen>
 
   // 기본 채널 이미지 위젯
   Widget _buildDefaultChannelImage() {
+    final rssTheme = AppTheme.rssThemeOf(context);
+
     return Container(
       width: 60,
       height: 60,
-      color: Colors.blue,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(rssTheme.channelImageBorderRadius),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: rssTheme.channelImageGradientColors,
+        ),
+      ),
       child: const Icon(
         Icons.rss_feed,
         color: Colors.white,
@@ -518,8 +580,10 @@ class _RssScreenState extends State<RssScreen>
     );
   }
 
-  // 구독 상태 표시 위젯 - 수정: 로딩 상태 추가
+  // 구독 상태 표시 위젯
   Widget _buildSubscriptionIndicator(bool isSubscribed, String channelRssLink) {
+    final rssTheme = AppTheme.rssThemeOf(context);
+
     // 구독/구독취소 처리 중인지 확인
     final isProcessing = _subscribingStatus[channelRssLink] == true;
 
@@ -529,7 +593,9 @@ class _RssScreenState extends State<RssScreen>
         height: 24,
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          color: isSubscribed ? Colors.blue.shade700 : Colors.grey.shade600,
+          color: isSubscribed
+              ? rssTheme.subscribeButtonActiveText
+              : rssTheme.subscribeButtonInactiveText,
         ),
       );
     }
@@ -537,7 +603,9 @@ class _RssScreenState extends State<RssScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: isSubscribed ? Colors.blue.shade50 : Colors.grey.shade200,
+        color: isSubscribed
+            ? rssTheme.subscribeButtonActiveBackground
+            : rssTheme.subscribeButtonInactiveBackground,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -546,7 +614,9 @@ class _RssScreenState extends State<RssScreen>
           Icon(
             isSubscribed ? Icons.check : Icons.add,
             size: 16,
-            color: isSubscribed ? Colors.blue.shade700 : Colors.grey.shade700,
+            color: isSubscribed
+                ? rssTheme.subscribeButtonActiveText
+                : rssTheme.subscribeButtonInactiveText,
           ),
           const SizedBox(width: 4),
           Text(
@@ -554,7 +624,9 @@ class _RssScreenState extends State<RssScreen>
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: isSubscribed ? Colors.blue.shade700 : Colors.grey.shade700,
+              color: isSubscribed
+                  ? rssTheme.subscribeButtonActiveText
+                  : rssTheme.subscribeButtonInactiveText,
             ),
           ),
         ],
@@ -564,20 +636,37 @@ class _RssScreenState extends State<RssScreen>
 
   // 빈 상태 위젯
   Widget _buildEmptyState(String message, IconData icon) {
+    final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 48, color: Colors.grey[400]),
-          const SizedBox(height: 12),
+          Icon(
+            icon,
+            size: 48,
+            color: subscribeStyle.emptyIconColor,
+          ),
+          const SizedBox(height: 16),
           Text(
             message,
             style: TextStyle(
-              color: Colors.grey[700],
+              color: subscribeStyle.emptyTextColor,
               fontSize: 16,
               fontWeight: FontWeight.w500,
             ),
           ),
+          const SizedBox(height: 12),
+          if (icon == Icons.rss_feed) ...[
+            Text(
+              'RSS 피드를 추가하려면 아래 + 버튼을 눌러주세요',
+              style: TextStyle(
+                color: subscribeStyle.hintTextColor,
+                fontSize: 14,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ],
       ),
     );
@@ -587,19 +676,20 @@ class _RssScreenState extends State<RssScreen>
 // TabBar를 SliverPersistentHeader로 만들기 위한 delegate 클래스
 class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   final Widget child;
+  final ThemeData theme;
 
-  _SliverAppBarDelegate(this.child);
+  _SliverAppBarDelegate(this.child, {required this.theme});
 
   @override
   Widget build(
       BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         boxShadow: overlapsContent
             ? [
                 BoxShadow(
-                  color: Colors.black.withValues(),
+                  color: theme.shadowColor.withOpacity(0.1),
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),

@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/custom_news.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';
+import 'package:omninews_flutter/provider/settings_provider.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
+import 'package:omninews_flutter/utils/url_launcher_helper.dart';
+import 'package:omninews_flutter/services/news_bookmark_service.dart';
+import 'package:omninews_flutter/models/news.dart';
+import 'package:provider/provider.dart'; // News 클래스 임포트 추가
 
-class CustomNewsListView extends StatelessWidget {
+class CustomNewsListView extends StatefulWidget {
   final Future<List<CustomNews>> newsList;
   final String categoryName;
-  final String currentSortOption; // 현재 정렬 옵션
-  final Function(String) onSortChanged; // 정렬 옵션 변경 콜백
+  final String currentSortOption;
+  final Function(String) onSortChanged;
+  final VoidCallback? onBookmarkChanged;
 
   const CustomNewsListView({
     super.key,
@@ -15,19 +21,26 @@ class CustomNewsListView extends StatelessWidget {
     required this.categoryName,
     required this.currentSortOption,
     required this.onSortChanged,
+    this.onBookmarkChanged,
   });
 
-  void _launchURL(String url) async {
-    final Uri uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      throw 'Could not launch $url';
-    }
-  }
+  @override
+  State<CustomNewsListView> createState() => _CustomNewsListViewState();
+}
+
+class _CustomNewsListViewState extends State<CustomNewsListView> {
+  // 북마크 기능을 위한 상태 저장
+  final Map<String, bool> _bookmarkStatus = {};
+  final Map<String, bool> _loadingStatus = {};
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cardStyle = AppTheme.newsCardStyleOf(context);
+    final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
+
+    final settings = Provider.of<SettingsProvider>(context).settings;
+
     return Column(
       children: [
         // 더 모던하고 심플한 정렬 옵션 선택 UI
@@ -40,15 +53,15 @@ class CustomNewsListView extends StatelessWidget {
               _buildSortOption(
                 context: context,
                 label: "정확순",
-                isSelected: currentSortOption == "sim",
-                onTap: () => onSortChanged("sim"),
+                isSelected: widget.currentSortOption == "sim",
+                onTap: () => widget.onSortChanged("sim"),
               ),
               const SizedBox(width: 16),
               _buildSortOption(
                 context: context,
                 label: "최신순",
-                isSelected: currentSortOption == "date",
-                onTap: () => onSortChanged("date"),
+                isSelected: widget.currentSortOption == "date",
+                onTap: () => widget.onSortChanged("date"),
               ),
             ],
           ),
@@ -57,13 +70,14 @@ class CustomNewsListView extends StatelessWidget {
         // 뉴스 목록
         Expanded(
           child: FutureBuilder<List<CustomNews>>(
-            future: newsList,
+            future: widget.newsList,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(
-                    child: CircularProgressIndicator(
-                  color: Colors.blue,
-                ));
+                return Center(
+                  child: CircularProgressIndicator(
+                    color: theme.primaryColor,
+                  ),
+                );
               } else if (snapshot.hasError) {
                 return Center(
                   child: Padding(
@@ -71,13 +85,16 @@ class CustomNewsListView extends StatelessWidget {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.error_outline,
-                            size: 48, color: Colors.grey),
+                        Icon(
+                          Icons.error_outline,
+                          size: 48,
+                          color: subscribeStyle.errorIconColor,
+                        ),
                         const SizedBox(height: 12),
                         Text(
                           'Failed to load news',
                           style: TextStyle(
-                            color: Colors.grey[800],
+                            color: subscribeStyle.emptyTextColor,
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
                           ),
@@ -85,8 +102,10 @@ class CustomNewsListView extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${snapshot.error}',
-                          style:
-                              TextStyle(color: Colors.grey[600], fontSize: 14),
+                          style: TextStyle(
+                              color: subscribeStyle.emptyTextColor
+                                  .withOpacity(0.8),
+                              fontSize: 14),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -98,12 +117,16 @@ class CustomNewsListView extends StatelessWidget {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.newspaper, size: 48, color: Colors.grey[400]),
+                      Icon(
+                        Icons.newspaper,
+                        size: 48,
+                        color: subscribeStyle.emptyIconColor,
+                      ),
                       const SizedBox(height: 12),
                       Text(
                         '뉴스가 없습니다',
                         style: TextStyle(
-                          color: Colors.grey[700],
+                          color: subscribeStyle.emptyTextColor,
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
                         ),
@@ -114,70 +137,32 @@ class CustomNewsListView extends StatelessWidget {
               }
 
               final news = snapshot.data!;
+
+              // 각 뉴스의 북마크 상태 확인
+              for (var customNews in news) {
+                if (!_bookmarkStatus.containsKey(customNews.originalLink)) {
+                  _checkBookmarkStatus(customNews.originalLink);
+                }
+              }
+
               return ListView.separated(
                 padding: const EdgeInsets.only(top: 4),
                 itemCount: news.length,
-                separatorBuilder: (context, index) =>
-                    const Divider(height: 1, indent: 16, endIndent: 16),
+                separatorBuilder: (context, index) => Divider(
+                  height: 1,
+                  indent: 16,
+                  endIndent: 16,
+                  color: theme.dividerTheme.color,
+                ),
                 itemBuilder: (context, index) {
                   final item = news[index];
+
                   return InkWell(
-                    onTap: () => _launchURL(item.originalLink),
+                    onTap: () => UrlLauncherHelper.openUrl(
+                        context, item.originalLink, settings.webOpenMode),
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // 뉴스 제목
-                          Text(
-                            item.plainTitle,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black,
-                              height: 1.3,
-                            ),
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 6),
-
-                          // 뉴스 내용 요약
-                          Text(
-                            _truncateDescription(item.plainDescription),
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[700],
-                              height: 1.2,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 8),
-
-                          // 출처 및 날짜
-                          Row(
-                            children: [
-                              Text(
-                                _extractDomain(item.originalLink),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.blue[700],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                _formatDate(item.pubDate),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                      padding: cardStyle.cardPadding,
+                      child: _buildNewsContent(item, cardStyle, theme),
                     ),
                   );
                 },
@@ -189,6 +174,164 @@ class CustomNewsListView extends StatelessWidget {
     );
   }
 
+  // 뉴스 내용 구성
+  Widget _buildNewsContent(
+      CustomNews item, NewsCardStyleExtension cardStyle, ThemeData theme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 뉴스 제목과 북마크 버튼
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                item.plainTitle,
+                style: cardStyle.titleStyle,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            // 북마크 버튼
+            IconButton(
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              icon: _loadingStatus[item.originalLink] == true
+                  ? SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: theme.primaryColor,
+                      ),
+                    )
+                  : Icon(
+                      _bookmarkStatus[item.originalLink] == true
+                          ? Icons.bookmark
+                          : Icons.bookmark_border,
+                      color: _bookmarkStatus[item.originalLink] == true
+                          ? cardStyle.bookmarkActiveColor
+                          : cardStyle.bookmarkInactiveColor,
+                      size: 20,
+                    ),
+              onPressed: () => _toggleBookmark(item),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+
+        // 뉴스 내용 요약
+        Text(
+          _truncateDescription(item.plainDescription),
+          style: cardStyle.descriptionStyle,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 8),
+
+        // 출처 및 날짜
+        Row(
+          children: [
+            Text(
+              _extractDomain(item.originalLink),
+              style: cardStyle.sourceStyle,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              _formatDate(item.pubDate),
+              style: cardStyle.dateStyle,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  // 북마크 상태 확인
+  Future<void> _checkBookmarkStatus(String newsLink) async {
+    final isBookmarked = await NewsBookmarkService.isNewsBookmarked(newsLink);
+    if (mounted) {
+      setState(() {
+        _bookmarkStatus[newsLink] = isBookmarked;
+      });
+    }
+  }
+
+  // 북마크 토글
+  Future<void> _toggleBookmark(CustomNews customNews) async {
+    final newsLink = customNews.originalLink;
+    if (_loadingStatus[newsLink] == true) return;
+
+    setState(() {
+      _loadingStatus[newsLink] = true;
+    });
+
+    try {
+      bool success;
+      if (_bookmarkStatus[newsLink] == true) {
+        success = await NewsBookmarkService.removeNewsBookmark(newsLink);
+      } else {
+        // CustomNews를 News 형식으로 변환하여 북마크에 추가
+        final news = _convertCustomNewsToNews(customNews);
+        success = await NewsBookmarkService.addNewsBookmark(news);
+      }
+
+      if (success && mounted) {
+        setState(() {
+          _bookmarkStatus[newsLink] = !(_bookmarkStatus[newsLink] ?? false);
+        });
+
+        // 북마크 상태 변경 시 콜백 호출
+        if (widget.onBookmarkChanged != null) {
+          widget.onBookmarkChanged!();
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_bookmarkStatus[newsLink] == true
+                ? '북마크에 추가되었습니다'
+                : '북마크에서 제거되었습니다'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).primaryColor,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error toggling bookmark: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('북마크 변경 중 오류가 발생했습니다: $e'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingStatus[newsLink] = false;
+        });
+      }
+    }
+  }
+
+  // CustomNews를 News로 변환 (북마크 서비스 사용을 위해)
+  News _convertCustomNewsToNews(CustomNews customNews) {
+    // News 생성자를 사용하여 객체 생성
+    return News(
+      newsId: 0,
+      newsTitle: customNews.plainTitle,
+      newsDescription: customNews.plainDescription,
+      newsLink: customNews.originalLink,
+      newsSource: _extractDomain(customNews.originalLink),
+      newsPubDate: customNews.pubDate,
+      newsImageLink: "", // CustomNews에는 이미지가 없으므로 빈 문자열 사용
+    );
+  }
+
   // 개선된 정렬 옵션 버튼 위젯
   Widget _buildSortOption({
     required BuildContext context,
@@ -196,18 +339,20 @@ class CustomNewsListView extends StatelessWidget {
     required bool isSelected,
     required VoidCallback onTap,
   }) {
+    final theme = Theme.of(context);
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          // 선택된 상태와 선택되지 않은 상태의 배경 색상 구분
-          color: isSelected ? Colors.blue[50] : Colors.transparent,
+          color: isSelected
+              ? theme.primaryColor.withOpacity(0.1)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
-          // 테두리 추가로 구분감 강화
           border: Border.all(
-            color: isSelected ? Colors.blue : Colors.transparent,
+            color: isSelected ? theme.primaryColor : Colors.transparent,
             width: 1,
           ),
         ),
@@ -219,8 +364,9 @@ class CustomNewsListView extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                // 텍스트 색상을 더 선명하게 구분
-                color: isSelected ? Colors.blue[700] : Colors.black54,
+                color: isSelected
+                    ? theme.primaryColor
+                    : theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
               ),
             ),
             if (isSelected) ...[
@@ -228,7 +374,7 @@ class CustomNewsListView extends StatelessWidget {
               Icon(
                 Icons.check_circle,
                 size: 14,
-                color: Colors.blue[700], // 아이콘 색상도 조정
+                color: theme.primaryColor,
               ),
             ],
           ],
@@ -250,7 +396,6 @@ class CustomNewsListView extends StatelessWidget {
     }
   }
 
-  // 날짜 포맷팅
   String _formatDate(String dateStr) {
     try {
       final date = DateTime.parse(dateStr);
@@ -271,7 +416,6 @@ class CustomNewsListView extends StatelessWidget {
     }
   }
 
-  // 설명 텍스트 자르기
   String _truncateDescription(String description) {
     if (description.length > 100) {
       return '${description.substring(0, 100)}...';

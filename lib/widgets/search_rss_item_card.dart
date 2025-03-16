@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
+import 'package:omninews_flutter/provider/settings_provider.dart';
 import 'package:omninews_flutter/services/subscribe_service.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
+import 'package:omninews_flutter/models/app_setting.dart';
+import 'package:omninews_flutter/utils/url_launcher_helper.dart';
+import 'package:provider/provider.dart';
 
 class SearchRssItemCard extends StatefulWidget {
   final RssItem item;
@@ -67,6 +71,8 @@ class _SearchRssItemCardState extends State<SearchRssItemCard> {
           SnackBar(
             content: Text(_isBookmarked ? '북마크에 추가되었습니다' : '북마크에서 제거되었습니다'),
             duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).primaryColor,
           ),
         );
       }
@@ -76,6 +82,8 @@ class _SearchRssItemCardState extends State<SearchRssItemCard> {
           SnackBar(
             content: Text('북마크 변경 중 오류가 발생했습니다: $e'),
             duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -88,23 +96,28 @@ class _SearchRssItemCardState extends State<SearchRssItemCard> {
     }
   }
 
-  Future<void> _openLink() async {
-    final Uri uri = Uri.parse(widget.item.rssLink);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('링크를 열 수 없습니다')),
-        );
-      }
-    }
+  void _openLink(AppSettings settings) {
+    // 설정된 웹 열기 방식으로 URL 열기
+    UrlLauncherHelper.openUrl(
+        context, widget.item.rssLink, settings.webOpenMode);
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cardStyle = AppTheme.newsCardStyleOf(context);
+    final searchStyle = AppTheme.searchStyleOf(context);
+    final rssTheme = AppTheme.rssThemeOf(context);
+
+    final settings = Provider.of<SettingsProvider>(context).settings;
+
+    // 미래의 이미지 표시 기능을 위한 처리
+    final hasImage = widget.item.rssImageLink != null &&
+        widget.item.rssImageLink!.isNotEmpty;
+    final showImage = hasImage && settings.viewMode == ViewMode.textAndImage;
+
     return InkWell(
-      onTap: _openLink,
+      onTap: () => _openLink(settings),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
         child: Column(
@@ -115,15 +128,15 @@ class _SearchRssItemCardState extends State<SearchRssItemCard> {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
-                color: Colors.orange[50],
+                color: searchStyle.rssTagBackground,
                 borderRadius: BorderRadius.circular(4),
-                border: Border.all(color: Colors.orange.shade200, width: 1),
+                border: Border.all(color: searchStyle.rssTagBorder, width: 1),
               ),
               child: Text(
                 'RSS',
                 style: TextStyle(
                   fontSize: 10,
-                  color: Colors.orange[700],
+                  color: searchStyle.rssTagText,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -136,33 +149,31 @@ class _SearchRssItemCardState extends State<SearchRssItemCard> {
                 Expanded(
                   child: Text(
                     widget.item.rssTitle,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
-                      height: 1.3,
-                    ),
+                    style: cardStyle.titleStyle,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(width: 4), // 약간의 간격 추가
+                const SizedBox(width: 4),
                 IconButton(
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                   icon: _isLoading
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
+                            color: theme.primaryColor,
                           ),
                         )
                       : Icon(
                           _isBookmarked
                               ? Icons.bookmark
                               : Icons.bookmark_border,
-                          color: _isBookmarked ? Colors.blue : Colors.grey,
+                          color: _isBookmarked
+                              ? cardStyle.bookmarkActiveColor
+                              : cardStyle.bookmarkInactiveColor,
                           size: 20,
                         ),
                   onPressed: _toggleBookmark,
@@ -174,43 +185,61 @@ class _SearchRssItemCardState extends State<SearchRssItemCard> {
             // 설명
             Text(
               _truncateDescription(widget.item.rssDescription),
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[700],
-                height: 1.2,
-              ),
+              style: cardStyle.descriptionStyle,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 8),
 
-            // 출처 및 날짜 (오버플로우 수정)
+            // 출처 및 날짜
             Row(
               children: [
-                // 채널 제목은 Flexible 또는 Expanded로 감싸서 오버플로우 방지
                 Flexible(
                   child: Text(
                     widget.item.rssTitle,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: Colors.orange[700],
+                      color: rssTheme.linkColor,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 const SizedBox(width: 8),
-                // 날짜는 고정 크기로 가정
                 Text(
                   _formatDate(widget.item.rssPubDate),
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
+                  style: cardStyle.dateStyle,
                 ),
               ],
             ),
+
+            // 이미지가 있고 뷰 모드가 텍스트+이미지일 때만 이미지 표시
+            // 현재는 RSS 아이템에 이미지가 없지만 미래에 추가될 경우를 대비
+            if (showImage && widget.item.rssImageLink != null) ...[
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.network(
+                  widget.item.rssImageLink!,
+                  height: 150,
+                  width: double.infinity,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      height: 150,
+                      color: theme.colorScheme.surfaceVariant,
+                      child: Icon(
+                        Icons.image_not_supported,
+                        size: 40,
+                        color:
+                            theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ],
         ),
       ),

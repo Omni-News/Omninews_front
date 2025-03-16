@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/rss_channel.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
+import 'package:omninews_flutter/models/app_setting.dart'; // 추가
 
 class RssChannelCard extends StatefulWidget {
   final RssChannel channel;
@@ -24,33 +26,41 @@ class _RssChannelCardState extends State<RssChannelCard> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
+    // 이미지 표시 여부 결정 (뷰 모드 설정에 따름)
+    final showImage = true;
+
     return InkWell(
       onTap: widget.onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: theme.cardColor,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Channel Image - 둥근 모서리로 개선
-            _buildChannelImage(),
+            // Channel Image - 뷰 모드에 따라 표시/숨김
+            if (showImage) ...[
+              Hero(
+                tag: 'channel_${widget.channel.channelRssLink}',
+                child: _buildChannelImage(),
+              ),
+              const SizedBox(width: 16),
+            ],
 
-            const SizedBox(width: 16),
-
-            // Channel Info - 정보 배치 개선
+            // Channel Info
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     widget.channel.channelTitle,
-                    style: const TextStyle(
+                    style: textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w600,
-                      fontSize: 16,
-                      color: Colors.black,
                       height: 1.3,
                     ),
                     maxLines: 1,
@@ -59,9 +69,7 @@ class _RssChannelCardState extends State<RssChannelCard> {
                   const SizedBox(height: 4),
                   Text(
                     widget.channel.channelDescription,
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      fontSize: 14,
+                    style: textTheme.bodyMedium?.copyWith(
                       height: 1.2,
                     ),
                     maxLines: 2,
@@ -86,7 +94,7 @@ class _RssChannelCardState extends State<RssChannelCard> {
               ),
             ),
 
-            // Subscribe/Unsubscribe Button - 개선된 버튼 스타일
+            // Subscribe/Unsubscribe Button
             _buildSubscriptionButton(),
           ],
         ),
@@ -96,8 +104,10 @@ class _RssChannelCardState extends State<RssChannelCard> {
 
   // 채널 이미지 위젯
   Widget _buildChannelImage() {
+    final rssTheme = AppTheme.rssThemeOf(context);
+
     return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
+      borderRadius: BorderRadius.circular(rssTheme.channelImageBorderRadius),
       child: widget.channel.channelImageUrl != null &&
               widget.channel.channelImageUrl!.isNotEmpty
           ? Image.network(
@@ -115,16 +125,17 @@ class _RssChannelCardState extends State<RssChannelCard> {
 
   // 기본 채널 아이콘 위젯
   Widget _buildDefaultChannelIcon() {
+    final rssTheme = AppTheme.rssThemeOf(context);
+
     return Container(
       width: 60,
       height: 60,
       decoration: BoxDecoration(
-        color: Colors.blue,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(rssTheme.channelImageBorderRadius),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Colors.blue[400]!, Colors.blue[700]!],
+          colors: rssTheme.channelImageGradientColors,
         ),
       ),
       child: const Icon(
@@ -138,21 +149,21 @@ class _RssChannelCardState extends State<RssChannelCard> {
   // 정보 아이템 위젯 (아이콘 + 텍스트)
   Widget _buildInfoItem(
       {required IconData icon, required String text, Color? iconColor}) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
           icon,
           size: 14,
-          color: iconColor ?? Colors.grey[600],
+          color: iconColor ?? theme.iconTheme.color?.withOpacity(0.7),
         ),
         const SizedBox(width: 4),
         Text(
           text,
-          style: TextStyle(
-            fontSize: 13,
-            color: Colors.grey[700],
-          ),
+          style: textTheme.bodySmall,
         ),
       ],
     );
@@ -160,44 +171,51 @@ class _RssChannelCardState extends State<RssChannelCard> {
 
   // 구독 버튼 위젯
   Widget _buildSubscriptionButton() {
+    final theme = Theme.of(context);
+    final rssTheme = AppTheme.rssThemeOf(context);
+
     return _isLoading
         ? SizedBox(
             width: 20,
             height: 20,
             child: CircularProgressIndicator(
               strokeWidth: 2,
-              color: Colors.grey[600],
+              color: theme.colorScheme.secondary,
             ),
           )
-        : Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: widget.isSubscribed
-                  ? Colors.blue.shade50
-                  : Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  widget.isSubscribed ? Icons.check : Icons.add,
-                  size: 16,
-                  color:
-                      widget.isSubscribed ? Colors.blue[700] : Colors.grey[700],
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  widget.isSubscribed ? '구독 중' : '구독',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+        : InkWell(
+            onTap: widget.onSubscriptionChanged,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: widget.isSubscribed
+                    ? rssTheme.subscribeButtonActiveBackground
+                    : rssTheme.subscribeButtonInactiveBackground,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    widget.isSubscribed ? Icons.check : Icons.add,
+                    size: 16,
                     color: widget.isSubscribed
-                        ? Colors.blue[700]
-                        : Colors.grey[700],
+                        ? rssTheme.subscribeButtonActiveText
+                        : rssTheme.subscribeButtonInactiveText,
                   ),
-                ),
-              ],
+                  const SizedBox(width: 4),
+                  Text(
+                    widget.isSubscribed ? '구독 중' : '구독',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: widget.isSubscribed
+                          ? rssTheme.subscribeButtonActiveText
+                          : rssTheme.subscribeButtonInactiveText,
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
   }

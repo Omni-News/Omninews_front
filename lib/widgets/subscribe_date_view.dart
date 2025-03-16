@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
 import 'package:omninews_flutter/widgets/rss_item_card.dart';
 import 'package:sticky_headers/sticky_headers.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
 
 class SubscribeDateView extends StatelessWidget {
   final Future<List<RssItem>> items;
@@ -18,21 +19,30 @@ class SubscribeDateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return RefreshIndicator(
       onRefresh: () async {
         onRefresh();
       },
+      color: theme.primaryColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       child: FutureBuilder<List<RssItem>>(
         future: items,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return Center(
+              child: CircularProgressIndicator(
+                color: theme.primaryColor,
+              ),
+            );
           } else if (snapshot.hasError) {
             return _buildErrorState('데이터를 불러오는데 실패했습니다', context);
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
             return _buildEmptyState(
               searchQuery.isEmpty ? '구독 항목이 없습니다' : '검색 결과가 없습니다',
               searchQuery.isEmpty ? Icons.feed_outlined : Icons.search,
+              context,
             );
           }
 
@@ -47,20 +57,23 @@ class SubscribeDateView extends StatelessWidget {
               final formattedDate = _formatDate(date);
 
               return StickyHeader(
-                header: _buildDateHeader(formattedDate, items.length),
+                header: _buildDateHeader(formattedDate, items.length, context),
                 content: Column(
                   children: [
-                    // 아이템 목록
+                    // 아이템 목록 - 설정 전달
                     ...items.map((item) => Column(
                           children: [
-                            RssItemCard(item: item),
+                            // 뷰 모드와 웹 열기 방식 설정 전달
+                            RssItemCard(
+                              item: item,
+                            ),
                             // 마지막 아이템이 아니면 구분선 추가
                             if (items.indexOf(item) != items.length - 1)
                               Divider(
                                 height: 1,
                                 indent: 16,
                                 endIndent: 16,
-                                color: Colors.grey.shade200,
+                                color: theme.dividerTheme.color,
                               ),
                           ],
                         )),
@@ -69,7 +82,9 @@ class SubscribeDateView extends StatelessWidget {
                     if (index < itemsByDate.length - 1)
                       Container(
                         height: 8,
-                        color: Colors.grey[100],
+                        color: theme.brightness == Brightness.dark
+                            ? theme.cardColor.withOpacity(0.2)
+                            : theme.cardColor.withOpacity(0.8),
                         margin: const EdgeInsets.only(top: 8),
                       ),
                   ],
@@ -147,9 +162,12 @@ class SubscribeDateView extends StatelessWidget {
     }
   }
 
-  Widget _buildDateHeader(String date, int itemCount) {
+  Widget _buildDateHeader(String date, int itemCount, BuildContext context) {
+    final theme = Theme.of(context);
+    final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
+
     return Container(
-      color: Colors.white,
+      color: theme.cardColor,
       padding: const EdgeInsets.symmetric(
         horizontal: 16,
         vertical: 14,
@@ -163,14 +181,14 @@ class SubscribeDateView extends StatelessWidget {
               fontWeight: FontWeight.w700,
               fontSize: 17,
               letterSpacing: -0.5,
-              color: Colors.indigo[700], // 진한 남색으로 변경하여 본문과 구분
+              color: subscribeStyle.dateHeaderColor,
             ),
           ),
           const SizedBox(width: 8),
           Text(
             '·',
             style: TextStyle(
-              color: Colors.grey[400],
+              color: theme.dividerTheme.color,
               fontSize: 15,
               fontWeight: FontWeight.bold,
             ),
@@ -179,7 +197,7 @@ class SubscribeDateView extends StatelessWidget {
           Text(
             '$itemCount개의 항목',
             style: TextStyle(
-              color: Colors.grey[600],
+              color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
               fontSize: 14,
               letterSpacing: -0.3,
             ),
@@ -190,16 +208,23 @@ class SubscribeDateView extends StatelessWidget {
   }
 
   Widget _buildErrorState(String message, BuildContext context) {
+    final theme = Theme.of(context);
+    final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+          Icon(
+            Icons.error_outline,
+            size: 48,
+            color: subscribeStyle.errorIconColor,
+          ),
           const SizedBox(height: 16),
           Text(
             message,
             style: TextStyle(
-              color: Colors.grey[800],
+              color: subscribeStyle.emptyTextColor,
               fontSize: 16,
               fontWeight: FontWeight.w500,
             ),
@@ -210,8 +235,12 @@ class SubscribeDateView extends StatelessWidget {
             icon: const Icon(Icons.refresh),
             label: const Text('다시 시도'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
-              foregroundColor: Colors.white,
+              backgroundColor: theme.primaryColor,
+              foregroundColor: theme.colorScheme.onPrimary,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ],
@@ -219,7 +248,9 @@ class SubscribeDateView extends StatelessWidget {
     );
   }
 
-  Widget _buildEmptyState(String message, IconData icon) {
+  Widget _buildEmptyState(String message, IconData icon, BuildContext context) {
+    final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -227,28 +258,34 @@ class SubscribeDateView extends StatelessWidget {
           Icon(
             icon,
             size: 64,
-            color: Colors.grey[300],
+            color: subscribeStyle.emptyIconColor,
           ),
           const SizedBox(height: 16),
           Text(
             message,
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey[600],
+              color: subscribeStyle.emptyTextColor,
               fontWeight: FontWeight.w500,
             ),
           ),
           const SizedBox(height: 8),
           if (searchQuery.isEmpty && icon == Icons.feed_outlined) ...[
             const SizedBox(height: 16),
-            const Text(
+            Text(
               '아직 구독한 채널이 없습니다.',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 14,
+                color: subscribeStyle.hintTextColor,
+              ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'RSS 화면에서 채널을 구독해보세요.',
-              style: TextStyle(fontSize: 14, color: Colors.grey),
+              style: TextStyle(
+                fontSize: 14,
+                color: subscribeStyle.hintTextColor,
+              ),
             ),
           ],
         ],

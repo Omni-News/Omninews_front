@@ -6,6 +6,8 @@ import 'package:omninews_flutter/services/news_service.dart';
 import 'package:omninews_flutter/widgets/news_list_view.dart';
 import 'package:omninews_flutter/widgets/custom_news_list_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
+import 'package:omninews_flutter/provider/settings_provider.dart';
 
 class NewsScreen extends StatefulWidget {
   const NewsScreen({super.key});
@@ -25,7 +27,7 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
     "IT/과학",
   ];
 
-  // 기본 카테고리 목록을 따로 저장 (추가된 카테고리와 구분하기 위함)
+  // 기본 카테고리 목록을 따로 저장
   final List<String> defaultCategories = [
     "정치",
     "경제",
@@ -35,75 +37,59 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
     "IT/과학",
   ];
 
-  // 기본 카테고리와 사용자 카테고리의 데이터 타입이 다르므로 분리하여 관리
+  // 카테고리별 뉴스 데이터
   Map<String, Future<List<News>>> newsList = {};
   Map<String, Future<List<CustomNews>>> customNewsList = {};
-
-  // 사용자 추가 카테고리별 정렬 옵션 저장 ("sim" or "date")
   Map<String, String> categorySortOptions = {};
 
   final TextEditingController _categoryController = TextEditingController();
   final ScrollController _tabScrollController = ScrollController();
   bool _isLoading = true;
 
-// NewsScreen 클래스에 추가할 부분 (initState 메소드 내)
   @override
   void initState() {
     super.initState();
-    // 먼저 기본 상태로 TabController 초기화
     _tabController = TabController(length: categories.length, vsync: this);
-    _loadCategories(); // 그 후 저장된 카테고리 비동기적으로 불러오기
-
-    // TabController 리스너 추가 - 페이지 스와이프 시 카테고리 바 동기화
+    _loadCategories();
     _tabController.addListener(_handleTabIndexChange);
 
-    // 검색에서 추가된 카테고리로 이동 확인 (약간의 지연 후 실행)
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndNavigateToNewCategory();
     });
   }
 
-// 새로운 메소드 추가
   Future<void> _checkAndNavigateToNewCategory() async {
     final prefs = await SharedPreferences.getInstance();
     final selectIndex = prefs.getInt('select_category_index');
 
-    // 값이 있으면 해당 인덱스로 이동
     if (selectIndex != null) {
-      // -1이면 마지막 카테고리로 이동
       int targetIndex = selectIndex == -1 ? categories.length - 1 : selectIndex;
 
-      // 인덱스가 범위 내인지 확인
       if (targetIndex >= 0 && targetIndex < categories.length) {
-        // 탭 선택 및 스크롤
         _tabController.animateTo(targetIndex);
         _scrollToCurrentTab();
       }
 
-      // 값 삭제 (일회성)
       await prefs.remove('select_category_index');
     }
   }
 
-  // TabController 인덱스 변경 시 카테고리 바 스크롤 위치 조정
   void _handleTabIndexChange() {
     if (!_tabController.indexIsChanging) {
       _scrollToCurrentTab();
     }
   }
 
-  // 현재 선택된 탭으로 스크롤 이동
   void _scrollToCurrentTab() {
     if (!mounted || !_tabScrollController.hasClients) return;
 
-    // 전체 탭 너비 계산에 필요한 값들
-    const double tabPadding = 17.0 * 2; // 탭 내부 패딩
-    const double screenWidth = 375.0; // 대략적인 화면 너비 (실제로는 동적으로 구해야 함)
+    // 현재 화면 너비 가져오기 (이전 하드코딩된 값 대신)
+    final screenWidth = MediaQuery.of(context).size.width;
+    const double tabPadding = 17.0 * 2;
 
-    // 현재 탭의 평균 너비 (대략적인 계산)
+    // 현재 탭의 평균 너비 계산
     double averageTabWidth = 0;
     for (var category in categories) {
-      // 카테고리 이름 길이에 따라 대략적인 너비 계산
       averageTabWidth += (category.length * 10 + tabPadding);
     }
     averageTabWidth /= categories.length;
@@ -125,7 +111,6 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
     );
   }
 
-  // 저장된 카테고리 불러오기
   Future<void> _loadCategories() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -147,7 +132,7 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
             // 기본 카테고리 + 저장된 사용자 카테고리
             categories = [...defaultCategories, ...savedCategories];
 
-            // 로드된 카테고리에 대해 정렬 옵션이 없으면 기본값 설정
+            // 정렬 옵션 기본값 설정
             for (var category in savedCategories) {
               if (!categorySortOptions.containsKey(category)) {
                 categorySortOptions[category] = "sim"; // 기본값은 정확순
@@ -158,7 +143,7 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
             _tabController.dispose();
             _tabController =
                 TabController(length: categories.length, vsync: this);
-            _tabController.addListener(_handleTabIndexChange); // 리스너 다시 추가
+            _tabController.addListener(_handleTabIndexChange);
             fetchAllNewsLists();
             _isLoading = false;
           });
@@ -180,7 +165,6 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
     }
   }
 
-  // 카테고리와 정렬 옵션 저장
   Future<void> _saveCategories() async {
     final prefs = await SharedPreferences.getInstance();
     final userCategories = categories
@@ -197,7 +181,6 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
     await prefs.setStringList('category_sort_options', sortOptionsList);
   }
 
-  // 카테고리 정렬 옵션 변경
   void updateCategorySortOption(String category, String sortOption) {
     setState(() {
       categorySortOptions[category] = sortOption;
@@ -230,22 +213,42 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
     });
   }
 
-  // 새로운 카테고리 추가 다이얼로그
   void _showAddCategoryDialog() {
+    final theme = Theme.of(context);
     _categoryController.text = ''; // 컨트롤러 초기화
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('새 카테고리 추가'),
+        title: Text(
+          '새 카테고리 추가',
+          style: TextStyle(
+            color: theme.textTheme.headlineMedium?.color,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: theme.cardColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
         content: TextField(
           controller: _categoryController,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: '카테고리 이름',
             hintText: '새 카테고리 이름을 입력하세요',
-            border: OutlineInputBorder(),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(8),
+              borderSide: BorderSide(
+                color: theme.primaryColor,
+                width: 2,
+              ),
+            ),
           ),
           autofocus: true,
+          style: TextStyle(color: theme.textTheme.bodyLarge?.color),
           onSubmitted: (value) {
             if (value.trim().isNotEmpty) {
               _addCategory(value);
@@ -256,7 +259,12 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
+            child: Text(
+              '취소',
+              style: TextStyle(
+                color: theme.textTheme.bodyLarge?.color?.withOpacity(0.7),
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
@@ -264,8 +272,12 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blue,
+              backgroundColor: theme.primaryColor,
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
             ),
             child: const Text('추가'),
           ),
@@ -274,14 +286,17 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
     );
   }
 
-  // 카테고리 삭제 다이얼로그
   void _showDeleteCategoryDialog(String category, int index) {
+    final theme = Theme.of(context);
+
     // 기본 카테고리는 삭제 불가
     if (defaultCategories.contains(category)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('기본 카테고리는 삭제할 수 없습니다'),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: const Text('기본 카테고리는 삭제할 수 없습니다'),
+          backgroundColor: theme.colorScheme.error,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
         ),
       );
       return;
@@ -290,12 +305,30 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('카테고리 삭제'),
-        content: Text('\'$category\' 카테고리를 삭제하시겠습니까?'),
+        title: Text(
+          '카테고리 삭제',
+          style: TextStyle(
+            color: theme.textTheme.headlineMedium?.color,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: theme.cardColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        content: Text(
+          '\'$category\' 카테고리를 삭제하시겠습니까?',
+          style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
+            child: Text(
+              '취소',
+              style: TextStyle(
+                color: theme.textTheme.bodyLarge?.color?.withOpacity(0.7),
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
@@ -303,8 +336,12 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
               Navigator.pop(context);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: theme.colorScheme.error,
               foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              elevation: 0,
             ),
             child: const Text('삭제'),
           ),
@@ -313,7 +350,6 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
     );
   }
 
-  // 카테고리 삭제 처리
   void _deleteCategory(int index) {
     final categoryToDelete = categories[index];
 
@@ -345,12 +381,13 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('\'$categoryToDelete\' 카테고리가 삭제되었습니다'),
+        backgroundColor: Theme.of(context).primaryColor,
+        behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ),
     );
   }
 
-  // 카테고리 추가 처리
   void _addCategory(String category) {
     if (category.trim().isEmpty) return;
 
@@ -359,6 +396,8 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('\'$category\' 카테고리가 이미 존재합니다'),
+          backgroundColor: Theme.of(context).colorScheme.error,
+          behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 2),
         ),
       );
@@ -381,7 +420,7 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
         vsync: this,
         initialIndex: categories.length - 1, // 새로 추가된 탭으로 이동
       );
-      _tabController.addListener(_handleTabIndexChange); // 리스너 다시 추가
+      _tabController.addListener(_handleTabIndexChange);
     });
 
     // 카테고리 저장
@@ -389,7 +428,6 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
 
     // 카테고리 추가 후 약간의 지연을 주어 UI가 업데이트된 후 스크롤 수행
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // 새로 추가된 탭으로 이동
       if (mounted) {
         _tabController.animateTo(categories.length - 1);
         _scrollToCurrentTab(); // 추가된 탭으로 스크롤
@@ -400,6 +438,8 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('\'$category\' 카테고리가 추가되었습니다'),
+        backgroundColor: Theme.of(context).primaryColor,
+        behavior: SnackBarBehavior.floating,
         duration: const Duration(seconds: 2),
       ),
     );
@@ -416,35 +456,48 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+
+    // 설정 Provider 가져오기
+    final settingsProvider = Provider.of<SettingsProvider>(context);
+    final settings = settingsProvider.settings;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: CircularProgressIndicator(
+                color: theme.primaryColor,
+              ),
+            )
           : NestedScrollView(
               headerSliverBuilder:
                   (BuildContext context, bool innerBoxIsScrolled) {
                 return [
                   SliverAppBar(
                     leading: IconButton(
-                      icon: const Icon(Icons.menu, color: Colors.black87),
+                      icon: Icon(
+                        Icons.menu,
+                        color: theme.appBarTheme.iconTheme?.color,
+                      ),
                       onPressed: () {
                         homeScaffoldKey.currentState?.openDrawer();
                       },
                     ),
                     pinned: true,
                     elevation: 0,
-                    backgroundColor: Colors.white,
-                    title: const Text(
+                    backgroundColor: theme.appBarTheme.backgroundColor,
+                    title: Text(
                       'News',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 20,
-                      ),
+                      style: textTheme.headlineMedium,
                     ),
                     actions: [
                       IconButton(
-                        icon: const Icon(Icons.refresh, color: Colors.black87),
+                        icon: Icon(
+                          Icons.refresh,
+                          color: theme.appBarTheme.iconTheme?.color,
+                        ),
                         onPressed: _refresh,
                       ),
                     ],
@@ -458,18 +511,12 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
                         child: TabBar(
                           controller: _tabController,
                           isScrollable: true,
-                          indicatorColor: Colors.blue,
-                          labelColor: Colors.blue,
-                          unselectedLabelColor: Colors.black87,
+                          indicatorColor: theme.primaryColor,
+                          labelColor: theme.primaryColor,
+                          unselectedLabelColor: textTheme.bodyLarge?.color,
                           indicatorWeight: 3,
-                          labelStyle: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 17,
-                          ),
-                          unselectedLabelStyle: const TextStyle(
-                            fontWeight: FontWeight.normal,
-                            fontSize: 15,
-                          ),
+                          labelStyle: textTheme.labelLarge,
+                          unselectedLabelStyle: textTheme.labelMedium,
                           labelPadding:
                               const EdgeInsets.symmetric(horizontal: 17.0),
                           padding: const EdgeInsets.symmetric(horizontal: 9.0),
@@ -489,15 +536,28 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
                                     Text(category),
                                     if (isCustomCategory) ...[
                                       const SizedBox(width: 5),
-                                      const Icon(Icons.search, size: 16),
+                                      Icon(
+                                        Icons.search,
+                                        size: 16,
+                                        color: _tabController.index == index
+                                            ? theme.primaryColor
+                                            : textTheme.bodyLarge?.color
+                                                ?.withOpacity(0.6),
+                                      ),
                                       const SizedBox(width: 4),
                                       InkWell(
                                         onTap: () {
                                           _showDeleteCategoryDialog(
                                               category, index);
                                         },
-                                        child:
-                                            const Icon(Icons.close, size: 14),
+                                        child: Icon(
+                                          Icons.close,
+                                          size: 14,
+                                          color: _tabController.index == index
+                                              ? theme.primaryColor
+                                              : textTheme.bodyLarge?.color
+                                                  ?.withOpacity(0.6),
+                                        ),
                                       ),
                                     ],
                                   ],
@@ -516,22 +576,22 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
               body: TabBarView(
                 controller: _tabController,
                 children: categories.map((category) {
-                  // 기본 카테고리와 사용자 추가 카테고리를 구분하여 다른 리스트뷰 사용
                   final isDefaultCategory =
                       defaultCategories.contains(category);
 
                   if (isDefaultCategory) {
+                    // 기본 카테고리용 뉴스 리스트 뷰에 설정 전달
                     return NewsListView(newsList: newsList[category]!);
                   } else {
-                    // 사용자 추가 카테고리는 커스텀 뉴스 리스트뷰 사용
+                    // 사용자 추가 카테고리용 커스텀 뉴스 리스트 뷰에 설정 전달
                     return CustomNewsListView(
-                      newsList: customNewsList[category]!,
-                      categoryName: category,
-                      currentSortOption: categorySortOptions[category] ?? "sim",
-                      onSortChanged: (newSortOption) {
-                        updateCategorySortOption(category, newSortOption);
-                      },
-                    );
+                        newsList: customNewsList[category]!,
+                        categoryName: category,
+                        currentSortOption:
+                            categorySortOptions[category] ?? "sim",
+                        onSortChanged: (newSortOption) {
+                          updateCategorySortOption(category, newSortOption);
+                        });
                   }
                 }).toList(),
               ),
@@ -539,14 +599,16 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
       // 카테고리 추가 버튼
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddCategoryDialog,
-        backgroundColor: Colors.blue,
+        backgroundColor: theme.primaryColor,
+        foregroundColor: Colors.white,
+        elevation: 4,
         child: const Icon(Icons.add),
       ),
     );
   }
 }
 
-// TabBar를 SliverPersistentHeader로 만들기 위한 delegate 클래스 (변경 없음)
+// TabBar를 SliverPersistentHeader로 만들기 위한 delegate 클래스
 class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   final Widget child;
 
@@ -555,13 +617,15 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   @override
   Widget build(
       BuildContext context, double shrinkOffset, bool overlapsContent) {
+    final theme = Theme.of(context);
+
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardColor,
         boxShadow: overlapsContent
             ? [
                 BoxShadow(
-                  color: Colors.black.withValues(),
+                  color: theme.shadowColor,
                   blurRadius: 4,
                   offset: const Offset(0, 2),
                 ),
