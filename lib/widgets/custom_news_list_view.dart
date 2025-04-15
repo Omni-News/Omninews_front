@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/custom_news.dart';
 import 'package:intl/intl.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
+import 'package:omninews_flutter/services/recently_read_service.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
 import 'package:omninews_flutter/utils/url_launcher_helper.dart';
 import 'package:omninews_flutter/services/news_bookmark_service.dart';
 import 'package:omninews_flutter/models/news.dart';
-import 'package:provider/provider.dart'; // News 클래스 임포트 추가
+import 'package:provider/provider.dart';
+import 'package:html_unescape/html_unescape.dart'; // HTML 엔티티 처리 패키지 추가
 
 class CustomNewsListView extends StatefulWidget {
   final Future<List<CustomNews>> newsList;
@@ -32,6 +34,22 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
   // 북마크 기능을 위한 상태 저장
   final Map<String, bool> _bookmarkStatus = {};
   final Map<String, bool> _loadingStatus = {};
+  final HtmlUnescape _htmlUnescape = HtmlUnescape(); // HTML 엔티티 처리 객체
+
+  // HTML 엔티티를 일반 텍스트로 변환하는 함수
+  String _decodeHtmlEntities(String text) {
+    if (text.isEmpty) {
+      return '';
+    }
+    
+    try {
+      // HTML 엔티티 디코딩 (예: &quot; -> ", &amp; -> &)
+      return _htmlUnescape.convert(text);
+    } catch (e) {
+      debugPrint('Error decoding HTML entities: $e');
+      return text; // 오류 발생 시 원본 반환
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -158,8 +176,11 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
                   final item = news[index];
 
                   return InkWell(
-                    onTap: () => UrlLauncherHelper.openUrl(
-                        context, item.originalLink, settings.webOpenMode),
+                    onTap: () => {
+                      RecentlyReadService.addCustomNews(item),
+                      UrlLauncherHelper.openUrl(
+                          context, item.originalLink, settings.webOpenMode)
+                    },
                     child: Padding(
                       padding: cardStyle.cardPadding,
                       child: _buildNewsContent(item, cardStyle, theme),
@@ -177,6 +198,11 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
   // 뉴스 내용 구성
   Widget _buildNewsContent(
       CustomNews item, NewsCardStyleExtension cardStyle, ThemeData theme) {
+    
+    // HTML 엔티티 디코딩 적용
+    final decodedTitle = _decodeHtmlEntities(item.plainTitle);
+    final decodedDescription = _decodeHtmlEntities(item.plainDescription);
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -186,7 +212,7 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
           children: [
             Expanded(
               child: Text(
-                item.plainTitle,
+                decodedTitle, // 디코딩된 제목 사용
                 style: cardStyle.titleStyle,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
@@ -222,7 +248,7 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
 
         // 뉴스 내용 요약
         Text(
-          _truncateDescription(item.plainDescription),
+          _truncateDescription(decodedDescription), // 디코딩된 설명 사용
           style: cardStyle.descriptionStyle,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
@@ -320,11 +346,15 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
 
   // CustomNews를 News로 변환 (북마크 서비스 사용을 위해)
   News _convertCustomNewsToNews(CustomNews customNews) {
+    // 제목과 설명에서 HTML 엔티티 제거
+    final decodedTitle = _decodeHtmlEntities(customNews.plainTitle);
+    final decodedDescription = _decodeHtmlEntities(customNews.plainDescription);
+    
     // News 생성자를 사용하여 객체 생성
     return News(
       newsId: 0,
-      newsTitle: customNews.plainTitle,
-      newsDescription: customNews.plainDescription,
+      newsTitle: decodedTitle, // 디코딩된 제목 사용
+      newsDescription: decodedDescription, // 디코딩된 설명 사용
       newsLink: customNews.originalLink,
       newsSource: _extractDomain(customNews.originalLink),
       newsPubDate: customNews.pubDate,

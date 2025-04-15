@@ -517,11 +517,210 @@ class AppTheme {
     ],
   );
 
+// 종이질감 서정적 테마 추가
+  static final ThemeData paperTheme = ThemeData(
+    brightness: Brightness.light,
+    primaryColor: const Color(0xFF8D6E63), // 따뜻한 브라운
+    scaffoldBackgroundColor: const Color(0xFFF8F3E9), // 페이퍼 베이지색
+    cardColor: const Color(0xFFFCF7F0), // 따뜻한 화이트
+    shadowColor: Colors.brown.withOpacity(0.1),
+    appBarTheme: const AppBarTheme(
+      backgroundColor: Color(0xFFF8F3E9),
+      foregroundColor: Color(0xFF3E2723),
+      elevation: 0,
+      iconTheme: IconThemeData(color: Color(0xFF5D4037)),
+    ),
+    drawerTheme: const DrawerThemeData(
+      backgroundColor: Color(0xFFF8F3E9),
+    ),
+    dividerTheme: const DividerThemeData(
+      color: Color(0xFFE0D6C8),
+      thickness: 1,
+    ),
+    bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      backgroundColor: Color(0xFFF8F3E9),
+      selectedItemColor: Color(0xFF8D6E63),
+      unselectedItemColor: Color(0xFFBCAA9C),
+    ),
+    elevatedButtonTheme: ElevatedButtonThemeData(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF8D6E63),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+    ),
+    textTheme: TextTheme(
+      // 뉴스 제목
+      titleLarge: const TextStyle(
+        color: Color(0xFF3E2723),
+        fontSize: 24,
+        fontWeight: FontWeight.w700,
+        height: 1.3,
+        letterSpacing: -0.2,
+        fontFamily: 'Serif',
+      ),
+      // 뉴스 본문
+      bodyLarge: const TextStyle(
+        color: Color(0xFF4E342E),
+        fontSize: 17,
+        height: 1.7,
+        letterSpacing: 0.3,
+        fontFamily: 'Serif',
+      ),
+      // 뉴스 요약
+      bodyMedium: TextStyle(
+        color: Colors.brown[700],
+        fontSize: 15,
+        height: 1.4,
+        fontFamily: 'Serif',
+      ),
+      // 날짜, 출처 등 작은 텍스트
+      bodySmall: const TextStyle(
+        color: Color(0xFF6D4C41),
+        fontSize: 13,
+        fontStyle: FontStyle.italic,
+      ),
+      // 탭 라벨
+      labelLarge: const TextStyle(
+        fontWeight: FontWeight.w600,
+        fontSize: 17,
+        color: Color(0xFF5D4037),
+        letterSpacing: -0.3,
+      ),
+      labelMedium: const TextStyle(
+        fontWeight: FontWeight.normal,
+        fontSize: 15,
+        color: Color(0xFF8D6E63),
+      ),
+      // 앱 바 제목
+      headlineMedium: const TextStyle(
+        color: Color(0xFF3E2723),
+        fontWeight: FontWeight.w600,
+        fontSize: 20,
+        letterSpacing: -0.5,
+        fontFamily: 'Serif',
+      ),
+    ),
+    colorScheme: const ColorScheme.light().copyWith(
+      primary: const Color(0xFF8D6E63),
+      secondary: const Color(0xFFBCAAA4),
+      surface: const Color(0xFFFCF7F0),
+      background: const Color(0xFFF8F3E9),
+      error: const Color(0xFFB71C1C),
+      // 출처 태그 배경색
+      primaryContainer: const Color(0xFFEFE5DC),
+      // 출처 태그 텍스트 색상
+      onPrimaryContainer: const Color(0xFF5D4037),
+    ),
+    chipTheme: ChipThemeData(
+      backgroundColor: const Color(0xFFEFE5DC),
+      labelStyle: TextStyle(color: Colors.brown[700], fontSize: 12),
+      shape: RoundedRectangleBorder(
+        side: const BorderSide(color: Color(0xFFD7CCC8)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+    ),
+    // 확장 테마 데이터 (앱 전용 속성)
+    extensions: [
+      NewsCardStyleExtension(
+        titleStyle: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFF3E2723),
+          height: 1.3,
+          fontFamily: 'Serif',
+        ),
+        descriptionStyle: const TextStyle(
+          fontSize: 14,
+          color: Color(0xFF5D4037),
+          height: 1.5,
+          fontFamily: 'Serif',
+        ),
+        sourceStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          color: Color(0xFF795548),
+          fontStyle: FontStyle.italic,
+        ),
+        dateStyle: const TextStyle(
+          fontSize: 12,
+          color: Color(0xFF8D6E63),
+          fontStyle: FontStyle.italic,
+        ),
+        bookmarkActiveColor: const Color(0xFF795548),
+        bookmarkInactiveColor: const Color(0xFFBCAAA4),
+        thumbnailPlaceholderColor: const Color(0xFFEFE5DC),
+        thumbnailBorderRadius: 6.0,
+        cardPadding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+        dividerColor: const Color(0xFFE0D6C8),
+      ),
+      RssThemeExtension(
+        channelCardBackground: const Color(0xFFFCF7F0),
+        subscribeButtonActiveBackground: const Color(0xFFECE2D8),
+        subscribeButtonActiveText: const Color(0xFF5D4037),
+        subscribeButtonInactiveBackground: const Color(0xFFEFE5DC),
+        subscribeButtonInactiveText: const Color(0xFF8D6E63),
+        channelImageGradientColors: const [
+          Color(0xFF8D6E63),
+          Color(0xFF5D4037)
+        ],
+        channelImageBorderRadius: 10.0,
+        linkColor: const Color(0xFF795548),
+        channelIconColor: const Color(0xFFA1887F),
+      ),
+      // 검색 결과 태그 스타일
+      SearchStyleExtension(
+        channelTagBackground: const Color(0xFFEDE2D8),
+        channelTagBorder: const Color(0xFFD7CCC8),
+        channelTagText: const Color(0xFF6D4C41),
+        rssTagBackground: const Color(0xFFE8E0D8),
+        rssTagBorder: const Color(0xFFD7CCC8),
+        rssTagText: const Color(0xFF795548),
+        channelIconColor: const Color(0xFFBCAAA4),
+        channelIconBackground: const Color(0xFFEFE5DC),
+      ),
+      // 구독 뷰 스타일
+      SubscribeViewStyleExtension(
+        dateHeaderBackground: const Color(0xFFF5EFE6),
+        dateTextStyle: const TextStyle(
+          fontWeight: FontWeight.w600,
+          fontSize: 17,
+          letterSpacing: -0.5,
+          color: Color(0xFF5D4037),
+          fontFamily: 'Serif',
+        ),
+        countTextStyle: const TextStyle(
+          color: Color(0xFF8D6E63),
+          fontSize: 14,
+          letterSpacing: -0.3,
+          fontStyle: FontStyle.italic,
+        ),
+        dotColor: const Color(0xFFBCAAA4),
+        channelCardBorder: const Color(0xFFE0D6C8),
+        expandButtonBackground: const Color(0xFFEFE5DC),
+        expandButtonTextColor: const Color(0xFF795548),
+        collapseButtonTextColor: const Color(0xFFBCAAA4),
+        sectionDividerColor: const Color(0xFFE8E0D8),
+        errorIconColor: const Color(0xFFD7CCC8),
+        emptyIconColor: const Color(0xFFD7CCC8),
+        emptyTextColor: const Color(0xFF8D6E63),
+        hintBoxBackground: const Color(0xFFEFE5DC),
+        hintBoxBorder: const Color(0xFFE0D6C8),
+        hintTextColor: const Color(0xFF8D6E63),
+        dateHeaderColor: const Color(0xFF5D4037),
+      ),
+    ],
+  );
+
   // 테마별 이름과 테마 데이터를 매핑
   static final Map<String, ThemeData> themeData = {
     "light": lightTheme,
     "blue": blueTheme,
     "dark": darkTheme,
+    "paper": paperTheme,
   };
 
   // 테마별 표시 이름
@@ -529,6 +728,7 @@ class AppTheme {
     "light": "White Theme",
     "blue": "Blue Theme",
     "dark": "Black Theme",
+    "paper": "Paper Theme",
   };
 
   // 테마별 색상 미리보기
@@ -536,6 +736,7 @@ class AppTheme {
     "light": Colors.white,
     "blue": const Color(0xFF1565C0),
     "dark": const Color(0xFF121212),
+    "paper": const Color(0xFFF8F3E9),
   };
 
   // 헬퍼 메서드: 뉴스 상세화면 전용 스타일
@@ -790,7 +991,8 @@ class RssThemeExtension extends ThemeExtension<RssThemeExtension> {
       channelImageBorderRadius: lerpDouble(
           channelImageBorderRadius, other.channelImageBorderRadius, t),
       linkColor: Color.lerp(linkColor, other.linkColor, t)!,
-      channelIconColor: Color.lerp(channelIconColor, other.channelIconColor, t)!,
+      channelIconColor:
+          Color.lerp(channelIconColor, other.channelIconColor, t)!,
     );
   }
 
@@ -1021,7 +1223,8 @@ class SubscribeViewStyleExtension
           Color.lerp(hintBoxBackground, other.hintBoxBackground, t)!,
       hintBoxBorder: Color.lerp(hintBoxBorder, other.hintBoxBorder, t)!,
       hintTextColor: Color.lerp(hintTextColor, other.hintTextColor, t)!,
-      dateHeaderColor: Color.lerp(dateHeaderColor, other.dateHeaderColor, t)!, // 추가된 속성
+      dateHeaderColor:
+          Color.lerp(dateHeaderColor, other.dateHeaderColor, t)!, // 추가된 속성
     );
   }
 

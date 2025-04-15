@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1008455298981",
+    "project_id": "kdh-omninews",
+    "storage_bucket": "kdh-omninews.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1008455298981:android:31ee11ca26020063c0824c",
+        "android_client_info": {
+          "package_name": "com.example.omninews_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC2TuHUHq7KMI9FQU0xSGDvlThIo1GNyrw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

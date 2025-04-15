@@ -3,10 +3,13 @@ import 'package:intl/intl.dart';
 import 'package:omninews_flutter/models/news.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
 import 'package:omninews_flutter/services/news_bookmark_service.dart';
+import 'package:omninews_flutter/services/recently_read_service.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
 import 'package:omninews_flutter/models/app_setting.dart';
 import 'package:omninews_flutter/utils/url_launcher_helper.dart';
 import 'package:provider/provider.dart';
+import 'package:html/parser.dart' show parse;
+import 'package:html_unescape/html_unescape.dart';
 
 class NewsApiItemCard extends StatefulWidget {
   final NewsApi news;
@@ -27,6 +30,7 @@ class NewsApiItemCard extends StatefulWidget {
 class _NewsApiItemCardState extends State<NewsApiItemCard> {
   bool _isBookmarked = false;
   bool _isLoading = false;
+  final HtmlUnescape _htmlUnescape = HtmlUnescape();
 
   @override
   void initState() {
@@ -103,6 +107,7 @@ class _NewsApiItemCardState extends State<NewsApiItemCard> {
   }
 
   void _openNewsLink(AppSettings settings) {
+    RecentlyReadService.addApiNews(widget.news);
     // 설정된 웹 열기 방식을 사용하여 URL 열기
     UrlLauncherHelper.openUrl(
         context, widget.news.newsOriginalLink, settings.webOpenMode);
@@ -114,8 +119,9 @@ class _NewsApiItemCardState extends State<NewsApiItemCard> {
     final theme = Theme.of(context);
     final settings = Provider.of<SettingsProvider>(context).settings;
 
-    // NewsApi 클래스에 이미지 URL이 있는지 확인하고, 있다면 뷰 모드에 따라 처리할 수 있음
-    // 현재는 텍스트만 표시하는 방식으로 구현
+    // 뉴스 제목과 설명에서 HTML 태그와 엔티티 처리
+    final cleanTitle = _cleanHtmlContent(widget.news.newsTitle);
+    final cleanDescription = _cleanHtmlContent(widget.news.newsDescription);
 
     return InkWell(
       onTap: () => _openNewsLink(settings), // 설정에 따라 URL 열기
@@ -130,7 +136,7 @@ class _NewsApiItemCardState extends State<NewsApiItemCard> {
               children: [
                 Expanded(
                   child: Text(
-                    _removeHtmlTags(widget.news.newsTitle),
+                    cleanTitle,
                     style: cardStyle.titleStyle,
                     maxLines: 3,
                     overflow: TextOverflow.ellipsis,
@@ -165,8 +171,7 @@ class _NewsApiItemCardState extends State<NewsApiItemCard> {
 
             // 뉴스 내용 요약
             Text(
-              _truncateDescription(
-                  _removeHtmlTags(widget.news.newsDescription)),
+              _truncateDescription(cleanDescription),
               style: cardStyle.descriptionStyle,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -193,10 +198,30 @@ class _NewsApiItemCardState extends State<NewsApiItemCard> {
     );
   }
 
-  // HTML 태그 제거 유틸리티 함수
-  String _removeHtmlTags(String htmlString) {
-    RegExp exp = RegExp(r"<[^>]*>", multiLine: true, caseSensitive: true);
-    return htmlString.replaceAll(exp, '');
+  // HTML 태그와 엔티티를 모두 처리하는 향상된 함수
+  String _cleanHtmlContent(String htmlString) {
+    if (htmlString.isEmpty) {
+      return '';
+    }
+
+    try {
+      // 먼저 HTML 파싱하여 태그 제거
+      final document = parse(htmlString);
+      String plainText = document.body?.text ?? '';
+
+      // HTML 엔티티 디코딩 (예: &quot; -> ")
+      plainText = _htmlUnescape.convert(plainText);
+
+      // 추가 정리 (줄바꿈, 공백 처리)
+      plainText = plainText.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+      return plainText;
+    } catch (e) {
+      // 파싱에 실패한 경우 간단한 방법으로 처리
+      String result = htmlString.replaceAll(RegExp(r'<[^>]*>'), '');
+      result = _htmlUnescape.convert(result);
+      return result.trim();
+    }
   }
 
   // 설명 텍스트 자르기

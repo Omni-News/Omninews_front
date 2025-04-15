@@ -19,7 +19,7 @@ class _RssScreenState extends State<RssScreen>
   late Future<List<RssChannel>> recommendedChannels;
   List<RssChannel> subscribedChannelsList = [];
   late TabController _tabController;
-  final List<String> _tabs = ['구독 중', '추천 RSS'];
+  final List<String> _tabs = ['구독 중', '인기 RSS'];
   bool _isLoading = true;
 
   // 구독 버튼 상태를 저장하는 맵 (채널 RSS 링크를 키로 사용)

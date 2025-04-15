@@ -13,9 +13,12 @@ class SearchScreen extends StatefulWidget {
   SearchScreenState createState() => SearchScreenState();
 }
 
-class SearchScreenState extends State<SearchScreen> {
+class SearchScreenState extends State<SearchScreen>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _controller = TextEditingController();
   final FocusNode _focusNode = FocusNode(); // 검색창 포커스 관리용
+  late TabController _tabController;
+  final PageController _pageController = PageController();
 
   // 검색 결과 상태 관리
   UnifiedSearchResult? _searchResult;
@@ -24,17 +27,26 @@ class SearchScreenState extends State<SearchScreen> {
   String _sortOption = 'sim';
   String _lastQuery = ''; // 마지막 검색어 저장
 
-  // 결과 필터링
-  bool _showNews = true;
-  bool _showRssItems = true;
-  bool _showChannels = true;
+  // 결과 필터링 - 탭으로 변환
+  final List<String> _tabs = ['뉴스', 'RSS 피드', '채널'];
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: _tabs.length, vsync: this);
     _controller.addListener(_onTextChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FocusScope.of(context).requestFocus(_focusNode);
+    });
+
+    // 탭 컨트롤러와 페이지 컨트롤러 연동
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        if (_pageController.hasClients) {
+          // 탭 변경 시 페이지 뷰 즉시 업데이트
+          _pageController.jumpToPage(_tabController.index);
+        }
+      }
     });
   }
 
@@ -43,6 +55,8 @@ class SearchScreenState extends State<SearchScreen> {
     _controller.removeListener(_onTextChanged);
     _controller.dispose();
     _focusNode.dispose();
+    _tabController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -52,6 +66,10 @@ class SearchScreenState extends State<SearchScreen> {
 
   void _search(String query) async {
     if (query.trim().isEmpty) return;
+
+    // 현재 탭 인덱스 저장 (최초 검색이 아닌 경우에만)
+    final currentTabIndex =
+        _hasSearched && _tabController.length > 0 ? _tabController.index : 0;
 
     setState(() {
       _isLoading = true;
@@ -68,13 +86,12 @@ class SearchScreenState extends State<SearchScreen> {
         setState(() {
           _searchResult = result;
           _isLoading = false;
+        });
 
-          if (result.newsResults.isNotEmpty ||
-              result.rssItemResults.isNotEmpty ||
-              result.rssChannelResults.isNotEmpty) {
-            _showNews = true;
-            _showRssItems = true;
-            _showChannels = true;
+        // UI가 업데이트된 후에 탭 상태 확인
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _hasResults()) {
+            _checkAndUpdateTab(currentTabIndex);
           }
         });
       }
@@ -100,6 +117,71 @@ class SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  // 검색 후 탭 상태 체크 및 업데이트
+  void _checkAndUpdateTab(int preferredTabIndex) {
+    if (_searchResult == null || !_hasResults()) return;
+
+    try {
+      // 먼저 선호하는 탭에 결과가 있는지 확인
+      bool hasResultsInPreferredTab = _hasResultsInTab(preferredTabIndex);
+
+      if (hasResultsInPreferredTab) {
+        // 선호하는 탭에 결과가 있으면 해당 탭으로 이동
+        _tabController.animateTo(preferredTabIndex);
+
+        // PageController를 안전하게 사용
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(preferredTabIndex);
+        }
+      } else {
+        // 선호하는 탭에 결과가 없으면 결과가 있는 첫 탭으로 이동
+        int newTabIndex = _findFirstTabWithResults();
+        if (newTabIndex >= 0) {
+          _tabController.animateTo(newTabIndex);
+
+          // PageController를 안전하게 사용
+          if (_pageController.hasClients) {
+            _pageController.jumpToPage(newTabIndex);
+          }
+        }
+      }
+    } catch (e) {
+      print('탭 업데이트 중 오류: $e');
+      // 오류가 발생해도 앱이 중단되지 않도록 조용히 실패
+    }
+  }
+
+  // 특정 탭에 결과가 있는지 확인
+  bool _hasResultsInTab(int tabIndex) {
+    if (_searchResult == null) return false;
+
+    switch (tabIndex) {
+      case 0: // 뉴스 탭
+        return _searchResult!.newsResults.isNotEmpty;
+      case 1: // RSS 피드 탭
+        return _searchResult!.rssItemResults.isNotEmpty;
+      case 2: // 채널 탭
+        return _searchResult!.rssChannelResults.isNotEmpty;
+      default:
+        return false;
+    }
+  }
+
+  // 결과가 있는 첫 번째 탭 인덱스 찾기
+  int _findFirstTabWithResults() {
+    if (_searchResult == null) return -1;
+
+    if (_searchResult!.newsResults.isNotEmpty) {
+      return 0; // 뉴스 탭
+    } else if (_searchResult!.rssItemResults.isNotEmpty) {
+      return 1; // RSS 피드 탭
+    } else if (_searchResult!.rssChannelResults.isNotEmpty) {
+      return 2; // 채널 탭
+    }
+
+    return -1; // 모든 탭에 결과가 없음
+  }
+
   void _handleSearch() {
     final query = _controller.text;
     if (query.isNotEmpty) {
@@ -114,14 +196,67 @@ class SearchScreenState extends State<SearchScreen> {
     setState(() {});
   }
 
+  // 정렬 옵션 변경 시 현재 탭 유지
   void _updateSortOption(String sortOption) {
     if (_sortOption != sortOption) {
+      // 현재 탭 인덱스 저장
+      final currentTabIndex = _tabController.index;
+
       setState(() {
         _sortOption = sortOption;
       });
 
       if (_hasSearched && _lastQuery.isNotEmpty) {
-        _search(_lastQuery);
+        // 검색 시 현재 탭 인덱스 전달
+        _searchWithCurrentTab(_lastQuery, currentTabIndex);
+      }
+    }
+  }
+
+  // 현재 탭 인덱스와 함께 검색
+  void _searchWithCurrentTab(String query, int currentTabIndex) async {
+    if (query.trim().isEmpty) return;
+
+    setState(() {
+      _isLoading = true;
+      _searchResult = null;
+    });
+
+    try {
+      final result =
+          await UnifiedSearchService.search(query, sort: _sortOption);
+
+      if (mounted) {
+        setState(() {
+          _searchResult = result;
+          _isLoading = false;
+        });
+
+        // UI가 업데이트된 후 탭 상태 확인
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _hasResults()) {
+            _checkAndUpdateTab(currentTabIndex);
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _searchResult = UnifiedSearchResult(
+            newsResults: [],
+            rssItemResults: [],
+            rssChannelResults: [],
+          );
+          _isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('검색 중 오류가 발생했습니다: $e'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
       }
     }
   }
@@ -316,12 +451,34 @@ class SearchScreenState extends State<SearchScreen> {
           if (_hasSearched && _searchResult != null && !_isLoading)
             _buildSearchOptionsBar(),
 
-          // 결과 필터 칩
+          // 탭 바 추가 (필터 칩 대신 탭바 사용)
           if (_hasSearched &&
               _searchResult != null &&
               !_isLoading &&
               _hasResults())
-            _buildFilterChips(),
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: theme.canvasColor,
+                border: Border(
+                  bottom: BorderSide(color: theme.dividerColor, width: 1),
+                ),
+              ),
+              child: TabBar(
+                controller: _tabController,
+                labelColor: theme.primaryColor,
+                unselectedLabelColor:
+                    theme.textTheme.bodyLarge?.color?.withOpacity(0.7),
+                indicatorColor: theme.primaryColor,
+                indicatorWeight: 3,
+                tabs: [
+                  _buildTab('뉴스', _searchResult!.newsResults.length),
+                  _buildTab('RSS 피드', _searchResult!.rssItemResults.length),
+                  _buildTab('채널', _searchResult!.rssChannelResults.length),
+                ],
+                isScrollable: false, // 전체 화면 너비 사용
+              ),
+            ),
 
           // 검색 결과
           Expanded(
@@ -332,10 +489,170 @@ class SearchScreenState extends State<SearchScreen> {
                     ? _buildInitialView()
                     : !_hasResults()
                         ? _buildEmptyResultView()
-                        : _buildSearchResultsList(),
+                        : PageView(
+                            controller: _pageController,
+                            physics: const ClampingScrollPhysics(),
+                            onPageChanged: (index) {
+                              if (_tabController.index != index) {
+                                _tabController.animateTo(index);
+                              }
+                            },
+                            children: [
+                              // 뉴스 페이지
+                              _buildNewsResultsList(),
+
+                              // RSS 피드 페이지
+                              _buildRssItemResultsList(),
+
+                              // 채널 페이지
+                              _buildChannelResultsList(),
+                            ],
+                          ),
           ),
         ],
       ),
+    );
+  }
+
+  // 새로운 탭 위젯 생성
+  Widget _buildTab(String label, int count) {
+    return Tab(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(label),
+          const SizedBox(width: 6),
+          if (count > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Theme.of(context).primaryColor.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                count.toString(),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // 뉴스 결과 페이지
+  Widget _buildNewsResultsList() {
+    final theme = Theme.of(context);
+    List<Widget> resultWidgets = [];
+
+    if (_searchResult!.newsResults.isEmpty) {
+      return Center(
+        child: Text(
+          '뉴스 검색 결과가 없습니다',
+          style: TextStyle(color: theme.hintColor),
+        ),
+      );
+    }
+
+    for (var i = 0; i < _searchResult!.newsResults.length; i++) {
+      resultWidgets.add(NewsApiItemCard(
+        news: _searchResult!.newsResults[i],
+        onBookmarkChanged: () {
+          setState(() {});
+        },
+      ));
+
+      if (i < _searchResult!.newsResults.length - 1) {
+        resultWidgets.add(Divider(
+          height: 1,
+          indent: 16,
+          endIndent: 16,
+          color: theme.dividerTheme.color,
+        ));
+      }
+    }
+
+    return ListView(
+      padding: const EdgeInsets.only(top: 4, bottom: 16),
+      children: resultWidgets,
+    );
+  }
+
+  // RSS 피드 결과 페이지
+  Widget _buildRssItemResultsList() {
+    final theme = Theme.of(context);
+    List<Widget> resultWidgets = [];
+
+    if (_searchResult!.rssItemResults.isEmpty) {
+      return Center(
+        child: Text(
+          'RSS 피드 검색 결과가 없습니다',
+          style: TextStyle(color: theme.hintColor),
+        ),
+      );
+    }
+
+    for (var i = 0; i < _searchResult!.rssItemResults.length; i++) {
+      resultWidgets.add(SearchRssItemCard(
+        item: _searchResult!.rssItemResults[i],
+        onBookmarkChanged: () {
+          setState(() {});
+        },
+      ));
+
+      if (i < _searchResult!.rssItemResults.length - 1) {
+        resultWidgets.add(Divider(
+          height: 1,
+          indent: 16,
+          endIndent: 16,
+          color: theme.dividerTheme.color,
+        ));
+      }
+    }
+
+    return ListView(
+      padding: const EdgeInsets.only(top: 4, bottom: 16),
+      children: resultWidgets,
+    );
+  }
+
+  // 채널 결과 페이지
+  Widget _buildChannelResultsList() {
+    final theme = Theme.of(context);
+    List<Widget> resultWidgets = [];
+
+    if (_searchResult!.rssChannelResults.isEmpty) {
+      return Center(
+        child: Text(
+          '채널 검색 결과가 없습니다',
+          style: TextStyle(color: theme.hintColor),
+        ),
+      );
+    }
+
+    for (var i = 0; i < _searchResult!.rssChannelResults.length; i++) {
+      resultWidgets.add(SearchRssChannelCard(
+        channel: _searchResult!.rssChannelResults[i],
+        onSubscriptionChanged: () {
+          setState(() {});
+        },
+      ));
+
+      if (i < _searchResult!.rssChannelResults.length - 1) {
+        resultWidgets.add(Divider(
+          height: 1,
+          indent: 16,
+          endIndent: 16,
+          color: theme.dividerTheme.color,
+        ));
+      }
+    }
+
+    return ListView(
+      padding: const EdgeInsets.only(top: 4, bottom: 16),
+      children: resultWidgets,
     );
   }
 
@@ -343,37 +660,49 @@ class SearchScreenState extends State<SearchScreen> {
     final theme = Theme.of(context);
     final hasResults = _hasResults();
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, 4, 16, hasResults ? 0 : 4),
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, 8, 16, hasResults ? 4 : 8),
+      decoration: BoxDecoration(
+        color: theme.brightness == Brightness.dark
+            ? theme.cardColor.withOpacity(0.4)
+            : theme.canvasColor,
+        border: Border(
+          bottom: BorderSide(
+            color: theme.dividerColor.withOpacity(0.5),
+            width: 1,
+          ),
+        ),
+      ),
       child: Row(
         children: [
           // 카테고리 추가 버튼
           InkWell(
             onTap: () => _addToNewsCategories(_lastQuery),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(8),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                    color: theme.colorScheme.primary.withOpacity(0.3),
-                    width: 1),
+                color: theme.primaryColor,
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    "카테고리에 추가",
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: theme.colorScheme.onPrimaryContainer,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  const Icon(
+                    Icons.add_circle_outline,
+                    size: 16,
+                    color: Colors.white,
                   ),
                   const SizedBox(width: 4),
-                  Icon(Icons.add_circle_outline,
-                      size: 14, color: theme.colorScheme.onPrimaryContainer),
+                  Text(
+                    "카테고리 추가",
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -388,291 +717,17 @@ class SearchScreenState extends State<SearchScreen> {
             isSelected: _sortOption == "sim",
             onTap: () => _updateSortOption("sim"),
           ),
-          const SizedBox(width: 16),
           _buildSortOption(
             context: context,
             label: "인기순",
             isSelected: _sortOption == "pop",
             onTap: () => _updateSortOption("pop"),
           ),
-          const SizedBox(width: 16),
           _buildSortOption(
             context: context,
             label: "최신순",
             isSelected: _sortOption == "date",
             onTap: () => _updateSortOption("date"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterChips() {
-    // 모든 필터가 꺼져있으면 하나라도 활성화
-    if (!_showNews && !_showRssItems && !_showChannels) {
-      setState(() {
-        _showNews = true;
-      });
-    }
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            _buildFilterChip(
-              label: '뉴스',
-              count: _searchResult!.newsResults.length,
-              isSelected: _showNews,
-              onTap: () => setState(() => _showNews = !_showNews),
-            ),
-            const SizedBox(width: 8),
-            _buildFilterChip(
-              label: 'RSS 피드',
-              count: _searchResult!.rssItemResults.length,
-              isSelected: _showRssItems,
-              onTap: () => setState(() => _showRssItems = !_showRssItems),
-            ),
-            const SizedBox(width: 8),
-            _buildFilterChip(
-              label: '채널',
-              count: _searchResult!.rssChannelResults.length,
-              isSelected: _showChannels,
-              onTap: () => setState(() => _showChannels = !_showChannels),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFilterChip({
-    required String label,
-    required int count,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    final theme = Theme.of(context);
-    final searchStyle = AppTheme.searchStyleOf(context);
-
-    Color chipBackground;
-    Color chipBorderColor;
-    Color chipTextColor;
-
-    if (isSelected) {
-      if (label == '뉴스') {
-        chipBackground = theme.primaryColor.withOpacity(0.1);
-        chipBorderColor = theme.primaryColor.withOpacity(0.3);
-        chipTextColor = theme.primaryColor;
-      } else if (label == 'RSS 피드') {
-        chipBackground = searchStyle.rssTagBackground.withOpacity(0.8);
-        chipBorderColor = searchStyle.rssTagBorder;
-        chipTextColor = searchStyle.rssTagText;
-      } else {
-        chipBackground = searchStyle.channelTagBackground.withOpacity(0.8);
-        chipBorderColor = searchStyle.channelTagBorder;
-        chipTextColor = searchStyle.channelTagText;
-      }
-    } else {
-      chipBackground = theme.brightness == Brightness.dark
-          ? Colors.grey[800]!.withOpacity(0.5)
-          : Colors.grey[100]!;
-      chipBorderColor = theme.brightness == Brightness.dark
-          ? Colors.grey[700]!
-          : Colors.grey[300]!;
-      chipTextColor = theme.brightness == Brightness.dark
-          ? Colors.grey[300]!
-          : Colors.grey[700]!;
-    }
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: chipBackground,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: chipBorderColor, width: 1),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: chipTextColor,
-              ),
-            ),
-            const SizedBox(width: 4),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? chipTextColor.withOpacity(0.2)
-                    : theme.brightness == Brightness.dark
-                        ? Colors.grey[700]
-                        : Colors.grey[200],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                count.toString(),
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: chipTextColor,
-                ),
-              ),
-            ),
-            const SizedBox(width: 2),
-            Icon(
-              isSelected ? Icons.check_circle : Icons.circle_outlined,
-              size: 16,
-              color: chipTextColor,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSearchResultsList() {
-    final theme = Theme.of(context);
-    List<Widget> resultWidgets = [];
-
-    // 뉴스 결과
-    if (_showNews && _searchResult!.newsResults.isNotEmpty) {
-      if ((_showRssItems && _searchResult!.rssItemResults.isNotEmpty) ||
-          (_showChannels && _searchResult!.rssChannelResults.isNotEmpty)) {
-        resultWidgets
-            .add(_buildSectionHeader('뉴스', _searchResult!.newsResults.length));
-      }
-
-      for (var i = 0; i < _searchResult!.newsResults.length; i++) {
-        resultWidgets.add(NewsApiItemCard(
-          news: _searchResult!.newsResults[i],
-          onBookmarkChanged: () {
-            setState(() {});
-          },
-        ));
-
-        if (i < _searchResult!.newsResults.length - 1 ||
-            (_showRssItems && _searchResult!.rssItemResults.isNotEmpty) ||
-            (_showChannels && _searchResult!.rssChannelResults.isNotEmpty)) {
-          resultWidgets.add(Divider(
-            height: 1,
-            indent: 16,
-            endIndent: 16,
-            color: theme.dividerTheme.color,
-          ));
-        }
-      }
-    }
-
-    // RSS 피드 결과
-    if (_showRssItems && _searchResult!.rssItemResults.isNotEmpty) {
-      if ((_showNews && _searchResult!.newsResults.isNotEmpty) ||
-          (_showChannels && _searchResult!.rssChannelResults.isNotEmpty)) {
-        resultWidgets.add(_buildSectionHeader(
-            'RSS 피드', _searchResult!.rssItemResults.length));
-      }
-
-      for (var i = 0; i < _searchResult!.rssItemResults.length; i++) {
-        resultWidgets.add(SearchRssItemCard(
-          item: _searchResult!.rssItemResults[i],
-          onBookmarkChanged: () {
-            setState(() {});
-          },
-        ));
-
-        if (i < _searchResult!.rssItemResults.length - 1 ||
-            (_showChannels && _searchResult!.rssChannelResults.isNotEmpty)) {
-          resultWidgets.add(Divider(
-            height: 1,
-            indent: 16,
-            endIndent: 16,
-            color: theme.dividerTheme.color,
-          ));
-        }
-      }
-    }
-
-    // 채널 결과
-    if (_showChannels && _searchResult!.rssChannelResults.isNotEmpty) {
-      if ((_showNews && _searchResult!.newsResults.isNotEmpty) ||
-          (_showRssItems && _searchResult!.rssItemResults.isNotEmpty)) {
-        resultWidgets.add(
-            _buildSectionHeader('채널', _searchResult!.rssChannelResults.length));
-      }
-
-      for (var i = 0; i < _searchResult!.rssChannelResults.length; i++) {
-        resultWidgets.add(SearchRssChannelCard(
-          channel: _searchResult!.rssChannelResults[i],
-          onSubscriptionChanged: () {
-            setState(() {});
-          },
-        ));
-
-        if (i < _searchResult!.rssChannelResults.length - 1) {
-          resultWidgets.add(Divider(
-            height: 1,
-            indent: 16,
-            endIndent: 16,
-            color: theme.dividerTheme.color,
-          ));
-        }
-      }
-    }
-
-    return ListView(
-      padding: const EdgeInsets.only(top: 4, bottom: 16),
-      children: resultWidgets,
-    );
-  }
-
-  Widget _buildSectionHeader(String title, int count) {
-    final theme = Theme.of(context);
-
-    Color backgroundColor = theme.brightness == Brightness.dark
-        ? theme.cardColor.withOpacity(0.3)
-        : Colors.grey[50]!;
-
-    return Container(
-      color: backgroundColor,
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: Row(
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: theme.textTheme.titleSmall?.color,
-              letterSpacing: -0.5,
-            ),
-          ),
-          const SizedBox(width: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: theme.brightness == Brightness.dark
-                  ? Colors.grey[800]
-                  : Colors.grey[200],
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(
-              count.toString(),
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: theme.brightness == Brightness.dark
-                    ? Colors.grey[300]
-                    : Colors.grey[700],
-              ),
-            ),
           ),
         ],
       ),
@@ -740,45 +795,42 @@ class SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildSortOption(
-      {required BuildContext context,
-      required String label,
-      required bool isSelected,
-      required VoidCallback onTap}) {
+  Widget _buildSortOption({
+    required BuildContext context,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
     final theme = Theme.of(context);
 
-    return GestureDetector(
+    return InkWell(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? theme.primaryColor.withOpacity(0.1)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               label,
               style: TextStyle(
-                fontSize: 14,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                 color: isSelected
                     ? theme.primaryColor
                     : theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                letterSpacing: -0.2,
               ),
             ),
-            if (isSelected) ...[
-              const SizedBox(width: 4),
-              Icon(
-                Icons.check_circle,
-                size: 14,
-                color: theme.primaryColor,
+            if (isSelected)
+              Padding(
+                padding: const EdgeInsets.only(left: 3),
+                child: Icon(
+                  Icons.check,
+                  size: 14,
+                  color: theme.primaryColor,
+                ),
               ),
-            ],
           ],
         ),
       ),
@@ -788,12 +840,8 @@ class SearchScreenState extends State<SearchScreen> {
   bool _hasResults() {
     if (_searchResult == null) return false;
 
-    final hasNewsResults = _showNews && _searchResult!.newsResults.isNotEmpty;
-    final hasRssItemResults =
-        _showRssItems && _searchResult!.rssItemResults.isNotEmpty;
-    final hasChannelResults =
-        _showChannels && _searchResult!.rssChannelResults.isNotEmpty;
-
-    return hasNewsResults || hasRssItemResults || hasChannelResults;
+    return _searchResult!.newsResults.isNotEmpty ||
+        _searchResult!.rssItemResults.isNotEmpty ||
+        _searchResult!.rssChannelResults.isNotEmpty;
   }
 }
