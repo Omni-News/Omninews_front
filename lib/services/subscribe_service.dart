@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:omninews_test_flutter/models/rss_channel.dart';
-import 'package:omninews_test_flutter/models/rss_item.dart';
-import 'package:omninews_test_flutter/services/rss_service.dart';
-import 'package:omninews_test_flutter/utils/rss_manager.dart';
+import 'package:omninews_flutter/models/rss_channel.dart';
+import 'package:omninews_flutter/models/rss_item.dart';
+import 'package:omninews_flutter/services/rss_service.dart';
+import 'package:omninews_flutter/utils/rss_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SubscribeService {

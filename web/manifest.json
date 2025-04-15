@@ -1,6 +1,6 @@
 {
-    "name": "omninews_test_flutter",
-    "short_name": "omninews_test_flutter",
+    "name": "omninews_flutter",
+    "short_name": "omninews_flutter",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

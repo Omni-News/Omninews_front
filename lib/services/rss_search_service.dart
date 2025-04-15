@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:omninews_test_flutter/models/rss_item.dart';
-import 'package:omninews_test_flutter/models/rss_channel.dart';
-import 'package:omninews_test_flutter/services/subscribe_service.dart';
+import 'package:omninews_flutter/models/rss_item.dart';
+import 'package:omninews_flutter/models/rss_channel.dart';
+import 'package:omninews_flutter/services/subscribe_service.dart';
 
 class RssSearchService {
   // baseUrl 사용

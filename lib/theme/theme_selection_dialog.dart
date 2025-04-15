@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_test_flutter/provider/theme_provider.dart';
+import 'package:omninews_flutter/provider/theme_provider.dart';
 import 'package:provider/provider.dart';
 import 'app_theme.dart';
 

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_test_flutter/theme/app_theme.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ThemeProvider extends ChangeNotifier {

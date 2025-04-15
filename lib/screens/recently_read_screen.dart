@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:omninews_test_flutter/models/recently_read_item.dart';
-import 'package:omninews_test_flutter/services/recently_read_service.dart';
-import 'package:omninews_test_flutter/theme/app_theme.dart';
-import 'package:omninews_test_flutter/models/app_setting.dart';
-import 'package:omninews_test_flutter/widgets/rss_item_card.dart';
-import 'package:omninews_test_flutter/widgets/news_item_card.dart';
+import 'package:omninews_flutter/models/recently_read_item.dart';
+import 'package:omninews_flutter/services/recently_read_service.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
+import 'package:omninews_flutter/models/app_setting.dart';
+import 'package:omninews_flutter/widgets/rss_item_card.dart';
+import 'package:omninews_flutter/widgets/news_item_card.dart';
 import 'package:provider/provider.dart';
-import 'package:omninews_test_flutter/provider/settings_provider.dart';
+import 'package:omninews_flutter/provider/settings_provider.dart';
 import 'package:sticky_headers/sticky_headers.dart';
 import 'package:html/parser.dart' show parse; // HTML 파싱 추가
 

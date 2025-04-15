@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.omninews_test_flutter"
+    namespace = "com.example.omninews_flutter"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 

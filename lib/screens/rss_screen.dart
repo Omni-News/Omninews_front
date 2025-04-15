@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_test_flutter/models/rss_channel.dart';
-import 'package:omninews_test_flutter/screens/home_screen.dart';
-import 'package:omninews_test_flutter/services/rss_service.dart';
-import 'package:omninews_test_flutter/screens/rss_add_screen.dart';
-import 'package:omninews_test_flutter/screens/rss_channel_detail_screen.dart';
-import 'package:omninews_test_flutter/theme/app_theme.dart';
+import 'package:omninews_flutter/models/rss_channel.dart';
+import 'package:omninews_flutter/screens/home_screen.dart';
+import 'package:omninews_flutter/services/rss_service.dart';
+import 'package:omninews_flutter/screens/rss_add_screen.dart';
+import 'package:omninews_flutter/screens/rss_channel_detail_screen.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
 
 class RssScreen extends StatefulWidget {
   const RssScreen({super.key});

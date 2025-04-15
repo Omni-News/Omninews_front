@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:omninews_test_flutter/models/rss_channel.dart';
-import 'package:omninews_test_flutter/models/rss_item.dart';
-import 'package:omninews_test_flutter/utils/rss_manager.dart';
+import 'package:omninews_flutter/models/rss_channel.dart';
+import 'package:omninews_flutter/models/rss_item.dart';
+import 'package:omninews_flutter/utils/rss_manager.dart';
 
 class RssService {
   static const String baseUrl =

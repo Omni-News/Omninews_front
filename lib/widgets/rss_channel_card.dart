@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_test_flutter/models/rss_channel.dart';
-import 'package:omninews_test_flutter/theme/app_theme.dart';
-import 'package:omninews_test_flutter/models/app_setting.dart'; // 추가
+import 'package:omninews_flutter/models/rss_channel.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
+import 'package:omninews_flutter/models/app_setting.dart'; // 추가
 
 class RssChannelCard extends StatefulWidget {
   final RssChannel channel;

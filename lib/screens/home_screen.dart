@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_test_flutter/screens/about_screen.dart';
-import 'package:omninews_test_flutter/screens/help_feedback_screen.dart';
-import 'package:omninews_test_flutter/screens/settings_screen.dart';
-import 'package:omninews_test_flutter/screens/subscribe_screen.dart';
-import 'package:omninews_test_flutter/screens/bookmark_screen.dart';
-import 'package:omninews_test_flutter/screens/news_screen.dart';
-import 'package:omninews_test_flutter/screens/rss_screen.dart';
-import 'package:omninews_test_flutter/screens/search_screen.dart';
-import 'package:omninews_test_flutter/screens/recently_read_screen.dart';
-import 'package:omninews_test_flutter/theme/theme_selection_dialog.dart';
-import 'package:omninews_test_flutter/screens/login_screen.dart'; // 추가
+import 'package:omninews_flutter/screens/about_screen.dart';
+import 'package:omninews_flutter/screens/help_feedback_screen.dart';
+import 'package:omninews_flutter/screens/settings_screen.dart';
+import 'package:omninews_flutter/screens/subscribe_screen.dart';
+import 'package:omninews_flutter/screens/bookmark_screen.dart';
+import 'package:omninews_flutter/screens/news_screen.dart';
+import 'package:omninews_flutter/screens/rss_screen.dart';
+import 'package:omninews_flutter/screens/search_screen.dart';
+import 'package:omninews_flutter/screens/recently_read_screen.dart';
+import 'package:omninews_flutter/theme/theme_selection_dialog.dart';
+import 'package:omninews_flutter/screens/login_screen.dart'; // 추가
 
 // 전역 키를 선언하여 어디서든 접근할 수 있게 합니다
 final GlobalKey<ScaffoldState> homeScaffoldKey = GlobalKey<ScaffoldState>();

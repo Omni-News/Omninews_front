@@ -1,4 +1,4 @@
-# omninews_test_flutter
+# omninews_flutter
 
 A new Flutter project.
 

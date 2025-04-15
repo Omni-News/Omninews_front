@@ -2,7 +2,7 @@
     package="com.kdh.omninews_flutter">
     
     <application
-        android:label="omninews_test_flutter"
+        android:label="omninews_flutter"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

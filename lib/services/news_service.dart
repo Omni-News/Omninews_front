@@ -1,5 +1,5 @@
-import 'package:omninews_test_flutter/models/custom_news.dart';
-import 'package:omninews_test_flutter/models/news.dart';
+import 'package:omninews_flutter/models/custom_news.dart';
+import 'package:omninews_flutter/models/news.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 

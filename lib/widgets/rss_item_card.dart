@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_test_flutter/models/app_setting.dart';
-import 'package:omninews_test_flutter/models/rss_item.dart';
-import 'package:omninews_test_flutter/provider/settings_provider.dart';
-import 'package:omninews_test_flutter/services/recently_read_service.dart';
-import 'package:omninews_test_flutter/services/subscribe_service.dart';
+import 'package:omninews_flutter/models/app_setting.dart';
+import 'package:omninews_flutter/models/rss_item.dart';
+import 'package:omninews_flutter/provider/settings_provider.dart';
+import 'package:omninews_flutter/services/recently_read_service.dart';
+import 'package:omninews_flutter/services/subscribe_service.dart';
 import 'package:intl/intl.dart';
-import 'package:omninews_test_flutter/utils/url_launcher_helper.dart';
+import 'package:omninews_flutter/utils/url_launcher_helper.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:omninews_test_flutter/theme/app_theme.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
 
 class RssItemCard extends StatefulWidget {
   final RssItem item;

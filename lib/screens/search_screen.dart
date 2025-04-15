@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_test_flutter/services/unified_search_service.dart';
-import 'package:omninews_test_flutter/widgets/news_api_item_card.dart';
-import 'package:omninews_test_flutter/widgets/search_rss_channel_card.dart';
-import 'package:omninews_test_flutter/widgets/search_rss_item_card.dart';
+import 'package:omninews_flutter/services/unified_search_service.dart';
+import 'package:omninews_flutter/widgets/news_api_item_card.dart';
+import 'package:omninews_flutter/widgets/search_rss_channel_card.dart';
+import 'package:omninews_flutter/widgets/search_rss_item_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:omninews_test_flutter/theme/app_theme.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});

@@ -1,7 +1,7 @@
 // lib/providers/settings_provider.dart
 import 'package:flutter/material.dart';
-import 'package:omninews_test_flutter/models/app_setting.dart';
-import 'package:omninews_test_flutter/services/settings_service.dart';
+import 'package:omninews_flutter/models/app_setting.dart';
+import 'package:omninews_flutter/services/settings_service.dart';
 
 class SettingsProvider extends ChangeNotifier {
   AppSettings _settings = AppSettings();

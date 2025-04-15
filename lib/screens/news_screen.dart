@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_test_flutter/models/news.dart';
-import 'package:omninews_test_flutter/models/custom_news.dart';
-import 'package:omninews_test_flutter/screens/home_screen.dart';
-import 'package:omninews_test_flutter/services/news_service.dart';
-import 'package:omninews_test_flutter/widgets/news_list_view.dart';
-import 'package:omninews_test_flutter/widgets/custom_news_list_view.dart';
+import 'package:omninews_flutter/models/news.dart';
+import 'package:omninews_flutter/models/custom_news.dart';
+import 'package:omninews_flutter/screens/home_screen.dart';
+import 'package:omninews_flutter/services/news_service.dart';
+import 'package:omninews_flutter/widgets/news_list_view.dart';
+import 'package:omninews_flutter/widgets/custom_news_list_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
-import 'package:omninews_test_flutter/provider/settings_provider.dart';
+import 'package:omninews_flutter/provider/settings_provider.dart';
 
 class NewsScreen extends StatefulWidget {
   const NewsScreen({super.key});

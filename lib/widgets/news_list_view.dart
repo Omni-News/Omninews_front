@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_test_flutter/models/app_setting.dart';
-import 'package:omninews_test_flutter/models/news.dart';
-import 'package:omninews_test_flutter/provider/settings_provider.dart';
-import 'package:omninews_test_flutter/screens/news_detail_screen.dart';
+import 'package:omninews_flutter/models/app_setting.dart';
+import 'package:omninews_flutter/models/news.dart';
+import 'package:omninews_flutter/provider/settings_provider.dart';
+import 'package:omninews_flutter/screens/news_detail_screen.dart';
 import 'package:intl/intl.dart';
-import 'package:omninews_test_flutter/services/news_bookmark_service.dart';
-import 'package:omninews_test_flutter/theme/app_theme.dart';
+import 'package:omninews_flutter/services/news_bookmark_service.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 
 class NewsListView extends StatefulWidget {
