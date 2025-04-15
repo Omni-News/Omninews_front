@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/app_setting.dart';
 import 'package:omninews_flutter/models/news.dart';
+import 'package:omninews_flutter/services/recently_read_service.dart';
 import 'package:share/share.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
 import 'package:provider/provider.dart';
@@ -202,6 +203,7 @@ class NewsDetailScreen extends StatelessWidget {
                         padding: const EdgeInsets.only(left: 8),
                         child: ElevatedButton.icon(
                           onPressed: () {
+                            RecentlyReadService.addNews(news);
                             // 설정에 따라 URL 열기
                             UrlLauncherHelper.openUrl(
                                 context, news.newsLink, settings.webOpenMode);

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:omninews_flutter/models/news.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
 import 'package:omninews_flutter/services/news_bookmark_service.dart';
+import 'package:omninews_flutter/services/recently_read_service.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
 import 'package:omninews_flutter/models/app_setting.dart';
 import 'package:omninews_flutter/utils/url_launcher_helper.dart';
@@ -98,6 +99,7 @@ class _NewsItemCardState extends State<NewsItemCard> {
   }
 
   void _openNewsLink(AppSettings settings) {
+    RecentlyReadService.addNews(widget.news);
     // 설정된 웹 열기 방식을 사용하여 URL 열기
     UrlLauncherHelper.openUrl(
         context, widget.news.newsLink, settings.webOpenMode);

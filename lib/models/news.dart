@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 class News {
   final int newsId;
   final String newsTitle;

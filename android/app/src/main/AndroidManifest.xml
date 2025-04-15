@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.yourapp">
+    package="com.kdh.omninews">
 
     <application
         android:name="io.flutter.app.FlutterApplication"
@@ -21,5 +21,16 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <activity android:name="com.kakao.sdk.flutter.AuthCodeCustomTabsActivity">
+	        <intent-filter android:label="flutter_web_auth">
+		        <action android:name="android.intent.action.VIEW" />
+		        <category android:name="android.intent.category.DEFAULT" />
+		        <category android:name="android.intent.category.BROWSABLE" />
+    
+		        <!-- Redirect URI, "kakao${YOUR_NATIVE_APP_KEY}://oauth" 형식 -->
+		        <data android:scheme="kakao${70af74169ae36ee6942504c251e78cb6}" android:host="oauth"/>
+	        </intent-filter>
+        </activity>
+
     </application>
 </manifest>

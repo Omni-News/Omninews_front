@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:omninews_flutter/screens/about_screen.dart';
+import 'package:omninews_flutter/screens/help_feedback_screen.dart';
 import 'package:omninews_flutter/screens/settings_screen.dart';
 import 'package:omninews_flutter/screens/subscribe_screen.dart';
 import 'package:omninews_flutter/screens/bookmark_screen.dart';
 import 'package:omninews_flutter/screens/news_screen.dart';
 import 'package:omninews_flutter/screens/rss_screen.dart';
 import 'package:omninews_flutter/screens/search_screen.dart';
+import 'package:omninews_flutter/screens/recently_read_screen.dart';
 import 'package:omninews_flutter/theme/theme_selection_dialog.dart';
+import 'package:omninews_flutter/screens/login_screen.dart'; // 추가
 
 // 전역 키를 선언하여 어디서든 접근할 수 있게 합니다
 final GlobalKey<ScaffoldState> homeScaffoldKey = GlobalKey<ScaffoldState>();
@@ -19,6 +23,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   late List<Widget> _pages;
+  bool _isLoggedIn = false; // 로그인 상태를 저장하는 변수 추가
 
   @override
   void initState() {
@@ -30,6 +35,27 @@ class _HomeScreenState extends State<HomeScreen> {
       const BookmarkScreen(),
       const SearchScreen(),
     ];
+
+    // 앱 시작 시 자동 로그인 시도
+    _checkAutoLogin();
+  }
+
+  Future<void> _checkAutoLogin() async {
+    final bool hasValidToken = await LoginScreen.checkExistingToken();
+
+    if (hasValidToken) {
+      // 중괄호 {} 사용 및 괄호 수정
+      setState(() {
+        _isLoggedIn = true;
+      });
+    }
+  }
+
+  // 로그인 성공 후 호출될 함수
+  void _onLoginSuccess() {
+    setState(() {
+      _isLoggedIn = true;
+    });
   }
 
   void _onItemTapped(int index) {
@@ -48,6 +74,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 로그인이 되어 있지 않으면 로그인 화면을 표시
+    if (!_isLoggedIn) {
+      return LoginScreen(onLoginSuccess: _onLoginSuccess);
+    }
+
     // 테마 속성 가져오기
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
@@ -111,6 +142,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Recently Read',
                     onTap: () {
                       Navigator.pop(context);
+                      // 최근 읽은 글 화면으로 이동
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const RecentlyReadScreen(),
+                        ),
+                      );
                     },
                   ),
 
@@ -189,6 +227,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'About',
                     onTap: () {
                       Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const AboutScreen(),
+                        ),
+                      );
                     },
                   ),
 
@@ -197,6 +241,24 @@ class _HomeScreenState extends State<HomeScreen> {
                     title: 'Help & Feedback',
                     onTap: () {
                       Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const HelpFeedbackScreen(),
+                        ),
+                      );
+                    },
+                  ),
+
+                  // 로그아웃 옵션 추가
+                  _buildDrawerItem(
+                    icon: Icons.logout,
+                    title: 'Logout',
+                    onTap: () {
+                      Navigator.pop(context);
+                      setState(() {
+                        _isLoggedIn = false;
+                      });
                     },
                   ),
                 ],

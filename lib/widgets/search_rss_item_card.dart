@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
+import 'package:omninews_flutter/services/recently_read_service.dart';
 import 'package:omninews_flutter/services/subscribe_service.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
 import 'package:omninews_flutter/models/app_setting.dart';
@@ -97,6 +98,7 @@ class _SearchRssItemCardState extends State<SearchRssItemCard> {
   }
 
   void _openLink(AppSettings settings) {
+    RecentlyReadService.addRssItem(widget.item);
     // 설정된 웹 열기 방식으로 URL 열기
     UrlLauncherHelper.openUrl(
         context, widget.item.rssLink, settings.webOpenMode);
