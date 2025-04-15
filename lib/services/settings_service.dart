@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:omninews_test_flutter/models/app_setting.dart';
+import 'package:omninews_flutter/models/app_setting.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsService {

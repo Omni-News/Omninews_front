@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:omninews_test_flutter/models/rss_item.dart';
-import 'package:omninews_test_flutter/widgets/rss_item_card.dart';
+import 'package:omninews_flutter/models/rss_item.dart';
+import 'package:omninews_flutter/widgets/rss_item_card.dart';
 import 'package:sticky_headers/sticky_headers.dart';
-import 'package:omninews_test_flutter/theme/app_theme.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
 
 class SubscribeDateView extends StatelessWidget {
   final Future<List<RssItem>> items;

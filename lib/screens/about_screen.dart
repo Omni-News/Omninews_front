@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:omninews_test_flutter/utils/url_launcher_helper.dart'; // 변경: 사용자 정의 URL 실행 도우미 사용
-import 'package:omninews_test_flutter/models/app_setting.dart'; // 웹 열기 모드를 위한 설정 모델
-import 'package:omninews_test_flutter/theme/app_theme.dart'; // 테마 적용을 위한 앱 테마 임포트
+import 'package:omninews_flutter/utils/url_launcher_helper.dart'; // 변경: 사용자 정의 URL 실행 도우미 사용
+import 'package:omninews_flutter/models/app_setting.dart'; // 웹 열기 모드를 위한 설정 모델
+import 'package:omninews_flutter/theme/app_theme.dart'; // 테마 적용을 위한 앱 테마 임포트
 import 'package:provider/provider.dart';
-import 'package:omninews_test_flutter/provider/settings_provider.dart';
+import 'package:omninews_flutter/provider/settings_provider.dart';
 
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});

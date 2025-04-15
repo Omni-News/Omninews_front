@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_test_flutter/models/custom_news.dart';
+import 'package:omninews_flutter/models/custom_news.dart';
 import 'package:intl/intl.dart';
-import 'package:omninews_test_flutter/provider/settings_provider.dart';
-import 'package:omninews_test_flutter/services/recently_read_service.dart';
-import 'package:omninews_test_flutter/theme/app_theme.dart';
-import 'package:omninews_test_flutter/utils/url_launcher_helper.dart';
-import 'package:omninews_test_flutter/services/news_bookmark_service.dart';
-import 'package:omninews_test_flutter/models/news.dart';
+import 'package:omninews_flutter/provider/settings_provider.dart';
+import 'package:omninews_flutter/services/recently_read_service.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
+import 'package:omninews_flutter/utils/url_launcher_helper.dart';
+import 'package:omninews_flutter/services/news_bookmark_service.dart';
+import 'package:omninews_flutter/models/news.dart';
 import 'package:provider/provider.dart';
 import 'package:html_unescape/html_unescape.dart'; // HTML 엔티티 처리 패키지 추가
 

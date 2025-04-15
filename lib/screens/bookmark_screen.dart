@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:omninews_test_flutter/models/rss_item.dart';
-import 'package:omninews_test_flutter/models/news.dart';
-import 'package:omninews_test_flutter/services/subscribe_service.dart';
-import 'package:omninews_test_flutter/services/news_bookmark_service.dart';
-import 'package:omninews_test_flutter/widgets/rss_item_card.dart';
-import 'package:omninews_test_flutter/widgets/news_item_card.dart';
-import 'package:omninews_test_flutter/screens/home_screen.dart';
+import 'package:omninews_flutter/models/rss_item.dart';
+import 'package:omninews_flutter/models/news.dart';
+import 'package:omninews_flutter/services/subscribe_service.dart';
+import 'package:omninews_flutter/services/news_bookmark_service.dart';
+import 'package:omninews_flutter/widgets/rss_item_card.dart';
+import 'package:omninews_flutter/widgets/news_item_card.dart';
+import 'package:omninews_flutter/screens/home_screen.dart';
 import 'package:sticky_headers/sticky_headers.dart';
-import 'package:omninews_test_flutter/theme/app_theme.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
 
 class BookmarkScreen extends StatefulWidget {
   const BookmarkScreen({super.key});

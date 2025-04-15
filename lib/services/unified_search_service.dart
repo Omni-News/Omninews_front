@@ -1,8 +1,8 @@
-import 'package:omninews_test_flutter/models/news.dart';
-import 'package:omninews_test_flutter/models/rss_item.dart';
-import 'package:omninews_test_flutter/models/rss_channel.dart';
-import 'package:omninews_test_flutter/services/news_api_service.dart';
-import 'package:omninews_test_flutter/services/rss_search_service.dart';
+import 'package:omninews_flutter/models/news.dart';
+import 'package:omninews_flutter/models/rss_item.dart';
+import 'package:omninews_flutter/models/rss_channel.dart';
+import 'package:omninews_flutter/services/news_api_service.dart';
+import 'package:omninews_flutter/services/rss_search_service.dart';
 
 class UnifiedSearchResult {
   final List<NewsApi> newsResults;

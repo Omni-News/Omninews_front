@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:omninews_test_flutter/models/news.dart';
+import 'package:omninews_flutter/models/news.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class NewsBookmarkService {

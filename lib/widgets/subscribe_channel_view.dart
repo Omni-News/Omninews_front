@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_test_flutter/models/rss_item.dart';
-import 'package:omninews_test_flutter/models/rss_channel.dart';
-import 'package:omninews_test_flutter/provider/settings_provider.dart';
-import 'package:omninews_test_flutter/widgets/rss_item_card.dart';
-import 'package:omninews_test_flutter/theme/app_theme.dart';
-import 'package:omninews_test_flutter/models/app_setting.dart';
+import 'package:omninews_flutter/models/rss_item.dart';
+import 'package:omninews_flutter/models/rss_channel.dart';
+import 'package:omninews_flutter/provider/settings_provider.dart';
+import 'package:omninews_flutter/widgets/rss_item_card.dart';
+import 'package:omninews_flutter/theme/app_theme.dart';
+import 'package:omninews_flutter/models/app_setting.dart';
 import 'package:provider/provider.dart'; // 추가
 
 class SubscribeChannelView extends StatefulWidget {

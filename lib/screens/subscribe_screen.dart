@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_test_flutter/models/rss_item.dart';
-import 'package:omninews_test_flutter/models/rss_channel.dart';
-import 'package:omninews_test_flutter/services/subscribe_service.dart';
-import 'package:omninews_test_flutter/widgets/subscribe_date_view.dart';
-import 'package:omninews_test_flutter/widgets/subscribe_channel_view.dart';
-import 'package:omninews_test_flutter/screens/home_screen.dart';
+import 'package:omninews_flutter/models/rss_item.dart';
+import 'package:omninews_flutter/models/rss_channel.dart';
+import 'package:omninews_flutter/services/subscribe_service.dart';
+import 'package:omninews_flutter/widgets/subscribe_date_view.dart';
+import 'package:omninews_flutter/widgets/subscribe_channel_view.dart';
+import 'package:omninews_flutter/screens/home_screen.dart';
 
 class SubscribeScreen extends StatefulWidget {
   const SubscribeScreen({super.key});

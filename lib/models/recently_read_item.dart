@@ -1,6 +1,6 @@
-import 'package:omninews_test_flutter/models/custom_news.dart';
-import 'package:omninews_test_flutter/models/rss_item.dart';
-import 'package:omninews_test_flutter/models/news.dart';
+import 'package:omninews_flutter/models/custom_news.dart';
+import 'package:omninews_flutter/models/rss_item.dart';
+import 'package:omninews_flutter/models/news.dart';
 
 enum ReadItemType {
   rss,
