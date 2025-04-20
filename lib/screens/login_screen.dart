@@ -1,38 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:kakao_flutter_sdk/kakao_flutter_sdk.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:omninews_flutter/services/auth_service.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   final Function() onLoginSuccess;
 
   const LoginScreen({Key? key, required this.onLoginSuccess}) : super(key: key);
 
-  // TODO Apple 로그인 이후 기능 추가
-  static Future<bool> checkExistingToken() async {
-    try {
-      if (await AuthApi.instance.hasToken()) {
-        try {
-          AccessTokenInfo tokenInfo = await UserApi.instance.accessTokenInfo();
-          debugPrint('토큰 유효성 체크 성공 ${tokenInfo.id} ${tokenInfo.expiresIn}');
-        } catch (error) {
-          if (error is KakaoException && error.isInvalidTokenError()) {
-            debugPrint('토큰 만료 $error');
-          } else {
-            debugPrint('토큰 정보 조회 실패 $error');
-          }
-          return false;
-        }
-      } else {
-        debugPrint('발급된 토큰 없음');
-        return false;
-      }
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
 
-      return true;
-    } catch (error) {
-      debugPrint('로그인 실패 $error');
-      return false;
-    }
-  }
+class _LoginScreenState extends State<LoginScreen> {
+  // 통합된 Auth 서비스 인스턴스
+  final AuthService _authService = AuthService();
+  bool _isLoading = false;
 
   @override
   Widget build(BuildContext context) {
@@ -77,46 +59,58 @@ class LoginScreen extends StatelessWidget {
 
                   const SizedBox(height: 48.0),
 
-                  // Apple Login Button
-                  _buildLoginButtonWithIcon(
-                    context: context,
-                    icon: Icons.apple,
-                    text: "Sign in with Apple",
-                    backgroundColor: Colors.black,
-                    textColor: Colors.white,
-                    onPressed: () {
-                      // Implement Apple login logic here
-                      onLoginSuccess();
-                    },
-                  ),
+                  if (_isLoading)
+                    const CircularProgressIndicator()
+                  else
+                    Column(
+                      children: [
+                        // Google 로그인 버튼
+                        GestureDetector(
+                          onTap: _handleGoogleLogin,
+                          child: SvgPicture.asset(
+                            'resources/google_signin_button.svg',
+                            height: 50.0,
+                            width: double.infinity,
+                          ),
+                        ),
 
-                  const SizedBox(height: 16.0),
+                        const SizedBox(height: 16.0),
 
-                  // Kakao Login - 이미지만 사용
-                  GestureDetector(
-                    onTap: () {
-                      _handleKakaoLogin();
-                    },
-                    child: Image.asset(
-                      'resources/kakao_login.png',
-                      height: 50.0,
+                        // Apple Login Button
+                        _buildLoginButtonWithIcon(
+                          context: context,
+                          icon: Icons.apple,
+                          text: "Sign in with Apple",
+                          backgroundColor: Colors.black,
+                          textColor: Colors.white,
+                          onPressed: _handleAppleLogin,
+                        ),
+
+                        const SizedBox(height: 16.0),
+
+                        // Kakao Login Button
+                        GestureDetector(
+                          onTap: _handleKakaoLogin,
+                          child: Image.asset(
+                            'resources/kakao_login.png',
+                            height: 50.0,
+                          ),
+                        ),
+
+                        const SizedBox(height: 24.0),
+
+                        // Skip for now option
+                        TextButton(
+                          onPressed: widget.onLoginSuccess,
+                          child: Text(
+                            "Skip for now",
+                            style: TextStyle(
+                              color: theme.colorScheme.secondary,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-
-                  const SizedBox(height: 24.0),
-
-                  // Skip for now option
-                  TextButton(
-                    onPressed: () {
-                      onLoginSuccess();
-                    },
-                    child: Text(
-                      "Skip for now",
-                      style: TextStyle(
-                        color: theme.colorScheme.secondary,
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -126,53 +120,86 @@ class LoginScreen extends StatelessWidget {
     );
   }
 
-  // 카카오 로그인 처리를 위한 별도 메서드
-  Future<void> _handleKakaoLogin() async {
-    // 카카오톡 설치 여부 확인
-    // 카카오톡이 설치되어 있으면 카카오톡으로 로그인, 아니면 카카오계정으로 로그인
+  // Google 로그인 처리
+  Future<void> _handleGoogleLogin() async {
+    try {
+      setState(() => _isLoading = true);
+      debugPrint('Google 로그인 시작');
 
-    if (await isKakaoTalkInstalled()) {
-      try {
-        await UserApi.instance.loginWithKakaoTalk();
+      final success = await _authService.signInWithGoogle();
 
-        User user = await UserApi.instance.me();
-        debugPrint('카카오계정으로 로그인 성공 ${user.kakaoAccount?.profile?.nickname}');
-
-        onLoginSuccess();
-      } catch (error) {
-        debugPrint('카카오톡으로 로그인 실패 $error');
-
-        // 사용자가 카카오톡 설치 후 디바이스 권한 요청 화면에서 로그인을 취소한 경우,
-        // 의도적인 로그인 취소로 보고 카카오계정으로 로그인 시도 없이 로그인 취소로 처리 (예: 뒤로 가기)
-        if (error is PlatformException && error.code == 'CANCELED') {
-          return;
-        }
-        // 카카오톡에 연결된 카카오계정이 없는 경우, 카카오계정으로 로그인
-        try {
-          await UserApi.instance.loginWithKakaoAccount();
-
-          User user = await UserApi.instance.me();
-          debugPrint('카카오계정으로 로그인 성공 ${user.kakaoAccount?.profile?.nickname}');
-          onLoginSuccess();
-        } catch (error) {
-          debugPrint('카카오계정으로 로그인 실패 $error');
-        }
+      if (success) {
+        debugPrint('Google 로그인 성공: ${_authService.user?['displayName']}');
+        debugPrint('이메일: ${_authService.user?['email']}');
+        widget.onLoginSuccess();
+      } else {
+        debugPrint('Google 로그인 취소 또는 실패');
       }
-    } else {
-      try {
-        debugPrint('카카오톡 미설치');
-        await UserApi.instance.loginWithKakaoAccount();
-
-        User user = await UserApi.instance.me();
-        debugPrint('카카오계정으로 로그인 성공 ${user.kakaoAccount?.profile?.nickname}');
-
-        onLoginSuccess();
-      } catch (error) {
-        debugPrint('카카오계정으로 로그인 실패 $error');
+    } catch (e) {
+      debugPrint('Google 로그인 오류: $e');
+      _showErrorSnackbar('Google 로그인 중 오류가 발생했습니다.');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
       }
     }
   }
 
+  // 카카오 로그인 처리
+  Future<void> _handleKakaoLogin() async {
+    try {
+      setState(() => _isLoading = true);
+      debugPrint('카카오 로그인 시작');
+
+      final success = await _authService.signInWithKakao();
+
+      if (success) {
+        debugPrint('카카오 로그인 성공: ${_authService.user?['displayName']}');
+        widget.onLoginSuccess();
+      } else {
+        debugPrint('카카오 로그인 취소 또는 실패');
+      }
+    } catch (e) {
+      debugPrint('카카오 로그인 오류: $e');
+      _showErrorSnackbar('카카오 로그인 중 오류가 발생했습니다.');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  // 애플 로그인 처리 (틀만 구현)
+  Future<void> _handleAppleLogin() async {
+    try {
+      setState(() => _isLoading = true);
+      debugPrint('애플 로그인 시작');
+
+      // 현재는 구현되지 않았으므로 안내 메시지 표시
+      _showErrorSnackbar('애플 로그인은 아직 준비 중입니다.');
+
+      // 추후 구현 시 아래 코드 활성화
+      // final success = await _authService.signInWithApple();
+      // if (success) {
+      //   widget.onLoginSuccess();
+      // }
+    } catch (e) {
+      debugPrint('애플 로그인 오류: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  // 에러 메시지 표시
+  void _showErrorSnackbar(String message) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  // 로그인 버튼 위젯
   Widget _buildLoginButtonWithIcon({
     required BuildContext context,
     required IconData icon,

@@ -31,12 +31,9 @@ class SubscribeService {
         return jsonResponse.map((item) => RssItem.fromJson(item)).toList();
       } else {
         // API 호출 실패 시 로컬 저장소 사용
-        debugPrint('Error fetching bookmarks');
         return [];
       }
     } catch (e) {
-      debugPrint('Error fetching bookmarks: $e');
-
       return [];
     }
   }
@@ -50,7 +47,8 @@ class SubscribeService {
       for (var channel in subscribedChannels) {
         final response = await http.get(
           Uri.parse(
-              '$baseUrl/rss/items?channel_link=${channel.channelRssLink}'),
+            '$baseUrl/rss/items?channel_link=${channel.channelRssLink}',
+          ),
           headers: {"Content-Type": "application/json; charset=UTF-8"},
         );
 
@@ -95,7 +93,8 @@ class SubscribeService {
   }
 
   static Future<Map<RssChannel, List<RssItem>>> searchItemsByChannel(
-      String query) async {
+    String query,
+  ) async {
     try {
       final allItems = await getItemsByChannel();
       final Map<RssChannel, List<RssItem>> result = {};
@@ -213,17 +212,17 @@ class SubscribeService {
     }).toList();
   }
 
-// 북마크 추가 (SearchRssItemCard에서 호출하는 메서드)
+  // 북마크 추가 (SearchRssItemCard에서 호출하는 메서드)
   static Future<bool> addBookmark(RssItem item) async {
     return addLocalBookmark(item);
   }
 
-// 북마크 제거 (SearchRssItemCard에서 호출하는 메서드)
+  // 북마크 제거 (SearchRssItemCard에서 호출하는 메서드)
   static Future<bool> removeBookmark(String itemLink) async {
     return removeLocalBookmark(itemLink);
   }
 
-// RSS 채널 구독 여부 확인
+  // RSS 채널 구독 여부 확인
   static Future<bool> isSubscribed(String channelUrl) async {
     try {
       final subscribedLinks = await RssManager.getSubscribedChannelLinks();
@@ -234,7 +233,7 @@ class SubscribeService {
     }
   }
 
-// RSS 채널 구독
+  // RSS 채널 구독
   static Future<bool> subscribe(RssChannel channel) async {
     try {
       // API 호출 (필요한 경우)
@@ -248,7 +247,7 @@ class SubscribeService {
     }
   }
 
-// RSS 채널 구독 취소
+  // RSS 채널 구독 취소
   static Future<bool> unsubscribe(String channelUrl) async {
     try {
       // API 호출 (필요한 경우)
