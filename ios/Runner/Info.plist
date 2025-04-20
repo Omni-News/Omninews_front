@@ -29,7 +29,8 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>kakao89046ab727ea7019b5ec60e5aa53f5cb</string>
+          <string>com.googleusercontent.apps.1008455298981-96a4gkqhnmr1hhbqab80df7rljbhocai</string>
+          <string>kakao89046ab727ea7019b5ec60e5aa53f5cb</string>
 			</array>
 		</dict>
 	</array>
@@ -41,6 +42,7 @@
 		<string>https</string>
 		<string>kakaokompassauth</string>
 		<string>kakaolink</string>
+    <string>googlechromes</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
