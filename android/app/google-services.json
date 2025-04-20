@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1008455298981:android:31ee11ca26020063c0824c",
+        "mobilesdk_app_id": "1:1008455298981:android:195a02c09c10b5fec0824c",
         "android_client_info": {
-          "package_name": "com.example.omninews_flutter"
+          "package_name": "com.kdh.omninews"
         }
       },
       "oauth_client": [],
@@ -27,3 +27,4 @@
   ],
   "configuration_version": "1"
 }
+

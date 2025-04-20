@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CLIENT_ID</key>
+	<string>1008455298981-96a4gkqhnmr1hhbqab80df7rljbhocai.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.1008455298981-96a4gkqhnmr1hhbqab80df7rljbhocai</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>1008455298981-et5bvrb90qthskca8khd7cap0j540l7n.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
 	<string>AIzaSyDzSdJ4LcSGtGi9HamYZDvw48rXVBWR378</string>
 	<key>GCM_SENDER_ID</key>
@@ -9,7 +15,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.example.omninewsFlutter</string>
+	<string>com.kdh.omninews</string>
 	<key>PROJECT_ID</key>
 	<string>kdh-omninews</string>
 	<key>STORAGE_BUCKET</key>
@@ -25,6 +31,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:1008455298981:ios:7bd18f09a463c460c0824c</string>
+	<string>1:1008455298981:ios:69a31a451075695ac0824c</string>
 </dict>
 </plist>

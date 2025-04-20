@@ -36,7 +36,7 @@ dependencies:
   win32: ^5.10.1
   url_launcher: ^6.3.1
   share: ^2.0.4
-  intl: ^0.20.2
+  intl: ^0.19.0
   shared_preferences: ^2.5.2
   share_plus: ^10.1.4
   webview_flutter: ^4.2.2
@@ -56,6 +56,10 @@ dependencies:
   flutter_local_notifications: 19.1.0
   timezone: 0.10.0
   flutter_native_timezone: 2.0.0
+
+  flutter_svg: 2.0.17
+  google_sign_in: ^6.3.0
+  firebase_auth: ^5.5.2
 
 dev_dependencies:
   flutter_test:
@@ -86,6 +90,7 @@ flutter:
   assets:
     - resources/
     - resources/kakao_login.png
+    - resources/google_signin_button.svg
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

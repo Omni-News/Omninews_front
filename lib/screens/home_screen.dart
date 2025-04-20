@@ -8,6 +8,7 @@ import 'package:omninews_flutter/screens/news_screen.dart';
 import 'package:omninews_flutter/screens/rss_screen.dart';
 import 'package:omninews_flutter/screens/search_screen.dart';
 import 'package:omninews_flutter/screens/recently_read_screen.dart';
+import 'package:omninews_flutter/services/auth_service.dart';
 import 'package:omninews_flutter/theme/theme_selection_dialog.dart';
 import 'package:omninews_flutter/screens/login_screen.dart'; // 추가
 
@@ -37,19 +38,19 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     // 앱 시작 시 자동 로그인 시도
-    _checkAutoLogin();
+    //_checkAutoLogin();
   }
 
-  Future<void> _checkAutoLogin() async {
-    final bool hasValidToken = await LoginScreen.checkExistingToken();
-
-    if (hasValidToken) {
-      // 중괄호 {} 사용 및 괄호 수정
-      setState(() {
-        _isLoggedIn = true;
-      });
-    }
-  }
+  //  Future<void> _checkAutoLogin() async {
+  //    final bool hasValidToken = await LoginScreen.checkExistingToken();
+  //
+  //    if (hasValidToken) {
+  //      // 중괄호 {} 사용 및 괄호 수정
+  //      setState(() {
+  //        _isLoggedIn = true;
+  //      });
+  //    }
+  //  }
 
   // 로그인 성공 후 호출될 함수
   void _onLoginSuccess() {
@@ -66,10 +67,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // 테마 선택 다이얼로그 표시
   void _showThemeSelectionDialog() {
-    showDialog(
-      context: context,
-      builder: (_) => const ThemeSelectionDialog(),
-    );
+    showDialog(context: context, builder: (_) => const ThemeSelectionDialog());
   }
 
   @override
@@ -96,9 +94,10 @@ class _HomeScreenState extends State<HomeScreen> {
               width: double.infinity,
               decoration: BoxDecoration(
                 // 다크 모드일 때 어두운 색상, 라이트 모드일 때는 기존 primaryColor 사용
-                color: theme.brightness == Brightness.dark
-                    ? const Color(0xFF1A2038) // 다크 모드용 어두운 색상
-                    : theme.primaryColor,
+                color:
+                    theme.brightness == Brightness.dark
+                        ? const Color(0xFF1A2038) // 다크 모드용 어두운 색상
+                        : theme.primaryColor,
                 boxShadow: [
                   BoxShadow(
                     color: theme.shadowColor,
@@ -121,10 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 4),
                   const Text(
                     'Your News, Your Way',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
                   ),
                 ],
               ),
@@ -196,7 +192,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   // 설정 섹션
                   _buildSectionHeader(
-                      'PREFERENCES', theme.colorScheme.secondary),
+                    'PREFERENCES',
+                    theme.colorScheme.secondary,
+                  ),
 
                   _buildDrawerItem(
                     icon: Icons.color_lens_outlined,
@@ -213,9 +211,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                              builder: (context) => const SettingsScreen()));
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SettingsScreen(),
+                        ),
+                      );
                     },
                   ),
 
@@ -258,6 +258,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Navigator.pop(context);
                       setState(() {
                         _isLoggedIn = false;
+                        AuthService().signOut(); // 로그아웃 처리
                       });
                     },
                   ),
@@ -272,11 +273,7 @@ class _HomeScreenState extends State<HomeScreen> {
         decoration: BoxDecoration(
           color: theme.cardColor,
           boxShadow: [
-            BoxShadow(
-              color: theme.shadowColor,
-              blurRadius: 6,
-              spreadRadius: 2,
-            ),
+            BoxShadow(color: theme.shadowColor, blurRadius: 6, spreadRadius: 2),
           ],
         ),
         child: BottomNavigationBar(
@@ -359,10 +356,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final theme = Theme.of(context);
 
     return ListTile(
-      leading: Icon(
-        icon,
-        color: isSelected ? theme.primaryColor : null,
-      ),
+      leading: Icon(icon, color: isSelected ? theme.primaryColor : null),
       title: Text(
         title,
         style: TextStyle(
@@ -375,9 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
       selected: isSelected,
       selectedTileColor:
           isSelected ? theme.colorScheme.primary.withOpacity(0.12) : null,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
       minLeadingWidth: 24,
     );
