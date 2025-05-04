@@ -3,26 +3,31 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:omninews_flutter/models/rss_item.dart';
 import 'package:omninews_flutter/models/rss_channel.dart';
+import 'package:omninews_flutter/services/auth_service.dart';
 import 'package:omninews_flutter/services/subscribe_service.dart';
 
 class RssSearchService {
   // baseUrl 사용
   static final String baseUrl = SubscribeService.baseUrl;
 
+  static final AuthService _authService = AuthService();
+
   // RSS 피드 검색
   static Future<List<RssItem>> searchRssItems(
-      String query, String sortType) async {
+    String query,
+    String sortType,
+  ) async {
     try {
       // API 정렬 방식으로 변환
       final searchType = _convertSortOption(sortType);
 
+      final headers = _authService.getAuthHeaders();
       // RSS 검색 API 호출
       final response = await http.get(
         Uri.parse(
-            '$baseUrl/search/rss?search_value=$query&search_type=$searchType'),
-        headers: {
-          "Content-Type": "application/json; charset=UTF-8",
-        },
+          '$baseUrl/search/rss?search_value=$query&search_type=$searchType',
+        ),
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -47,18 +52,20 @@ class RssSearchService {
 
   // RSS 채널 검색
   static Future<List<RssChannel>> searchChannels(
-      String query, String sortType) async {
+    String query,
+    String sortType,
+  ) async {
     try {
       // API 정렬 방식으로 변환
       final searchType = _convertSortOption(sortType);
 
+      final headers = _authService.getAuthHeaders();
       // 채널 검색 API 호출
       final response = await http.get(
         Uri.parse(
-            '$baseUrl/search/channel?search_value=$query&search_type=$searchType'),
-        headers: {
-          "Content-Type": "application/json; charset=UTF-8",
-        },
+          '$baseUrl/search/channel?search_value=$query&search_type=$searchType',
+        ),
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -67,9 +74,10 @@ class RssSearchService {
         final List<dynamic> jsonResponse = json.decode(decodedResponse);
 
         // 리스트를 RssChannel 객체로 변환
-        final List<RssChannel> channels = jsonResponse
-            .map((channel) => RssChannel.fromJson(channel))
-            .toList();
+        final List<RssChannel> channels =
+            jsonResponse
+                .map((channel) => RssChannel.fromJson(channel))
+                .toList();
 
         return channels;
       } else {

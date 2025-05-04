@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/rss_channel.dart';
+import 'package:omninews_flutter/screens/home_screen.dart';
 import 'package:omninews_flutter/services/rss_service.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
 
@@ -20,6 +21,7 @@ class _RssAddScreenState extends State<RssAddScreen> {
   String? _errorMessage;
   bool _isExistingRss = false;
   bool _isAlreadySubscribed = false;
+  int? _channelId;
 
   @override
   void dispose() {
@@ -28,10 +30,7 @@ class _RssAddScreenState extends State<RssAddScreen> {
   }
 
   bool _isValidImageUrl(String? url) {
-    if (url == null || url.isEmpty) {
-      return false;
-    }
-
+    if (url == null || url.isEmpty) return false;
     try {
       final uri = Uri.parse(url);
       return uri.scheme.isNotEmpty && uri.host.isNotEmpty;
@@ -40,6 +39,7 @@ class _RssAddScreenState extends State<RssAddScreen> {
     }
   }
 
+  // RSS 미리보기 요청
   Future<void> _previewRss() async {
     final url = _urlController.text.trim();
     if (url.isEmpty) {
@@ -56,15 +56,22 @@ class _RssAddScreenState extends State<RssAddScreen> {
       _previewChannel = null;
       _isExistingRss = false;
       _isAlreadySubscribed = false;
+      _channelId = null;
     });
 
     try {
+      // 채널 미리보기 가져오기
       final preview = await RssService.previewRssFromUrl(url);
 
       if (preview != null) {
+        // 서버에 이미 존재하는지 확인
         final exists = await RssService.checkRssExists(url);
+        // 이미 구독 중인지 확인
         final alreadySubscribed =
-            await RssService.isChannelAlreadySubscribed(preview.channelRssLink);
+            await RssService.isChannelAlreadySubscribedByLink(
+              preview.channelRssLink,
+            );
+        debugPrint('Preview channel: ${alreadySubscribed}');
 
         if (mounted) {
           setState(() {
@@ -72,6 +79,11 @@ class _RssAddScreenState extends State<RssAddScreen> {
             _isExistingRss = exists;
             _isAlreadySubscribed = alreadySubscribed;
           });
+
+          // 이미 구독 중인 경우 알림 표시
+          if (alreadySubscribed) {
+            _showSnackBar('이미 구독 중인 RSS 채널입니다');
+          }
         }
       } else {
         if (mounted) {
@@ -95,6 +107,7 @@ class _RssAddScreenState extends State<RssAddScreen> {
     }
   }
 
+  // RSS 서버에 추가 (구독은 하지 않음)
   Future<void> _addRssToDb() async {
     if (_previewChannel == null) return;
 
@@ -106,27 +119,24 @@ class _RssAddScreenState extends State<RssAddScreen> {
     });
 
     try {
-      final success = await RssService.addRssToDb(url);
+      final id = await RssService.addRssToDb(url);
 
-      if (success) {
+      if (id != null && id != 0) {
+        _channelId = id; // 채널 ID 저장
+
         if (mounted) {
           setState(() {
-            _isExistingRss = true;
+            _isExistingRss = true; // 이제 DB에 존재함을 표시
+            _isLoading = false;
           });
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('RSS가 성공적으로 추가되었습니다'),
-              duration: const Duration(seconds: 2),
-              backgroundColor: Theme.of(context).primaryColor,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          _showSnackBar('RSS가 성공적으로 추가되었습니다. 이제 구독할 수 있습니다.');
         }
       } else {
         if (mounted) {
           setState(() {
             _errorMessage = 'RSS 추가 중 오류가 발생했습니다';
+            _isLoading = false;
           });
         }
       }
@@ -134,17 +144,13 @@ class _RssAddScreenState extends State<RssAddScreen> {
       if (mounted) {
         setState(() {
           _errorMessage = 'RSS 추가 중 오류가 발생했습니다: $e';
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
           _isLoading = false;
         });
       }
     }
   }
 
+  // 채널 구독 처리
   Future<void> _subscribeChannel() async {
     if (_previewChannel == null) return;
 
@@ -153,27 +159,31 @@ class _RssAddScreenState extends State<RssAddScreen> {
     });
 
     try {
-      final success =
-          await RssService.subscribeChannel(_previewChannel!.channelRssLink);
+      bool success;
+
+      // 채널 ID가 있으면 ID로 구독, 없으면 링크로 구독
+      if (_channelId != null) {
+        success = await RssService.subscribeChannel(_channelId!);
+      } else {
+        success = await RssService.subscribeChannelByRssLink(
+          _previewChannel!.channelRssLink,
+        );
+      }
 
       if (success) {
+        // 콜백 호출
         widget.onChannelAdded();
+
         if (mounted) {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('RSS 채널이 구독되었습니다'),
-              duration: const Duration(seconds: 2),
-              backgroundColor: Theme.of(context).primaryColor,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          // RSS 화면으로 이동
+          _navigateToRssScreen();
         }
       } else {
         if (mounted) {
           setState(() {
             _errorMessage = '이미 구독 중인 채널입니다';
             _isAlreadySubscribed = true;
+            _isLoading = false;
           });
         }
       }
@@ -181,15 +191,38 @@ class _RssAddScreenState extends State<RssAddScreen> {
       if (mounted) {
         setState(() {
           _errorMessage = '구독 중 오류가 발생했습니다: $e';
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
           _isLoading = false;
         });
       }
     }
+  }
+
+  // RSS 화면으로 이동
+  void _navigateToRssScreen() {
+    // 현재 화면을 스택에서 제거
+    Navigator.pop(context);
+
+    // RSS 탭이 있는 홈 화면으로 이동
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const HomeScreen(initialTabIndex: 1),
+      ),
+    );
+
+    _showSnackBar('RSS 채널이 구독되었습니다');
+  }
+
+  // 스낵바 표시 헬퍼 메서드
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+        backgroundColor: Theme.of(context).primaryColor,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -201,10 +234,7 @@ class _RssAddScreenState extends State<RssAddScreen> {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
-        title: Text(
-          'RSS 추가',
-          style: textTheme.headlineMedium,
-        ),
+        title: Text('RSS 추가', style: textTheme.headlineMedium),
         backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
         iconTheme: theme.appBarTheme.iconTheme,
@@ -218,158 +248,21 @@ class _RssAddScreenState extends State<RssAddScreen> {
               // 안내 텍스트
               Text(
                 'RSS 피드 URL 입력',
-                style: textTheme.titleLarge?.copyWith(
-                  fontSize: 18,
-                ),
+                style: textTheme.titleLarge?.copyWith(fontSize: 18),
               ),
-
               const SizedBox(height: 8),
-
-              Text(
-                'RSS 주소를 입력하고 미리보기 버튼을 눌러주세요.',
-                style: textTheme.bodyMedium,
-              ),
-
+              Text('RSS 주소를 입력하고 미리보기 버튼을 눌러주세요.', style: textTheme.bodyMedium),
               const SizedBox(height: 24),
 
               // URL 입력 필드
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: theme.shadowColor.withOpacity(0.1),
-                      spreadRadius: 1,
-                      blurRadius: 3,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: _urlController,
-                      decoration: InputDecoration(
-                        hintText: 'https://example.com/rss',
-                        hintStyle: TextStyle(color: theme.hintColor),
-                        filled: true,
-                        fillColor: theme.cardColor,
-                        prefixIcon: Icon(Icons.link,
-                            color: theme.iconTheme.color?.withOpacity(0.7)),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: BorderSide.none,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide:
-                              BorderSide(color: theme.dividerColor, width: 1),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide:
-                              BorderSide(color: theme.primaryColor, width: 1.5),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
-                      ),
-                      style: textTheme.bodyLarge?.copyWith(fontSize: 16),
-                      onSubmitted: (_) => _previewRss(),
-                    ),
-
-                    const SizedBox(height: 12),
-
-                    // 미리보기 버튼
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _isPreviewLoading ? null : _previewRss,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: theme.primaryColor,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          disabledBackgroundColor:
-                              theme.primaryColor.withOpacity(0.5),
-                        ),
-                        child: _isPreviewLoading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  color: Colors.white,
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text(
-                                'RSS 미리보기',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _buildUrlInputField(theme),
 
               // 오류 메시지
-              if (_errorMessage != null) ...[
-                const SizedBox(height: 20),
-                Container(
-                  width: double.infinity,
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: colorScheme.error.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border:
-                        Border.all(color: colorScheme.error.withOpacity(0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.error_outline,
-                          color: colorScheme.error, size: 20),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          _errorMessage!,
-                          style: TextStyle(
-                            color: colorScheme.error,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              if (_errorMessage != null) _buildErrorMessage(colorScheme),
 
               // 미리보기 결과
-              if (_previewChannel != null) ...[
-                const SizedBox(height: 30),
-                Row(
-                  children: [
-                    Icon(Icons.preview, size: 22, color: theme.primaryColor),
-                    const SizedBox(width: 8),
-                    Text(
-                      'RSS 미리보기',
-                      style: textTheme.titleLarge?.copyWith(
-                        fontSize: 18,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                _buildPreviewCard(),
-              ],
+              if (_previewChannel != null)
+                _buildPreviewSection(theme, textTheme),
 
               const SizedBox(height: 30),
             ],
@@ -379,12 +272,148 @@ class _RssAddScreenState extends State<RssAddScreen> {
     );
   }
 
-  Widget _buildPreviewCard() {
+  // URL 입력 필드와 미리보기 버튼
+  Widget _buildUrlInputField(ThemeData theme) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: theme.shadowColor.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _urlController,
+            decoration: InputDecoration(
+              hintText: 'https://example.com/rss',
+              hintStyle: TextStyle(color: theme.hintColor),
+              filled: true,
+              fillColor: theme.cardColor,
+              prefixIcon: Icon(
+                Icons.link,
+                color: theme.iconTheme.color?.withOpacity(0.7),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: theme.dividerColor, width: 1),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: theme.primaryColor, width: 1.5),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+            ),
+            style: theme.textTheme.bodyLarge?.copyWith(fontSize: 16),
+            onSubmitted: (_) => _previewRss(),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isPreviewLoading ? null : _previewRss,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: theme.primaryColor,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                disabledBackgroundColor: theme.primaryColor.withOpacity(0.5),
+              ),
+              child:
+                  _isPreviewLoading
+                      ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                      : const Text(
+                        'RSS 미리보기',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 오류 메시지 표시
+  Widget _buildErrorMessage(ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: colorScheme.error.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: colorScheme.error.withOpacity(0.3)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline, color: colorScheme.error, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _errorMessage!,
+                style: TextStyle(color: colorScheme.error, fontSize: 14),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 미리보기 섹션
+  Widget _buildPreviewSection(ThemeData theme, TextTheme textTheme) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 30),
+        Row(
+          children: [
+            Icon(Icons.preview, size: 22, color: theme.primaryColor),
+            const SizedBox(width: 8),
+            Text(
+              'RSS 미리보기',
+              style: textTheme.titleLarge?.copyWith(fontSize: 18),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        _buildPreviewCard(theme, textTheme),
+      ],
+    );
+  }
+
+  // 채널 미리보기 카드
+  Widget _buildPreviewCard(ThemeData theme, TextTheme textTheme) {
     if (_previewChannel == null) return const SizedBox.shrink();
 
-    final theme = Theme.of(context);
     final rssTheme = AppTheme.rssThemeOf(context);
-    final textTheme = theme.textTheme;
 
     return Container(
       decoration: BoxDecoration(
@@ -399,123 +428,118 @@ class _RssAddScreenState extends State<RssAddScreen> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 채널 헤더 영역
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: theme.cardColor,
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 채널 헤더 (이미지와 제목)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // 채널 썸네일
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(
-                          rssTheme.channelImageBorderRadius),
-                      child: _isValidImageUrl(_previewChannel!.channelImageUrl)
+                // 채널 썸네일
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(
+                    rssTheme.channelImageBorderRadius,
+                  ),
+                  child:
+                      _isValidImageUrl(_previewChannel!.channelImageUrl)
                           ? Image.network(
-                              _previewChannel!.channelImageUrl!,
-                              width: 70,
-                              height: 70,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return _buildDefaultChannelIcon();
-                              },
-                            )
-                          : _buildDefaultChannelIcon(),
-                    ),
+                            _previewChannel!.channelImageUrl!,
+                            width: 70,
+                            height: 70,
+                            fit: BoxFit.cover,
+                            errorBuilder:
+                                (_, __, ___) =>
+                                    _buildDefaultChannelIcon(rssTheme),
+                          )
+                          : _buildDefaultChannelIcon(rssTheme),
+                ),
 
-                    const SizedBox(width: 16),
+                const SizedBox(width: 16),
 
-                    // 채널 정보
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _previewChannel!.channelTitle,
-                            style: textTheme.titleLarge?.copyWith(
-                              fontSize: 18,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            _previewChannel!.channelLink,
-                            style: textTheme.bodySmall?.copyWith(
-                              color: theme.primaryColor,
-                              fontSize: 13,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
+                // 채널 정보
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _previewChannel!.channelTitle,
+                        style: textTheme.titleLarge?.copyWith(fontSize: 18),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-
-                // 채널 설명
-                Text(
-                  _previewChannel!.channelDescription,
-                  style: textTheme.bodyMedium?.copyWith(height: 1.5),
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                ),
-
-                const SizedBox(height: 16),
-
-                // 태그 정보
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _buildInfoChip(
-                      label: '언어: ${_previewChannel!.channelLanguage}',
-                      icon: Icons.language,
-                    ),
-                    _buildInfoChip(
-                      label: '랭크: ${_previewChannel!.channelRank}',
-                      icon: Icons.star,
-                      iconColor: Colors.amber,
-                    ),
-                    if (_previewChannel!.rssGenerator != null &&
-                        _previewChannel!.rssGenerator != 'None')
-                      _buildInfoChip(
-                        label: _previewChannel!.rssGenerator!,
-                        icon: Icons.settings,
+                      const SizedBox(height: 6),
+                      Text(
+                        _previewChannel!.channelLink,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: theme.primaryColor,
+                          fontSize: 13,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                  ],
+                    ],
+                  ),
                 ),
-
-                const SizedBox(height: 24),
-
-                // 구독 버튼
-                _buildSubscriptionButton(),
               ],
             ),
-          ),
-        ],
+
+            const SizedBox(height: 16),
+
+            // 채널 설명
+            Text(
+              _previewChannel!.channelDescription,
+              style: textTheme.bodyMedium?.copyWith(height: 1.5),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+
+            const SizedBox(height: 16),
+
+            // 태그 정보
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _buildInfoChip(
+                  label: '언어: ${_previewChannel!.channelLanguage}',
+                  icon: Icons.language,
+                  theme: theme,
+                ),
+                _buildInfoChip(
+                  label: '랭크: ${_previewChannel!.channelRank}',
+                  icon: Icons.star,
+                  iconColor: Colors.amber,
+                  theme: theme,
+                ),
+                if (_previewChannel!.rssGenerator != null &&
+                    _previewChannel!.rssGenerator != 'None')
+                  _buildInfoChip(
+                    label: _previewChannel!.rssGenerator!,
+                    icon: Icons.settings,
+                    theme: theme,
+                  ),
+              ],
+            ),
+
+            const SizedBox(height: 24),
+
+            // 구독 버튼
+            _buildSubscriptionButton(theme, rssTheme),
+          ],
+        ),
       ),
     );
   }
 
+  // 정보 칩
   Widget _buildInfoChip({
     required String label,
     required IconData icon,
     Color? iconColor,
+    required ThemeData theme,
   }) {
-    final theme = Theme.of(context);
     final chipTheme = theme.chipTheme;
 
     return Container(
@@ -533,19 +557,15 @@ class _RssAddScreenState extends State<RssAddScreen> {
             color: iconColor ?? theme.iconTheme.color?.withOpacity(0.7),
           ),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: chipTheme.labelStyle,
-          ),
+          Text(label, style: chipTheme.labelStyle),
         ],
       ),
     );
   }
 
-  Widget _buildSubscriptionButton() {
-    final theme = Theme.of(context);
-    final rssTheme = AppTheme.rssThemeOf(context);
-
+  // 구독 버튼
+  Widget _buildSubscriptionButton(ThemeData theme, dynamic rssTheme) {
+    // 이미 구독 중인 경우
     if (_isAlreadySubscribed) {
       return SizedBox(
         width: double.infinity,
@@ -571,6 +591,7 @@ class _RssAddScreenState extends State<RssAddScreen> {
       );
     }
 
+    // RSS 추가 또는 구독 버튼 표시 (DB에 존재하는지에 따라)
     final bool addingNew = !_isExistingRss;
 
     return SizedBox(
@@ -578,47 +599,46 @@ class _RssAddScreenState extends State<RssAddScreen> {
       child: ElevatedButton.icon(
         onPressed:
             _isLoading ? null : (addingNew ? _addRssToDb : _subscribeChannel),
-        icon: _isLoading
-            ? const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  color: Colors.white,
-                  strokeWidth: 2,
+        icon:
+            _isLoading
+                ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2,
+                  ),
+                )
+                : Icon(
+                  addingNew ? Icons.add_circle_outline : Icons.rss_feed,
+                  size: 18,
                 ),
-              )
-            : Icon(
-                addingNew ? Icons.add_circle_outline : Icons.rss_feed,
-                size: 18,
-              ),
         label: Text(
           addingNew ? 'RSS 추가하기' : '구독하기',
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: addingNew
-              ? Colors.green
-              : rssTheme.subscribeButtonActiveBackground,
+          backgroundColor:
+              addingNew
+                  ? Colors.green
+                  : rssTheme.subscribeButtonActiveBackground,
           foregroundColor: Colors.white,
           elevation: 0,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
-          disabledBackgroundColor: addingNew
-              ? Colors.green.withOpacity(0.5)
-              : theme.primaryColor.withOpacity(0.5),
+          disabledBackgroundColor:
+              addingNew
+                  ? Colors.green.withOpacity(0.5)
+                  : theme.primaryColor.withOpacity(0.5),
         ),
       ),
     );
   }
 
-  Widget _buildDefaultChannelIcon() {
-    final rssTheme = AppTheme.rssThemeOf(context);
-
+  // 기본 채널 아이콘
+  Widget _buildDefaultChannelIcon(dynamic rssTheme) {
     return Container(
       width: 70,
       height: 70,
@@ -630,11 +650,7 @@ class _RssAddScreenState extends State<RssAddScreen> {
           colors: rssTheme.channelImageGradientColors,
         ),
       ),
-      child: const Icon(
-        Icons.rss_feed,
-        color: Colors.white,
-        size: 34,
-      ),
+      child: const Icon(Icons.rss_feed, color: Colors.white, size: 34),
     );
   }
 }

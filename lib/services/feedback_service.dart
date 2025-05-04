@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:omninews_flutter/services/auth_service.dart';
 
 class FeedbackService {
   // 서버 엔드포인트 URL
   static const String _apiUrl = 'http://61.253.113.42:1027/feedback';
+  static final AuthService _authService = AuthService();
 
   /// 피드백을 서버로 전송하는 함수
   ///
@@ -18,21 +20,18 @@ class FeedbackService {
   }) async {
     try {
       // 요청 바디 구성
-      final Map<String, String> body = {
-        'feedback_content': content,
-      };
+      final Map<String, String> body = {'feedback_content': content};
 
       // 이메일이 있으면 추가
       if (email != null && email.isNotEmpty) {
         body['feedback_email'] = email;
       }
 
+      final headers = _authService.getAuthHeaders();
       // HTTP POST 요청 보내기
       final response = await http.post(
         Uri.parse(_apiUrl),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: jsonEncode(body),
       );
 

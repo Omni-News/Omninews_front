@@ -4,94 +4,74 @@ import 'package:http/http.dart' as http;
 import 'package:omninews_flutter/models/rss_channel.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
 import 'package:omninews_flutter/services/rss_service.dart';
-import 'package:omninews_flutter/utils/rss_manager.dart';
+import 'package:omninews_flutter/services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SubscribeService {
-  static const String baseUrl = 'http://61.253.113.42:1027 '; // API 서버 주소로 변경
+  static const String baseUrl = 'http://61.253.113.42:1027';
+  static final AuthService _authService = AuthService();
 
+  // 구독한 채널의 아이템 가져오기
   static Future<List<RssItem>> getSubscribedItems() async {
     try {
-      List<String> subscribedLinks =
-          await RssManager.getSubscribedChannelLinks();
+      // 구독 중인 채널 ID 목록 가져오기
+      final subscribedChannels = await RssService.fetchSubscribedChannels();
+      final List<int> channelIds =
+          subscribedChannels.map((channel) => channel.channelId).toList();
 
-      final List<Map<String, String>> formattedLinks =
-          subscribedLinks.map((link) => {"link": link}).toList();
-
-      // API 호출
-      final response = await http.post(
-        Uri.parse('$baseUrl/subscribe/items'),
-        headers: {"Content-Type": "application/json; charset=UTF-8"},
-        body: json.encode(formattedLinks), // 배열 형태로 인코딩
-      );
-
-      if (response.statusCode == 200) {
-        String decodedResponse = utf8.decode(response.bodyBytes);
-        List jsonResponse = json.decode(decodedResponse);
-        return jsonResponse.map((item) => RssItem.fromJson(item)).toList();
-      } else {
-        // API 호출 실패 시 로컬 저장소 사용
+      if (channelIds.isEmpty) {
         return [];
       }
+
+      // 서버에 요청하여 구독 아이템 가져오기
+      return await RssService.fetchSubscribedItems(channelIds);
     } catch (e) {
+      debugPrint('Error getting subscribed items: $e');
       return [];
     }
   }
 
+  // 채널별로 아이템 가져오기
   static Future<Map<RssChannel, List<RssItem>>> getItemsByChannel() async {
     try {
-      // 먼저 구독 중인 채널 목록 가져오기
+      // 구독 중인 채널 목록 가져오기
       final subscribedChannels = await RssService.fetchSubscribedChannels();
       final Map<RssChannel, List<RssItem>> result = {};
 
       for (var channel in subscribedChannels) {
-        final response = await http.get(
-          Uri.parse(
-            '$baseUrl/rss/items?channel_link=${channel.channelRssLink}',
-          ),
-          headers: {"Content-Type": "application/json; charset=UTF-8"},
-        );
-
-        if (response.statusCode == 200) {
-          String decodedResponse = utf8.decode(response.bodyBytes);
-          List jsonResponse = json.decode(decodedResponse);
-          final items =
-              jsonResponse.map((item) => RssItem.fromJson(item)).toList();
+        try {
+          // 해당 채널의 아이템 가져오기
+          final items = await RssService.fetchChannelItems(channel.channelId);
 
           if (items.isNotEmpty) {
             result[channel] = items;
           }
+        } catch (e) {
+          debugPrint(
+            'Error fetching items for channel ${channel.channelTitle}: $e',
+          );
         }
       }
 
       return result;
     } catch (e) {
       debugPrint('Error fetching items by channel: $e');
-
-      // API 오류 시 로컬 데이터 사용
       return {};
     }
   }
 
+  // 북마크된 아이템에서 검색
   static Future<List<RssItem>> searchBookmarkedItems(String query) async {
     try {
-      final allItems = await getItemsByChannel();
-      List<RssItem> result = [];
-
-      for (var entry in allItems.entries) {
-        final filteredItems = _filterItemsByQuery(entry.value, query);
-        if (filteredItems.isNotEmpty) {
-          result = filteredItems;
-        }
-      }
-
-      return result;
+      final bookmarkedItems = await getLocalBookmarks();
+      return _filterItemsByQuery(bookmarkedItems, query);
     } catch (e) {
-      debugPrint('Error searching items by channel: $e');
+      debugPrint('Error searching bookmarked items: $e');
       return [];
     }
   }
 
+  // 채널별 아이템 검색
   static Future<Map<RssChannel, List<RssItem>>> searchItemsByChannel(
     String query,
   ) async {
@@ -116,6 +96,7 @@ class SubscribeService {
   // 아이템이 북마크되어 있는지 확인
   static Future<bool> isBookmarked(String itemLink) async {
     try {
+      // 북마크 API가 구현되기 전까지는 로컬 저장소 사용
       final prefs = await SharedPreferences.getInstance();
       final bookmarksJson = prefs.getStringList('bookmarks') ?? [];
 
@@ -136,6 +117,7 @@ class SubscribeService {
   // 로컬 저장소에서 북마크 가져오기
   static Future<List<RssItem>> getLocalBookmarks() async {
     try {
+      // 북마크 API가 구현되기 전까지는 로컬 저장소 사용
       final prefs = await SharedPreferences.getInstance();
       final bookmarksJson = prefs.getStringList('bookmarks') ?? [];
 
@@ -157,9 +139,10 @@ class SubscribeService {
     }
   }
 
-  // 로컬에 북마크 추가
+  // 북마크 추가
   static Future<bool> addLocalBookmark(RssItem item) async {
     try {
+      // 북마크 API가 구현되기 전까지는 로컬 저장소 사용
       final prefs = await SharedPreferences.getInstance();
       final bookmarksJson = prefs.getStringList('bookmarks') ?? [];
 
@@ -180,9 +163,10 @@ class SubscribeService {
     }
   }
 
-  // 로컬에서 북마크 제거
+  // 북마크 제거
   static Future<bool> removeLocalBookmark(String itemLink) async {
     try {
+      // 북마크 API가 구현되기 전까지는 로컬 저장소 사용
       final prefs = await SharedPreferences.getInstance();
       final bookmarksJson = prefs.getStringList('bookmarks') ?? [];
 
@@ -222,39 +206,30 @@ class SubscribeService {
     return removeLocalBookmark(itemLink);
   }
 
-  // RSS 채널 구독 여부 확인
-  static Future<bool> isSubscribed(String channelUrl) async {
+  // 채널 구독 여부 확인
+  static Future<bool> isSubscribed(String channelRssLink) async {
     try {
-      final subscribedLinks = await RssManager.getSubscribedChannelLinks();
-      return subscribedLinks.contains(channelUrl);
+      return await RssService.isChannelAlreadySubscribed(channelRssLink);
     } catch (e) {
       debugPrint('Error checking subscription status: $e');
       return false;
     }
   }
 
-  // RSS 채널 구독
-  static Future<bool> subscribe(RssChannel channel) async {
+  // 채널 구독
+  static Future<bool> subscribe(int channelId) async {
     try {
-      // API 호출 (필요한 경우)
-      // ...
-
-      // 로컬에 저장
-      return await RssService.subscribeChannel(channel.channelRssLink);
+      return await RssService.subscribeChannel(channelId);
     } catch (e) {
       debugPrint('Error subscribing to channel: $e');
       return false;
     }
   }
 
-  // RSS 채널 구독 취소
-  static Future<bool> unsubscribe(String channelUrl) async {
+  // 채널 구독 취소
+  static Future<bool> unsubscribe(int channelId) async {
     try {
-      // API 호출 (필요한 경우)
-      // ...
-
-      // 로컬에서 제거
-      return await RssService.unsubscribeChannel(channelUrl);
+      return await RssService.unsubscribeChannel(channelId);
     } catch (e) {
       debugPrint('Error unsubscribing from channel: $e');
       return false;

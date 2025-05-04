@@ -92,7 +92,7 @@ class _RssScreenState extends State<RssScreen>
     });
 
     try {
-      final success = await RssService.subscribeChannel(channel.channelRssLink);
+      final success = await RssService.subscribeChannel(channel.channelId);
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -151,8 +151,7 @@ class _RssScreenState extends State<RssScreen>
     });
 
     try {
-      final success =
-          await RssService.unsubscribeChannel(channel.channelRssLink);
+      final success = await RssService.unsubscribeChannel(channel.channelId);
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -228,10 +227,7 @@ class _RssScreenState extends State<RssScreen>
               pinned: true,
               elevation: 0,
               backgroundColor: theme.appBarTheme.backgroundColor,
-              title: Text(
-                'RSS Feeds',
-                style: textTheme.headlineMedium,
-              ),
+              title: Text('RSS Feeds', style: textTheme.headlineMedium),
               actions: [
                 IconButton(
                   icon: Icon(
@@ -261,30 +257,33 @@ class _RssScreenState extends State<RssScreen>
             ),
           ];
         },
-        body: _isLoading
-            ? Center(
-                child: CircularProgressIndicator(color: theme.primaryColor))
-            : TabBarView(
-                controller: _tabController,
-                children: [
-                  // 구독 중인 RSS 탭
-                  _buildSubscribedTab(),
+        body:
+            _isLoading
+                ? Center(
+                  child: CircularProgressIndicator(color: theme.primaryColor),
+                )
+                : TabBarView(
+                  controller: _tabController,
+                  children: [
+                    // 구독 중인 RSS 탭
+                    _buildSubscribedTab(),
 
-                  // 추천 RSS 탭
-                  _buildRecommendedTab(),
-                ],
-              ),
+                    // 추천 RSS 탭
+                    _buildRecommendedTab(),
+                  ],
+                ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
           await Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => RssAddScreen(
-                onChannelAdded: () {
-                  _refreshData();
-                },
-              ),
+              builder:
+                  (context) => RssAddScreen(
+                    onChannelAdded: () {
+                      _refreshData();
+                    },
+                  ),
             ),
           );
           // 화면으로 돌아왔을 때 새로고침
@@ -342,12 +341,13 @@ class _RssScreenState extends State<RssScreen>
             return ListView.separated(
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: snapshot.data!.length,
-              separatorBuilder: (context, index) => Divider(
-                height: 1,
-                indent: 16,
-                endIndent: 16,
-                color: theme.dividerTheme.color,
-              ),
+              separatorBuilder:
+                  (context, index) => Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: theme.dividerTheme.color,
+                  ),
               itemBuilder: (context, index) {
                 final channel = snapshot.data![index];
                 return _buildChannelListItem(
@@ -408,12 +408,13 @@ class _RssScreenState extends State<RssScreen>
             return ListView.separated(
               padding: const EdgeInsets.symmetric(vertical: 8),
               itemCount: snapshot.data!.length,
-              separatorBuilder: (context, index) => Divider(
-                height: 1,
-                indent: 16,
-                endIndent: 16,
-                color: theme.dividerTheme.color,
-              ),
+              separatorBuilder:
+                  (context, index) => Divider(
+                    height: 1,
+                    indent: 16,
+                    endIndent: 16,
+                    color: theme.dividerTheme.color,
+                  ),
               itemBuilder: (context, index) {
                 final channel = snapshot.data![index];
                 // 필터링된 목록이므로 모두 구독되지 않은 상태
@@ -445,11 +446,12 @@ class _RssScreenState extends State<RssScreen>
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => RssChannelDetailScreen(
-              channel: channel,
-              isSubscribed: isSubscribed,
-              onSubscriptionChanged: _refreshData,
-            ),
+            builder:
+                (context) => RssChannelDetailScreen(
+                  channel: channel,
+                  isSubscribed: isSubscribed,
+                  onSubscriptionChanged: _refreshData,
+                ),
           ),
         ).then((_) => _refreshData());
       },
@@ -500,11 +502,7 @@ class _RssScreenState extends State<RssScreen>
                         style: textTheme.bodySmall,
                       ),
                       const SizedBox(width: 12),
-                      const Icon(
-                        Icons.star,
-                        size: 12,
-                        color: Colors.amber,
-                      ),
+                      const Icon(Icons.star, size: 12, color: Colors.amber),
                       const SizedBox(width: 4),
                       Text(
                         '${channel.channelRank}',
@@ -528,7 +526,9 @@ class _RssScreenState extends State<RssScreen>
               },
               borderRadius: BorderRadius.circular(16),
               child: _buildSubscriptionIndicator(
-                  isSubscribed, channel.channelRssLink),
+                isSubscribed,
+                channel.channelRssLink,
+              ),
             ),
           ],
         ),
@@ -545,14 +545,14 @@ class _RssScreenState extends State<RssScreen>
       child:
           channel.channelImageUrl != null && channel.channelImageUrl!.isNotEmpty
               ? Image.network(
-                  channel.channelImageUrl!,
-                  width: 60,
-                  height: 60,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return _buildDefaultChannelImage();
-                  },
-                )
+                channel.channelImageUrl!,
+                width: 60,
+                height: 60,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) {
+                  return _buildDefaultChannelImage();
+                },
+              )
               : _buildDefaultChannelImage(),
     );
   }
@@ -572,11 +572,7 @@ class _RssScreenState extends State<RssScreen>
           colors: rssTheme.channelImageGradientColors,
         ),
       ),
-      child: const Icon(
-        Icons.rss_feed,
-        color: Colors.white,
-        size: 30,
-      ),
+      child: const Icon(Icons.rss_feed, color: Colors.white, size: 30),
     );
   }
 
@@ -593,9 +589,10 @@ class _RssScreenState extends State<RssScreen>
         height: 24,
         child: CircularProgressIndicator(
           strokeWidth: 2,
-          color: isSubscribed
-              ? rssTheme.subscribeButtonActiveText
-              : rssTheme.subscribeButtonInactiveText,
+          color:
+              isSubscribed
+                  ? rssTheme.subscribeButtonActiveText
+                  : rssTheme.subscribeButtonInactiveText,
         ),
       );
     }
@@ -603,9 +600,10 @@ class _RssScreenState extends State<RssScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: isSubscribed
-            ? rssTheme.subscribeButtonActiveBackground
-            : rssTheme.subscribeButtonInactiveBackground,
+        color:
+            isSubscribed
+                ? rssTheme.subscribeButtonActivedBackground
+                : rssTheme.subscribeButtonInactiveBackground,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(
@@ -614,9 +612,10 @@ class _RssScreenState extends State<RssScreen>
           Icon(
             isSubscribed ? Icons.check : Icons.add,
             size: 16,
-            color: isSubscribed
-                ? rssTheme.subscribeButtonActiveText
-                : rssTheme.subscribeButtonInactiveText,
+            color:
+                isSubscribed
+                    ? rssTheme.subscribeButtonActiveText
+                    : rssTheme.subscribeButtonInactiveText,
           ),
           const SizedBox(width: 4),
           Text(
@@ -624,9 +623,10 @@ class _RssScreenState extends State<RssScreen>
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w500,
-              color: isSubscribed
-                  ? rssTheme.subscribeButtonActiveText
-                  : rssTheme.subscribeButtonInactiveText,
+              color:
+                  isSubscribed
+                      ? rssTheme.subscribeButtonActiveText
+                      : rssTheme.subscribeButtonInactiveText,
             ),
           ),
         ],
@@ -642,11 +642,7 @@ class _RssScreenState extends State<RssScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            icon,
-            size: 48,
-            color: subscribeStyle.emptyIconColor,
-          ),
+          Icon(icon, size: 48, color: subscribeStyle.emptyIconColor),
           const SizedBox(height: 16),
           Text(
             message,
@@ -682,19 +678,23 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: theme.cardColor,
-        boxShadow: overlapsContent
-            ? [
-                BoxShadow(
-                  color: theme.shadowColor.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : [],
+        boxShadow:
+            overlapsContent
+                ? [
+                  BoxShadow(
+                    color: theme.shadowColor.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+                : [],
       ),
       height: 48.0,
       child: child,

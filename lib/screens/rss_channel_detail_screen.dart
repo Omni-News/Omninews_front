@@ -37,7 +37,7 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
 
   void _loadRssItems() {
     setState(() {
-      _rssItems = RssService.fetchChannelItems(widget.channel.channelRssLink);
+      _rssItems = RssService.fetchChannelItems(widget.channel.channelId);
     });
   }
 
@@ -49,11 +49,9 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
     try {
       bool success;
       if (widget.isSubscribed) {
-        success =
-            await RssService.unsubscribeChannel(widget.channel.channelRssLink);
+        success = await RssService.unsubscribeChannel(widget.channel.channelId);
       } else {
-        success =
-            await RssService.subscribeChannel(widget.channel.channelRssLink);
+        success = await RssService.subscribeChannel(widget.channel.channelId);
       }
 
       if (success && mounted) {
@@ -131,10 +129,7 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
                 ),
                 onPressed: () => Navigator.pop(context),
               ),
-              title: Text(
-                'RSS 채널',
-                style: textTheme.headlineMedium,
-              ),
+              title: Text('RSS 채널', style: textTheme.headlineMedium),
               actions: [
                 IconButton(
                   icon: Container(
@@ -177,33 +172,21 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
                 _buildChannelHeader(settings),
 
                 // 구분선
-                Container(
-                  height: 8,
-                  color: theme.dividerTheme.color,
-                ),
+                Container(height: 8, color: theme.dividerTheme.color),
 
                 // 최신 피드 섹션
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
                   child: Row(
                     children: [
-                      Icon(
-                        Icons.article,
-                        size: 18,
-                        color: theme.primaryColor,
-                      ),
+                      Icon(Icons.article, size: 18, color: theme.primaryColor),
                       const SizedBox(width: 8),
                       Text(
                         '최신 피드',
-                        style: textTheme.titleLarge?.copyWith(
-                          fontSize: 18,
-                        ),
+                        style: textTheme.titleLarge?.copyWith(fontSize: 18),
                       ),
                       const Spacer(),
-                      Text(
-                        '새로고침하려면 아래로 당기세요',
-                        style: textTheme.bodySmall,
-                      ),
+                      Text('새로고침하려면 아래로 당기세요', style: textTheme.bodySmall),
                     ],
                   ),
                 ),
@@ -269,8 +252,9 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
                     ),
                     const SizedBox(height: 8),
                     InkWell(
-                      onTap: () =>
-                          _launchUrl(widget.channel.channelLink, settings),
+                      onTap:
+                          () =>
+                              _launchUrl(widget.channel.channelLink, settings),
                       child: Text(
                         widget.channel.channelLink,
                         style: TextStyle(
@@ -292,9 +276,7 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
           // 채널 설명
           Text(
             widget.channel.channelDescription,
-            style: textTheme.bodyMedium?.copyWith(
-              height: 1.5,
-            ),
+            style: textTheme.bodyMedium?.copyWith(height: 1.5),
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
           ),
@@ -332,36 +314,40 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
             child: ElevatedButton.icon(
               onPressed: _isSubscribing ? null : _toggleSubscription,
               style: ElevatedButton.styleFrom(
-                backgroundColor: widget.isSubscribed
-                    ? theme.colorScheme.error
-                    : rssTheme.subscribeButtonActiveBackground,
-                foregroundColor: widget.isSubscribed
-                    ? Colors.white
-                    : rssTheme.subscribeButtonActiveText,
+                backgroundColor:
+                    widget.isSubscribed
+                        ? theme.colorScheme.error
+                        : rssTheme.subscribeButtonActiveBackground,
+                foregroundColor:
+                    widget.isSubscribed
+                        ? Colors.white
+                        : rssTheme.subscribeButtonActiveText,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8),
                 ),
-                disabledBackgroundColor: widget.isSubscribed
-                    ? theme.colorScheme.error.withOpacity(0.6)
-                    : theme.primaryColor.withOpacity(0.6),
+                disabledBackgroundColor:
+                    widget.isSubscribed
+                        ? theme.colorScheme.error.withOpacity(0.6)
+                        : theme.primaryColor.withOpacity(0.6),
               ),
-              icon: _isSubscribing
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
+              icon:
+                  _isSubscribing
+                      ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                      : Icon(
+                        widget.isSubscribed
+                            ? Icons.remove_circle_outline
+                            : Icons.add_circle_outline,
+                        size: 20,
                       ),
-                    )
-                  : Icon(
-                      widget.isSubscribed
-                          ? Icons.remove_circle_outline
-                          : Icons.add_circle_outline,
-                      size: 20,
-                    ),
               label: Text(
                 widget.isSubscribed ? '구독 취소' : '구독하기',
                 style: const TextStyle(
@@ -384,18 +370,19 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
       tag: 'channel_${widget.channel.channelRssLink}',
       child: ClipRRect(
         borderRadius: BorderRadius.circular(rssTheme.channelImageBorderRadius),
-        child: widget.channel.channelImageUrl != null &&
-                widget.channel.channelImageUrl!.isNotEmpty
-            ? Image.network(
-                widget.channel.channelImageUrl!,
-                width: 90,
-                height: 90,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return _buildDefaultChannelIcon();
-                },
-              )
-            : _buildDefaultChannelIcon(),
+        child:
+            widget.channel.channelImageUrl != null &&
+                    widget.channel.channelImageUrl!.isNotEmpty
+                ? Image.network(
+                  widget.channel.channelImageUrl!,
+                  width: 90,
+                  height: 90,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return _buildDefaultChannelIcon();
+                  },
+                )
+                : _buildDefaultChannelIcon(),
       ),
     );
   }
@@ -415,11 +402,7 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
           colors: rssTheme.channelImageGradientColors,
         ),
       ),
-      child: const Icon(
-        Icons.rss_feed,
-        color: Colors.white,
-        size: 42,
-      ),
+      child: const Icon(Icons.rss_feed, color: Colors.white, size: 42),
     );
   }
 
@@ -447,10 +430,7 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
             color: iconColor ?? theme.iconTheme.color?.withOpacity(0.7),
           ),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: chipTheme.labelStyle,
-          ),
+          Text(label, style: chipTheme.labelStyle),
         ],
       ),
     );
@@ -467,9 +447,7 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
           return SizedBox(
             height: 300,
             child: Center(
-              child: CircularProgressIndicator(
-                color: theme.primaryColor,
-              ),
+              child: CircularProgressIndicator(color: theme.primaryColor),
             ),
           );
         } else if (snapshot.hasError) {
@@ -480,8 +458,9 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
             physics: const NeverScrollableScrollPhysics(),
             padding: const EdgeInsets.all(16),
             itemCount: snapshot.data!.length,
-            separatorBuilder: (context, index) =>
-                Divider(height: 30, color: theme.dividerTheme.color),
+            separatorBuilder:
+                (context, index) =>
+                    Divider(height: 30, color: theme.dividerTheme.color),
             itemBuilder: (context, index) {
               return RssItemCard(
                 item: snapshot.data![index],
@@ -511,8 +490,11 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline,
-              size: 48, color: subscribeStyle.errorIconColor),
+          Icon(
+            Icons.error_outline,
+            size: 48,
+            color: subscribeStyle.errorIconColor,
+          ),
           const SizedBox(height: 16),
           Text(
             '피드를 불러오는데 실패했습니다',

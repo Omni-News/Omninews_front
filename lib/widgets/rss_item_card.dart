@@ -3,6 +3,7 @@ import 'package:omninews_flutter/models/app_setting.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
 import 'package:omninews_flutter/services/recently_read_service.dart';
+import 'package:omninews_flutter/services/rss_service.dart';
 import 'package:omninews_flutter/services/subscribe_service.dart';
 import 'package:intl/intl.dart';
 import 'package:omninews_flutter/utils/url_launcher_helper.dart';
@@ -14,11 +15,7 @@ class RssItemCard extends StatefulWidget {
   final RssItem item;
   final VoidCallback? onBookmarkChanged;
 
-  const RssItemCard({
-    super.key,
-    required this.item,
-    this.onBookmarkChanged,
-  });
+  const RssItemCard({super.key, required this.item, this.onBookmarkChanged});
 
   @override
   State<RssItemCard> createState() => _RssItemCardState();
@@ -35,8 +32,9 @@ class _RssItemCardState extends State<RssItemCard> {
   }
 
   Future<void> _checkBookmarkStatus() async {
-    final isBookmarked =
-        await SubscribeService.isBookmarked(widget.item.rssLink);
+    final isBookmarked = await SubscribeService.isBookmarked(
+      widget.item.rssLink,
+    );
     if (mounted) {
       setState(() {
         _isBookmarked = isBookmarked;
@@ -54,8 +52,9 @@ class _RssItemCardState extends State<RssItemCard> {
     try {
       bool success;
       if (_isBookmarked) {
-        success =
-            await SubscribeService.removeLocalBookmark(widget.item.rssLink);
+        success = await SubscribeService.removeLocalBookmark(
+          widget.item.rssLink,
+        );
       } else {
         success = await SubscribeService.addLocalBookmark(widget.item);
       }
@@ -155,28 +154,33 @@ class _RssItemCardState extends State<RssItemCard> {
     return InkWell(
       onTap: () {
         RecentlyReadService.addRssItem(widget.item);
+        RssService.updateRssRank(widget.item.rssId);
         UrlLauncherHelper.openUrl(
-            context, widget.item.rssLink, settings.webOpenMode);
+          context,
+          widget.item.rssLink,
+          settings.webOpenMode,
+        );
       },
       child: Padding(
         padding: cardStyle.cardPadding,
-        child: settings.viewMode == ViewMode.textOnly
-            ? _buildTextOnlyLayout(cardStyle, rssTheme, theme)
-            : Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    flex: 3,
-                    child: _buildTextContent(cardStyle, rssTheme, theme),
-                  ),
+        child:
+            settings.viewMode == ViewMode.textOnly
+                ? _buildTextOnlyLayout(cardStyle, rssTheme, theme)
+                : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      flex: 3,
+                      child: _buildTextContent(cardStyle, rssTheme, theme),
+                    ),
 
-                  // 여백
-                  if (showImage) const SizedBox(width: 12),
+                    // 여백
+                    if (showImage) const SizedBox(width: 12),
 
-                  // 우측: 썸네일 이미지 (있을 경우)
-                  if (showImage) _buildThumbnail(),
-                ],
-              ),
+                    // 우측: 썸네일 이미지 (있을 경우)
+                    if (showImage) _buildThumbnail(),
+                  ],
+                ),
       ),
     );
   }
@@ -198,32 +202,38 @@ class _RssItemCardState extends State<RssItemCard> {
           child: CachedNetworkImage(
             imageUrl: widget.item.rssImageLink!,
             fit: BoxFit.cover,
-            placeholder: (context, url) => Container(
-              color: theme.brightness == Brightness.dark
-                  ? Colors.grey[800]
-                  : Colors.grey[200],
-              child: Center(
-                child: Icon(
-                  Icons.image_outlined,
-                  color: theme.brightness == Brightness.dark
-                      ? Colors.grey[600]
-                      : Colors.grey,
-                  size: 24,
+            placeholder:
+                (context, url) => Container(
+                  color:
+                      theme.brightness == Brightness.dark
+                          ? Colors.grey[800]
+                          : Colors.grey[200],
+                  child: Center(
+                    child: Icon(
+                      Icons.image_outlined,
+                      color:
+                          theme.brightness == Brightness.dark
+                              ? Colors.grey[600]
+                              : Colors.grey,
+                      size: 24,
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            errorWidget: (context, url, error) => Container(
-              color: theme.brightness == Brightness.dark
-                  ? Colors.grey[800]
-                  : Colors.grey[200],
-              child: Icon(
-                Icons.image_not_supported_outlined,
-                color: theme.brightness == Brightness.dark
-                    ? Colors.grey[600]
-                    : Colors.grey,
-                size: 24,
-              ),
-            ),
+            errorWidget:
+                (context, url, error) => Container(
+                  color:
+                      theme.brightness == Brightness.dark
+                          ? Colors.grey[800]
+                          : Colors.grey[200],
+                  child: Icon(
+                    Icons.image_not_supported_outlined,
+                    color:
+                        theme.brightness == Brightness.dark
+                            ? Colors.grey[600]
+                            : Colors.grey,
+                    size: 24,
+                  ),
+                ),
             errorListener: (_) => {}, // 로그 출력 억제
           ),
         ),
@@ -246,15 +256,21 @@ class _RssItemCardState extends State<RssItemCard> {
     }
   }
 
-// 텍스트 전용 레이아웃
-  Widget _buildTextOnlyLayout(NewsCardStyleExtension cardStyle,
-      RssThemeExtension rssTheme, ThemeData theme) {
+  // 텍스트 전용 레이아웃
+  Widget _buildTextOnlyLayout(
+    NewsCardStyleExtension cardStyle,
+    RssThemeExtension rssTheme,
+    ThemeData theme,
+  ) {
     return _buildTextContent(cardStyle, rssTheme, theme);
   }
 
-// 텍스트 콘텐츠 부분
-  Widget _buildTextContent(NewsCardStyleExtension cardStyle,
-      RssThemeExtension rssTheme, ThemeData theme) {
+  // 텍스트 콘텐츠 부분
+  Widget _buildTextContent(
+    NewsCardStyleExtension cardStyle,
+    RssThemeExtension rssTheme,
+    ThemeData theme,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -273,22 +289,24 @@ class _RssItemCardState extends State<RssItemCard> {
             IconButton(
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
-              icon: _isLoading
-                  ? SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: theme.primaryColor,
+              icon:
+                  _isLoading
+                      ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: theme.primaryColor,
+                        ),
+                      )
+                      : Icon(
+                        _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                        color:
+                            _isBookmarked
+                                ? cardStyle.bookmarkActiveColor
+                                : cardStyle.bookmarkInactiveColor,
+                        size: 20,
                       ),
-                    )
-                  : Icon(
-                      _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                      color: _isBookmarked
-                          ? cardStyle.bookmarkActiveColor
-                          : cardStyle.bookmarkInactiveColor,
-                      size: 20,
-                    ),
               onPressed: _toggleBookmark,
             ),
           ],
@@ -311,9 +329,7 @@ class _RssItemCardState extends State<RssItemCard> {
             // 소스 도메인 표시
             Text(
               _getSourceName(widget.item.rssLink),
-              style: cardStyle.sourceStyle.copyWith(
-                color: rssTheme.linkColor,
-              ),
+              style: cardStyle.sourceStyle.copyWith(color: rssTheme.linkColor),
             ),
             const SizedBox(width: 8),
 
