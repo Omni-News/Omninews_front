@@ -1,20 +1,24 @@
 import 'package:omninews_flutter/models/news.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:omninews_flutter/services/auth_service.dart';
 
 class NewsApiService {
   static const String baseUrl = 'http://61.253.113.42:1027';
+  static final AuthService _authService = AuthService();
   static Future<List<NewsApi>> fetchNews(
-      String query, int display, String sort) async {
+    String query,
+    int display,
+    String sort,
+  ) async {
     try {
       if (sort == 'pop') {
         sort = 'sim';
       }
+      final headers = _authService.getAuthHeaders();
       final response = await http.get(
         Uri.parse("$baseUrl/news/api?query=$query&display=$display&sort=$sort"),
-        headers: {
-          "Content-Type": "application/json; charset=UTF-8",
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 200) {

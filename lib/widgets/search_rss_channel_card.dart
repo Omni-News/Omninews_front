@@ -29,10 +29,10 @@ class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
   }
 
   Future<void> _checkSubscriptionStatus() async {
-    final channelUrl = widget.channel.channelRssLink ?? '';
-    if (channelUrl.isEmpty) return;
+    final channeRssLink = widget.channel.channelRssLink;
+    if (channeRssLink == '') return;
 
-    final isSubscribed = await SubscribeService.isSubscribed(channelUrl);
+    final isSubscribed = await SubscribeService.isSubscribed(channeRssLink);
     if (mounted) {
       setState(() {
         _isSubscribed = isSubscribed;
@@ -49,13 +49,13 @@ class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
 
     try {
       bool success;
-      final channelUrl = widget.channel.channelRssLink ?? '';
-      if (channelUrl.isEmpty) throw Exception('구독 URL이 없습니다');
+      final channelId = widget.channel.channelId;
+      if (channelId == 0) throw Exception('구독 URL이 없습니다');
 
       if (_isSubscribed) {
-        success = await SubscribeService.unsubscribe(channelUrl);
+        success = await SubscribeService.unsubscribe(channelId);
       } else {
-        success = await SubscribeService.subscribe(widget.channel);
+        success = await SubscribeService.subscribe(channelId);
       }
 
       if (success && mounted) {
@@ -125,31 +125,36 @@ class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
                   width: 50,
                   height: 50,
                   decoration: BoxDecoration(
-                    color: theme.brightness == Brightness.dark
-                        ? Colors.orange.withOpacity(0.2)
-                        : Colors.orange[50],
+                    color:
+                        theme.brightness == Brightness.dark
+                            ? Colors.orange.withOpacity(0.2)
+                            : Colors.orange[50],
                     borderRadius: BorderRadius.circular(
-                        rssTheme.channelImageBorderRadius),
+                      rssTheme.channelImageBorderRadius,
+                    ),
                   ),
-                  child: (widget.channel.channelImageUrl ?? '').isNotEmpty
-                      ? ClipRRect(
-                          borderRadius: BorderRadius.circular(
-                              rssTheme.channelImageBorderRadius),
-                          child: Image.network(
-                            widget.channel.channelImageUrl ?? '',
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => Icon(
-                              Icons.rss_feed,
-                              color: rssTheme.channelIconColor,
-                              size: 24,
+                  child:
+                      (widget.channel.channelImageUrl ?? '').isNotEmpty
+                          ? ClipRRect(
+                            borderRadius: BorderRadius.circular(
+                              rssTheme.channelImageBorderRadius,
                             ),
+                            child: Image.network(
+                              widget.channel.channelImageUrl ?? '',
+                              fit: BoxFit.cover,
+                              errorBuilder:
+                                  (context, error, stackTrace) => Icon(
+                                    Icons.rss_feed,
+                                    color: rssTheme.channelIconColor,
+                                    size: 24,
+                                  ),
+                            ),
+                          )
+                          : Icon(
+                            Icons.rss_feed,
+                            color: rssTheme.channelIconColor,
+                            size: 24,
                           ),
-                        )
-                      : Icon(
-                          Icons.rss_feed,
-                          color: rssTheme.channelIconColor,
-                          size: 24,
-                        ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -162,14 +167,18 @@ class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
                 children: [
                   // 태그 표시 (채널)
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     margin: const EdgeInsets.only(bottom: 4),
                     decoration: BoxDecoration(
                       color: searchStyle.channelTagBackground,
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
-                          color: searchStyle.channelTagBorder, width: 1),
+                        color: searchStyle.channelTagBorder,
+                        width: 1,
+                      ),
                     ),
                     child: Text(
                       '채널',
@@ -196,9 +205,7 @@ class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
                   // 채널 설명
                   Text(
                     widget.channel.channelDescription ?? '설명 없음',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontSize: 13,
-                    ),
+                    style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -210,25 +217,28 @@ class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
             // 구독 버튼
             _isLoading
                 ? SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: theme.primaryColor,
-                    ),
-                  )
-                : IconButton(
-                    icon: Icon(
-                      _isSubscribed
-                          ? Icons.check_circle
-                          : Icons.add_circle_outline,
-                      color: _isSubscribed
-                          ? rssTheme.subscribeButtonActiveText
-                          : theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
-                      size: 24,
-                    ),
-                    onPressed: _toggleSubscription,
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: theme.primaryColor,
                   ),
+                )
+                : IconButton(
+                  icon: Icon(
+                    _isSubscribed
+                        ? Icons.check_circle
+                        : Icons.add_circle_outline,
+                    color:
+                        _isSubscribed
+                            ? rssTheme.subscribeButtonActiveText
+                            : theme.textTheme.bodyMedium?.color?.withOpacity(
+                              0.7,
+                            ),
+                    size: 24,
+                  ),
+                  onPressed: _toggleSubscription,
+                ),
           ],
         ),
       ),

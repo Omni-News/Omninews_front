@@ -16,19 +16,30 @@ import 'package:omninews_flutter/screens/login_screen.dart'; // 추가
 final GlobalKey<ScaffoldState> homeScaffoldKey = GlobalKey<ScaffoldState>();
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final int initialTabIndex; // 초기 탭 인덱스 추가
+  final bool isAlreadyLoggedIn;
+
+  const HomeScreen({
+    super.key,
+    this.initialTabIndex = 0,
+    this.isAlreadyLoggedIn = false,
+  }); // 기본값 0으로 설정
+
   @override
   State<StatefulWidget> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
+  late int _selectedIndex; // 초기화를 지연
+  late bool _isLoggedIn;
   late List<Widget> _pages;
-  bool _isLoggedIn = false; // 로그인 상태를 저장하는 변수 추가
 
   @override
   void initState() {
     super.initState();
+    _selectedIndex = widget.initialTabIndex; // 부모 위젯에서 전달받은 초기 탭 인덱스로 설정
+    _isLoggedIn = widget.isAlreadyLoggedIn;
+
     _pages = [
       const SubscribeScreen(),
       const RssScreen(),
@@ -36,21 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
       const BookmarkScreen(),
       const SearchScreen(),
     ];
-
-    // 앱 시작 시 자동 로그인 시도
-    //_checkAutoLogin();
   }
-
-  //  Future<void> _checkAutoLogin() async {
-  //    final bool hasValidToken = await LoginScreen.checkExistingToken();
-  //
-  //    if (hasValidToken) {
-  //      // 중괄호 {} 사용 및 괄호 수정
-  //      setState(() {
-  //        _isLoggedIn = true;
-  //      });
-  //    }
-  //  }
 
   // 로그인 성공 후 호출될 함수
   void _onLoginSuccess() {

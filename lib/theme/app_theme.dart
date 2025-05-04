@@ -14,13 +14,8 @@ class AppTheme {
       elevation: 0,
       iconTheme: IconThemeData(color: Colors.black87),
     ),
-    drawerTheme: const DrawerThemeData(
-      backgroundColor: Colors.white,
-    ),
-    dividerTheme: DividerThemeData(
-      color: Colors.grey[200],
-      thickness: 1,
-    ),
+    drawerTheme: const DrawerThemeData(backgroundColor: Colors.white),
+    dividerTheme: DividerThemeData(color: Colors.grey[200], thickness: 1),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: Colors.white,
       selectedItemColor: Color(0xFF2979FF),
@@ -49,25 +44,12 @@ class AppTheme {
         letterSpacing: 0.3,
       ),
       // 뉴스 요약
-      bodyMedium: TextStyle(
-        color: Colors.grey[700],
-        fontSize: 14,
-        height: 1.2,
-      ),
+      bodyMedium: TextStyle(color: Colors.grey[700], fontSize: 14, height: 1.2),
       // 날짜, 출처 등 작은 텍스트
-      bodySmall: TextStyle(
-        color: Colors.grey[600],
-        fontSize: 12,
-      ),
+      bodySmall: TextStyle(color: Colors.grey[600], fontSize: 12),
       // 탭 라벨
-      labelLarge: const TextStyle(
-        fontWeight: FontWeight.bold,
-        fontSize: 17,
-      ),
-      labelMedium: const TextStyle(
-        fontWeight: FontWeight.normal,
-        fontSize: 15,
-      ),
+      labelLarge: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+      labelMedium: const TextStyle(fontWeight: FontWeight.normal, fontSize: 15),
       // 앱 바 제목
       headlineMedium: const TextStyle(
         color: Colors.black,
@@ -109,10 +91,7 @@ class AppTheme {
           fontWeight: FontWeight.w500,
           color: Colors.blue[700],
         ),
-        dateStyle: TextStyle(
-          fontSize: 12,
-          color: Colors.grey[600],
-        ),
+        dateStyle: TextStyle(fontSize: 12, color: Colors.grey[600]),
         bookmarkActiveColor: Colors.blue,
         bookmarkInactiveColor: Colors.grey,
         thumbnailPlaceholderColor: Colors.grey[200]!,
@@ -122,8 +101,9 @@ class AppTheme {
       ),
       RssThemeExtension(
         channelCardBackground: Colors.white,
-        subscribeButtonActiveBackground: Colors.blue.shade50,
-        subscribeButtonActiveText: Colors.blue[700]!,
+        subscribeButtonActiveBackground: Colors.blue.shade800,
+        subscribeButtonActivedBackground: Colors.blue.shade400,
+        subscribeButtonActiveText: Colors.white,
         subscribeButtonInactiveBackground: Colors.grey.shade200,
         subscribeButtonInactiveText: Colors.grey[700]!,
         channelImageGradientColors: [Colors.blue[400]!, Colors.blue[700]!],
@@ -186,13 +166,8 @@ class AppTheme {
       elevation: 0,
       iconTheme: IconThemeData(color: Colors.white),
     ),
-    drawerTheme: const DrawerThemeData(
-      backgroundColor: Color(0xFFE3F2FD),
-    ),
-    dividerTheme: DividerThemeData(
-      color: Colors.blue[100],
-      thickness: 1,
-    ),
+    drawerTheme: const DrawerThemeData(backgroundColor: Color(0xFFE3F2FD)),
+    dividerTheme: DividerThemeData(color: Colors.blue[100], thickness: 1),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: Colors.white,
       selectedItemColor: Color(0xFF1565C0),
@@ -221,25 +196,12 @@ class AppTheme {
         letterSpacing: 0.3,
       ),
       // 뉴스 요약
-      bodyMedium: TextStyle(
-        color: Colors.grey[800],
-        fontSize: 14,
-        height: 1.2,
-      ),
+      bodyMedium: TextStyle(color: Colors.grey[800], fontSize: 14, height: 1.2),
       // 날짜, 출처 등 작은 텍스트
-      bodySmall: TextStyle(
-        color: Colors.grey[700],
-        fontSize: 12,
-      ),
+      bodySmall: TextStyle(color: Colors.grey[700], fontSize: 12),
       // 탭 라벨
-      labelLarge: const TextStyle(
-        fontWeight: FontWeight.bold,
-        fontSize: 17,
-      ),
-      labelMedium: const TextStyle(
-        fontWeight: FontWeight.normal,
-        fontSize: 15,
-      ),
+      labelLarge: const TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+      labelMedium: const TextStyle(fontWeight: FontWeight.normal, fontSize: 15),
       // 앱 바 제목
       headlineMedium: const TextStyle(
         color: Colors.white,
@@ -281,10 +243,7 @@ class AppTheme {
           fontWeight: FontWeight.w500,
           color: Colors.blue[800],
         ),
-        dateStyle: TextStyle(
-          fontSize: 12,
-          color: Colors.grey[700],
-        ),
+        dateStyle: TextStyle(fontSize: 12, color: Colors.grey[700]),
         bookmarkActiveColor: Colors.blue[700]!,
         bookmarkInactiveColor: Colors.blueGrey[300]!,
         thumbnailPlaceholderColor: Colors.blue[50]!,
@@ -294,9 +253,10 @@ class AppTheme {
       ),
       RssThemeExtension(
         channelCardBackground: Colors.white,
-        subscribeButtonActiveBackground: Colors.blue.shade100,
-        subscribeButtonActiveText: Colors.blue[800]!,
-        subscribeButtonInactiveBackground: Colors.blue.shade50,
+        subscribeButtonActiveBackground: Colors.blue.shade800,
+        subscribeButtonActivedBackground: Colors.blue.shade500,
+        subscribeButtonActiveText: Colors.white,
+        subscribeButtonInactiveBackground: Colors.blue.shade100,
         subscribeButtonInactiveText: Colors.blue[800]!,
         channelImageGradientColors: [Colors.blue[300]!, Colors.blue[600]!],
         channelImageBorderRadius: 10.0,
@@ -358,13 +318,8 @@ class AppTheme {
       elevation: 0,
       iconTheme: IconThemeData(color: Colors.white),
     ),
-    drawerTheme: const DrawerThemeData(
-      backgroundColor: Color(0xFF1F1F1F),
-    ),
-    dividerTheme: DividerThemeData(
-      color: Colors.grey[800],
-      thickness: 1,
-    ),
+    drawerTheme: const DrawerThemeData(backgroundColor: Color(0xFF1F1F1F)),
+    dividerTheme: DividerThemeData(color: Colors.grey[800], thickness: 1),
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(
       backgroundColor: Color(0xFF1F1F1F),
       selectedItemColor: Color(0xFF90CAF9),
@@ -399,19 +354,10 @@ class AppTheme {
         height: 1.2,
       ),
       // 날짜, 출처 등 작은 텍스트
-      bodySmall: TextStyle(
-        color: Color(0xFFAAAAAA),
-        fontSize: 12,
-      ),
+      bodySmall: TextStyle(color: Color(0xFFAAAAAA), fontSize: 12),
       // 탭 라벨
-      labelLarge: TextStyle(
-        fontWeight: FontWeight.bold,
-        fontSize: 17,
-      ),
-      labelMedium: TextStyle(
-        fontWeight: FontWeight.normal,
-        fontSize: 15,
-      ),
+      labelLarge: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+      labelMedium: TextStyle(fontWeight: FontWeight.normal, fontSize: 15),
       // 앱 바 제목
       headlineMedium: TextStyle(
         color: Colors.white,
@@ -453,10 +399,7 @@ class AppTheme {
           fontWeight: FontWeight.w500,
           color: Colors.blue[300],
         ),
-        dateStyle: const TextStyle(
-          fontSize: 12,
-          color: Color(0xFFAAAAAA),
-        ),
+        dateStyle: const TextStyle(fontSize: 12, color: Color(0xFFAAAAAA)),
         bookmarkActiveColor: Colors.blue[300]!,
         bookmarkInactiveColor: Colors.grey,
         thumbnailPlaceholderColor: Colors.grey[800]!,
@@ -467,6 +410,7 @@ class AppTheme {
       RssThemeExtension(
         channelCardBackground: const Color(0xFF1E1E1E),
         subscribeButtonActiveBackground: Colors.blue.shade900,
+        subscribeButtonActivedBackground: Colors.blue.shade900,
         subscribeButtonActiveText: Colors.blue[200]!,
         subscribeButtonInactiveBackground: Colors.grey[800]!,
         subscribeButtonInactiveText: Colors.grey[400]!,
@@ -517,7 +461,7 @@ class AppTheme {
     ],
   );
 
-// 종이질감 서정적 테마 추가
+  // 종이질감 서정적 테마 추가
   static final ThemeData paperTheme = ThemeData(
     brightness: Brightness.light,
     primaryColor: const Color(0xFF8D6E63), // 따뜻한 브라운
@@ -530,9 +474,7 @@ class AppTheme {
       elevation: 0,
       iconTheme: IconThemeData(color: Color(0xFF5D4037)),
     ),
-    drawerTheme: const DrawerThemeData(
-      backgroundColor: Color(0xFFF8F3E9),
-    ),
+    drawerTheme: const DrawerThemeData(backgroundColor: Color(0xFFF8F3E9)),
     dividerTheme: const DividerThemeData(
       color: Color(0xFFE0D6C8),
       thickness: 1,
@@ -547,9 +489,7 @@ class AppTheme {
         backgroundColor: const Color(0xFF8D6E63),
         foregroundColor: Colors.white,
         elevation: 0,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     ),
     textTheme: TextTheme(
@@ -659,13 +599,14 @@ class AppTheme {
       ),
       RssThemeExtension(
         channelCardBackground: const Color(0xFFFCF7F0),
-        subscribeButtonActiveBackground: const Color(0xFFECE2D8),
+        subscribeButtonActiveBackground: const Color(0xFFA99178),
+        subscribeButtonActivedBackground: const Color(0xFFECE2D8),
         subscribeButtonActiveText: const Color(0xFF5D4037),
-        subscribeButtonInactiveBackground: const Color(0xFFEFE5DC),
-        subscribeButtonInactiveText: const Color(0xFF8D6E63),
+        subscribeButtonInactiveBackground: const Color(0xFFCDB6A2),
+        subscribeButtonInactiveText: const Color(0xFFA0522D),
         channelImageGradientColors: const [
           Color(0xFF8D6E63),
-          Color(0xFF5D4037)
+          Color(0xFF5D4037),
         ],
         channelImageBorderRadius: 10.0,
         linkColor: const Color(0xFF795548),
@@ -778,7 +719,8 @@ class AppTheme {
 
   // 구독 뷰 스타일 확장 가져오기
   static SubscribeViewStyleExtension subscribeViewStyleOf(
-      BuildContext context) {
+    BuildContext context,
+  ) {
     return Theme.of(context).extension<SubscribeViewStyleExtension>() ??
         SubscribeViewStyleExtension.fallback();
   }
@@ -842,7 +784,9 @@ class NewsCardStyleExtension extends ThemeExtension<NewsCardStyleExtension> {
 
   @override
   ThemeExtension<NewsCardStyleExtension> lerp(
-      covariant ThemeExtension<NewsCardStyleExtension>? other, double t) {
+    covariant ThemeExtension<NewsCardStyleExtension>? other,
+    double t,
+  ) {
     if (other is! NewsCardStyleExtension) {
       return this;
     }
@@ -857,10 +801,17 @@ class NewsCardStyleExtension extends ThemeExtension<NewsCardStyleExtension> {
           Color.lerp(bookmarkActiveColor, other.bookmarkActiveColor, t)!,
       bookmarkInactiveColor:
           Color.lerp(bookmarkInactiveColor, other.bookmarkInactiveColor, t)!,
-      thumbnailPlaceholderColor: Color.lerp(
-          thumbnailPlaceholderColor, other.thumbnailPlaceholderColor, t)!,
-      thumbnailBorderRadius:
-          lerpDouble(thumbnailBorderRadius, other.thumbnailBorderRadius, t),
+      thumbnailPlaceholderColor:
+          Color.lerp(
+            thumbnailPlaceholderColor,
+            other.thumbnailPlaceholderColor,
+            t,
+          )!,
+      thumbnailBorderRadius: lerpDouble(
+        thumbnailBorderRadius,
+        other.thumbnailBorderRadius,
+        t,
+      ),
       cardPadding: EdgeInsets.lerp(cardPadding, other.cardPadding, t)!,
       dividerColor: Color.lerp(dividerColor, other.dividerColor, t)!,
     );
@@ -885,10 +836,7 @@ class NewsCardStyleExtension extends ThemeExtension<NewsCardStyleExtension> {
         fontWeight: FontWeight.w500,
         color: Colors.blue,
       ),
-      dateStyle: const TextStyle(
-        fontSize: 12,
-        color: Colors.grey,
-      ),
+      dateStyle: const TextStyle(fontSize: 12, color: Colors.grey),
       bookmarkActiveColor: Colors.blue,
       bookmarkInactiveColor: Colors.grey,
       thumbnailPlaceholderColor: Colors.grey.shade200,
@@ -908,6 +856,7 @@ class NewsCardStyleExtension extends ThemeExtension<NewsCardStyleExtension> {
 class RssThemeExtension extends ThemeExtension<RssThemeExtension> {
   final Color channelCardBackground;
   final Color subscribeButtonActiveBackground;
+  final Color subscribeButtonActivedBackground;
   final Color subscribeButtonActiveText;
   final Color subscribeButtonInactiveBackground;
   final Color subscribeButtonInactiveText;
@@ -919,6 +868,7 @@ class RssThemeExtension extends ThemeExtension<RssThemeExtension> {
   RssThemeExtension({
     required this.channelCardBackground,
     required this.subscribeButtonActiveBackground,
+    required this.subscribeButtonActivedBackground,
     required this.subscribeButtonActiveText,
     required this.subscribeButtonInactiveBackground,
     required this.subscribeButtonInactiveText,
@@ -943,11 +893,16 @@ class RssThemeExtension extends ThemeExtension<RssThemeExtension> {
     return RssThemeExtension(
       channelCardBackground:
           channelCardBackground ?? this.channelCardBackground,
-      subscribeButtonActiveBackground: subscribeButtonActiveBackground ??
+      subscribeButtonActiveBackground:
+          subscribeButtonActiveBackground ??
           this.subscribeButtonActiveBackground,
+      subscribeButtonActivedBackground:
+          subscribeButtonActivedBackground ??
+          this.subscribeButtonActivedBackground,
       subscribeButtonActiveText:
           subscribeButtonActiveText ?? this.subscribeButtonActiveText,
-      subscribeButtonInactiveBackground: subscribeButtonInactiveBackground ??
+      subscribeButtonInactiveBackground:
+          subscribeButtonInactiveBackground ??
           this.subscribeButtonInactiveBackground,
       subscribeButtonInactiveText:
           subscribeButtonInactiveText ?? this.subscribeButtonInactiveText,
@@ -962,7 +917,9 @@ class RssThemeExtension extends ThemeExtension<RssThemeExtension> {
 
   @override
   ThemeExtension<RssThemeExtension> lerp(
-      covariant ThemeExtension<RssThemeExtension>? other, double t) {
+    covariant ThemeExtension<RssThemeExtension>? other,
+    double t,
+  ) {
     if (other is! RssThemeExtension) {
       return this;
     }
@@ -970,26 +927,53 @@ class RssThemeExtension extends ThemeExtension<RssThemeExtension> {
     return RssThemeExtension(
       channelCardBackground:
           Color.lerp(channelCardBackground, other.channelCardBackground, t)!,
-      subscribeButtonActiveBackground: Color.lerp(
-          subscribeButtonActiveBackground,
-          other.subscribeButtonActiveBackground,
-          t)!,
-      subscribeButtonActiveText: Color.lerp(
-          subscribeButtonActiveText, other.subscribeButtonActiveText, t)!,
-      subscribeButtonInactiveBackground: Color.lerp(
-          subscribeButtonInactiveBackground,
-          other.subscribeButtonInactiveBackground,
-          t)!,
-      subscribeButtonInactiveText: Color.lerp(
-          subscribeButtonInactiveText, other.subscribeButtonInactiveText, t)!,
+      subscribeButtonActiveBackground:
+          Color.lerp(
+            subscribeButtonActiveBackground,
+            other.subscribeButtonActiveBackground,
+            t,
+          )!,
+      subscribeButtonActivedBackground:
+          Color.lerp(
+            subscribeButtonActivedBackground,
+            other.subscribeButtonActivedBackground,
+            t,
+          )!,
+      subscribeButtonActiveText:
+          Color.lerp(
+            subscribeButtonActiveText,
+            other.subscribeButtonActiveText,
+            t,
+          )!,
+      subscribeButtonInactiveBackground:
+          Color.lerp(
+            subscribeButtonInactiveBackground,
+            other.subscribeButtonInactiveBackground,
+            t,
+          )!,
+      subscribeButtonInactiveText:
+          Color.lerp(
+            subscribeButtonInactiveText,
+            other.subscribeButtonInactiveText,
+            t,
+          )!,
       channelImageGradientColors: [
-        Color.lerp(channelImageGradientColors[0],
-            other.channelImageGradientColors[0], t)!,
-        Color.lerp(channelImageGradientColors[1],
-            other.channelImageGradientColors[1], t)!,
+        Color.lerp(
+          channelImageGradientColors[0],
+          other.channelImageGradientColors[0],
+          t,
+        )!,
+        Color.lerp(
+          channelImageGradientColors[1],
+          other.channelImageGradientColors[1],
+          t,
+        )!,
       ],
       channelImageBorderRadius: lerpDouble(
-          channelImageBorderRadius, other.channelImageBorderRadius, t),
+        channelImageBorderRadius,
+        other.channelImageBorderRadius,
+        t,
+      ),
       linkColor: Color.lerp(linkColor, other.linkColor, t)!,
       channelIconColor:
           Color.lerp(channelIconColor, other.channelIconColor, t)!,
@@ -1001,6 +985,7 @@ class RssThemeExtension extends ThemeExtension<RssThemeExtension> {
     return RssThemeExtension(
       channelCardBackground: Colors.white,
       subscribeButtonActiveBackground: Colors.blue.shade50,
+      subscribeButtonActivedBackground: Colors.blue.shade50,
       subscribeButtonActiveText: Colors.blue,
       subscribeButtonInactiveBackground: Colors.grey.shade200,
       subscribeButtonInactiveText: Colors.grey.shade700,
@@ -1070,7 +1055,9 @@ class SearchStyleExtension extends ThemeExtension<SearchStyleExtension> {
 
   @override
   ThemeExtension<SearchStyleExtension> lerp(
-      covariant ThemeExtension<SearchStyleExtension>? other, double t) {
+    covariant ThemeExtension<SearchStyleExtension>? other,
+    double t,
+  ) {
     if (other is! SearchStyleExtension) {
       return this;
     }
@@ -1195,7 +1182,9 @@ class SubscribeViewStyleExtension
 
   @override
   ThemeExtension<SubscribeViewStyleExtension> lerp(
-      covariant ThemeExtension<SubscribeViewStyleExtension>? other, double t) {
+    covariant ThemeExtension<SubscribeViewStyleExtension>? other,
+    double t,
+  ) {
     if (other is! SubscribeViewStyleExtension) {
       return this;
     }
@@ -1212,8 +1201,12 @@ class SubscribeViewStyleExtension
           Color.lerp(expandButtonBackground, other.expandButtonBackground, t)!,
       expandButtonTextColor:
           Color.lerp(expandButtonTextColor, other.expandButtonTextColor, t)!,
-      collapseButtonTextColor: Color.lerp(
-          collapseButtonTextColor, other.collapseButtonTextColor, t)!,
+      collapseButtonTextColor:
+          Color.lerp(
+            collapseButtonTextColor,
+            other.collapseButtonTextColor,
+            t,
+          )!,
       sectionDividerColor:
           Color.lerp(sectionDividerColor, other.sectionDividerColor, t)!,
       errorIconColor: Color.lerp(errorIconColor, other.errorIconColor, t)!,
