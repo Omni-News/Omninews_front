@@ -1,6 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:omninews_flutter/services/auth_service.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart'
+    show
+        SignInWithApple,
+        SignInWithAppleButton,
+        SignInWithAppleButtonStyle,
+        AppleIDAuthorizationScopes;
 
 class LoginScreen extends StatefulWidget {
   final Function() onLoginSuccess;
@@ -70,15 +76,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(height: 16.0),
 
                         // Apple Login Button with larger icon
-                        _buildLoginButtonWithIcon(
-                          context: context,
-                          icon: Icons.apple,
-                          text: "Sign in with Apple",
-                          backgroundColor: Colors.black,
-                          textColor: Colors.white,
-                          iconSize: 28.0, // Increase Apple logo size
-                          onPressed: _handleAppleLogin,
-                        ),
+                        _buildLoginButtonWithIcon(),
 
                         const SizedBox(height: 16.0),
 
@@ -245,6 +243,30 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       setState(() => _isLoading = true);
       debugPrint('애플 로그인 시작');
+      final result = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+      );
+
+      // 사용자이메일, 설정에 따라 비공개 올 수 있음. 첫 로그인만 오고 그 후는 null.
+      print(result.email ?? '');
+
+      // 사용자 이름 (성)
+      print(result.familyName ?? '');
+
+      // 사용자 이름 (이름)
+      print(result.givenName ?? '');
+
+      // Apple 고유 식별자
+      print(result.userIdentifier ?? '');
+
+      // Apple에서 발급ㅎ는 인증 토큰 (JWT)
+      print(result.identityToken ?? '');
+
+      // 짧은 기간 유효한 인증 코드.
+      print(result.authorizationCode ?? '');
 
       // 현재는 구현되지 않았으므로 안내 메시지 표시
       _showErrorSnackbar('애플 로그인은 아직 준비 중입니다.');
@@ -271,47 +293,23 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   // 로그인 버튼 위젯
-  Widget _buildLoginButtonWithIcon({
-    required BuildContext context,
-    String? imagePath,
-    IconData? icon,
-    double iconSize = 24.0, // Default size
-    String? text,
-    Color? backgroundColor,
-    Color? textColor,
-    required VoidCallback onPressed,
-  }) {
-    return SizedBox(
-      width: double.infinity,
-      height: 50.0,
-      child: ElevatedButton(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: backgroundColor ?? Colors.white,
-          foregroundColor: textColor ?? Colors.black,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8.0),
-          ),
-          elevation: 2,
-        ),
-        onPressed: onPressed,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (icon != null) Icon(icon, size: iconSize),
-            if (icon != null) const SizedBox(width: 12.0),
-            if (imagePath != null)
-              Image.asset(imagePath, height: iconSize, fit: BoxFit.contain),
-            if (text != null)
-              Text(
-                text,
-                style: const TextStyle(
-                  fontSize: 16.0,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-          ],
-        ),
-      ),
+  Widget _buildLoginButtonWithIcon() {
+    return SignInWithAppleButton(
+      onPressed: _handleAppleLogin,
+      style: SignInWithAppleButtonStyle.black,
+
+      /// 색상 지정 가능
+      height: 44,
+
+      /// 버튼 높이 지정 가능
+      borderRadius: BorderRadius.circular(8),
+
+      /// 모서리 지정 가능
+
+      /// 아이콘 위치 지정 가능
+      text: 'Sign in with Apple',
+
+      /// 텍스트 지정 가능
     );
   }
 }

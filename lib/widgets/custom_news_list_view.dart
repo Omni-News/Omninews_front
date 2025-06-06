@@ -41,7 +41,7 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
     if (text.isEmpty) {
       return '';
     }
-    
+
     try {
       // HTML 엔티티 디코딩 (예: &quot; -> ", &amp; -> &)
       return _htmlUnescape.convert(text);
@@ -92,9 +92,7 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return Center(
-                  child: CircularProgressIndicator(
-                    color: theme.primaryColor,
-                  ),
+                  child: CircularProgressIndicator(color: theme.primaryColor),
                 );
               } else if (snapshot.hasError) {
                 return Center(
@@ -121,9 +119,11 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
                         Text(
                           '${snapshot.error}',
                           style: TextStyle(
-                              color: subscribeStyle.emptyTextColor
-                                  .withOpacity(0.8),
-                              fontSize: 14),
+                            color: subscribeStyle.emptyTextColor.withOpacity(
+                              0.8,
+                            ),
+                            fontSize: 14,
+                          ),
                           textAlign: TextAlign.center,
                         ),
                       ],
@@ -166,21 +166,26 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
               return ListView.separated(
                 padding: const EdgeInsets.only(top: 4),
                 itemCount: news.length,
-                separatorBuilder: (context, index) => Divider(
-                  height: 1,
-                  indent: 16,
-                  endIndent: 16,
-                  color: theme.dividerTheme.color,
-                ),
+                separatorBuilder:
+                    (context, index) => Divider(
+                      height: 1,
+                      indent: 16,
+                      endIndent: 16,
+                      color: theme.dividerTheme.color,
+                    ),
                 itemBuilder: (context, index) {
                   final item = news[index];
 
                   return InkWell(
-                    onTap: () => {
-                      RecentlyReadService.addCustomNews(item),
-                      UrlLauncherHelper.openUrl(
-                          context, item.originalLink, settings.webOpenMode)
-                    },
+                    onTap:
+                        () => {
+                          RecentlyReadService.addCustomNews(item),
+                          UrlLauncherHelper.openUrl(
+                            context,
+                            item.originalLink,
+                            settings.webOpenMode,
+                          ),
+                        },
                     child: Padding(
                       padding: cardStyle.cardPadding,
                       child: _buildNewsContent(item, cardStyle, theme),
@@ -197,12 +202,14 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
 
   // 뉴스 내용 구성
   Widget _buildNewsContent(
-      CustomNews item, NewsCardStyleExtension cardStyle, ThemeData theme) {
-    
+    CustomNews item,
+    NewsCardStyleExtension cardStyle,
+    ThemeData theme,
+  ) {
     // HTML 엔티티 디코딩 적용
     final decodedTitle = _decodeHtmlEntities(item.plainTitle);
     final decodedDescription = _decodeHtmlEntities(item.plainDescription);
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -222,24 +229,26 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
             IconButton(
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
-              icon: _loadingStatus[item.originalLink] == true
-                  ? SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: theme.primaryColor,
+              icon:
+                  _loadingStatus[item.originalLink] == true
+                      ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: theme.primaryColor,
+                        ),
+                      )
+                      : Icon(
+                        _bookmarkStatus[item.originalLink] == true
+                            ? Icons.bookmark
+                            : Icons.bookmark_border,
+                        color:
+                            _bookmarkStatus[item.originalLink] == true
+                                ? cardStyle.bookmarkActiveColor
+                                : cardStyle.bookmarkInactiveColor,
+                        size: 20,
                       ),
-                    )
-                  : Icon(
-                      _bookmarkStatus[item.originalLink] == true
-                          ? Icons.bookmark
-                          : Icons.bookmark_border,
-                      color: _bookmarkStatus[item.originalLink] == true
-                          ? cardStyle.bookmarkActiveColor
-                          : cardStyle.bookmarkInactiveColor,
-                      size: 20,
-                    ),
               onPressed: () => _toggleBookmark(item),
             ),
           ],
@@ -263,10 +272,7 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
               style: cardStyle.sourceStyle,
             ),
             const SizedBox(width: 8),
-            Text(
-              _formatDate(item.pubDate),
-              style: cardStyle.dateStyle,
-            ),
+            Text(_formatDate(item.pubDate), style: cardStyle.dateStyle),
           ],
         ),
       ],
@@ -314,9 +320,11 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_bookmarkStatus[newsLink] == true
-                ? '북마크에 추가되었습니다'
-                : '북마크에서 제거되었습니다'),
+            content: Text(
+              _bookmarkStatus[newsLink] == true
+                  ? '북마크에 추가되었습니다'
+                  : '북마크에서 제거되었습니다',
+            ),
             duration: const Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
             backgroundColor: Theme.of(context).primaryColor,
@@ -349,12 +357,13 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
     // 제목과 설명에서 HTML 엔티티 제거
     final decodedTitle = _decodeHtmlEntities(customNews.plainTitle);
     final decodedDescription = _decodeHtmlEntities(customNews.plainDescription);
-    
+
     // News 생성자를 사용하여 객체 생성
     return News(
       newsId: 0,
       newsTitle: decodedTitle, // 디코딩된 제목 사용
       newsDescription: decodedDescription, // 디코딩된 설명 사용
+      newsSummary: customNews.plainDescription,
       newsLink: customNews.originalLink,
       newsSource: _extractDomain(customNews.originalLink),
       newsPubDate: customNews.pubDate,
@@ -377,9 +386,10 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected
-              ? theme.primaryColor.withOpacity(0.1)
-              : Colors.transparent,
+          color:
+              isSelected
+                  ? theme.primaryColor.withOpacity(0.1)
+                  : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? theme.primaryColor : Colors.transparent,
@@ -394,18 +404,15 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected
-                    ? theme.primaryColor
-                    : theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
+                color:
+                    isSelected
+                        ? theme.primaryColor
+                        : theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
               ),
             ),
             if (isSelected) ...[
               const SizedBox(width: 4),
-              Icon(
-                Icons.check_circle,
-                size: 14,
-                color: theme.primaryColor,
-              ),
+              Icon(Icons.check_circle, size: 14, color: theme.primaryColor),
             ],
           ],
         ),

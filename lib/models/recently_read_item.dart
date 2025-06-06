@@ -2,15 +2,13 @@ import 'package:omninews_flutter/models/custom_news.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
 import 'package:omninews_flutter/models/news.dart';
 
-enum ReadItemType {
-  rss,
-  news,
-}
+enum ReadItemType { rss, news }
 
 class RecentlyReadItem {
   final int id;
   final String title;
   final String description;
+  final String summary;
   final String link;
   final String imageUrl;
   final String source;
@@ -22,6 +20,7 @@ class RecentlyReadItem {
     required this.id,
     required this.title,
     required this.description,
+    required this.summary,
     required this.link,
     required this.source,
     required this.pubDate,
@@ -36,6 +35,7 @@ class RecentlyReadItem {
       id: 0,
       title: item.rssTitle,
       description: item.rssDescription,
+      summary: item.rssDescription,
       link: item.rssLink,
       source: "",
       pubDate: item.rssPubDate,
@@ -51,6 +51,7 @@ class RecentlyReadItem {
       id: 0,
       title: news.newsTitle,
       description: news.newsDescription,
+      summary: news.newsSummary,
       link: news.newsLink,
       source: news.newsSource,
       pubDate: news.newsPubDate,
@@ -65,6 +66,7 @@ class RecentlyReadItem {
       id: 0,
       title: news.title,
       description: news.description,
+      summary: news.description,
       link: news.link,
       source: "",
       pubDate: news.pubDate,
@@ -79,6 +81,7 @@ class RecentlyReadItem {
       id: 0,
       title: news.newsTitle,
       description: news.newsDescription,
+      summary: news.newsDescription,
       link: news.newsLink,
       source: news.newsOriginalLink,
       pubDate: news.newsPubDate,
@@ -93,6 +96,7 @@ class RecentlyReadItem {
       id: json['id'],
       title: json['title'],
       description: json['description'],
+      summary: json['summary'] ?? '',
       link: json['link'],
       source: json['source'],
       pubDate: json['pubDate'],
@@ -108,6 +112,7 @@ class RecentlyReadItem {
       'id': id,
       'title': title,
       'description': description,
+      'summary': summary,
       'link': link,
       'source': source,
       'pubDate': pubDate,
@@ -120,14 +125,15 @@ class RecentlyReadItem {
   // RSS 아이템으로 변환
   RssItem toRssItem() {
     return RssItem(
-        rssId: 0,
-        rssTitle: title,
-        rssDescription: description,
-        rssLink: link,
-        rssPubDate: pubDate,
-        rssImageLink: imageUrl.isNotEmpty ? imageUrl : null,
-        rssRank: 0,
-        channelId: 0);
+      rssId: 0,
+      rssTitle: title,
+      rssDescription: description,
+      rssLink: link,
+      rssPubDate: pubDate,
+      rssImageLink: imageUrl.isNotEmpty ? imageUrl : null,
+      rssRank: 0,
+      channelId: 0,
+    );
   }
 
   // News 객체로 변환
@@ -136,6 +142,7 @@ class RecentlyReadItem {
       newsId: 0,
       newsTitle: title,
       newsDescription: description,
+      newsSummary: summary,
       newsLink: link,
       newsSource: source,
       newsPubDate: pubDate,

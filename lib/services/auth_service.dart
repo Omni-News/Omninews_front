@@ -188,7 +188,7 @@ class AuthService {
     try {
       debugPrint('애플 로그인 시작');
 
-      // TODO: 애플 로그인 구현
+      // TODO: 애플 로그인 구현 (실기기 테스트 필요.)
 
       // 서버에 인증 정보 전송 (예시)
       // final paramUser = {
