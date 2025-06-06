@@ -141,9 +141,7 @@ class _RecentlyReadScreenState extends State<RecentlyReadScreen> {
           future: _items,
           builder: (context, snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
-              return const Center(
-                child: CircularProgressIndicator(),
-              );
+              return const Center(child: CircularProgressIndicator());
             } else if (snapshot.hasError) {
               return _buildErrorState('데이터를 불러오는데 실패했습니다');
             } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
@@ -151,27 +149,32 @@ class _RecentlyReadScreenState extends State<RecentlyReadScreen> {
             }
 
             // HTML 태그를 제거하고 처리된 아이템 목록 생성
-            final processedItems = snapshot.data!.map((item) {
-              // 제목과 설명에서 HTML 태그 제거
-              final cleanTitle = _stripHtmlTags(item.title);
-              final cleanDescription = _stripHtmlTags(item.description);
+            final processedItems =
+                snapshot.data!.map((item) {
+                  // 제목과 설명에서 HTML 태그 제거
+                  final cleanTitle = _stripHtmlTags(item.title);
+                  final cleanDescription = _stripHtmlTags(item.description);
 
-              // 도메인 추출
-              final domain = _getDomainFromUrl(item.link);
+                  // 도메인 추출
+                  final domain = _getDomainFromUrl(item.link);
 
-              // 새 아이템 생성 (복사본)
-              return RecentlyReadItem(
-                id: item.id,
-                title: cleanTitle,
-                description: cleanDescription,
-                link: item.link, // 원본 링크는
-                source: domain, // 도메인만 표시하도록 변경
-                pubDate: item.pubDate,
-                type: item.type,
-                readAt: item.readAt,
-                imageUrl: item.imageUrl,
-              );
-            }).toList();
+                  // 새 아이템 생성 (복사본)
+                  return RecentlyReadItem(
+                    id: item.id,
+                    title: cleanTitle,
+                    description: cleanDescription,
+                    summary:
+                        item.summary.isEmpty
+                            ? cleanDescription // 요약이 비어있으면 설명 사용
+                            : item.summary,
+                    link: item.link, // 원본 링크는
+                    source: domain, // 도메인만 표시하도록 변경
+                    pubDate: item.pubDate,
+                    type: item.type,
+                    readAt: item.readAt,
+                    imageUrl: item.imageUrl,
+                  );
+                }).toList();
 
             // 날짜별로 그룹화
             final itemsByDate = _groupItemsByDate(processedItems);
@@ -208,7 +211,8 @@ class _RecentlyReadScreenState extends State<RecentlyReadScreen> {
 
   // 날짜별로 아이템 그룹화
   Map<String, List<RecentlyReadItem>> _groupItemsByDate(
-      List<RecentlyReadItem> items) {
+    List<RecentlyReadItem> items,
+  ) {
     final Map<String, List<RecentlyReadItem>> grouped = {};
 
     for (final item in items) {
@@ -221,16 +225,16 @@ class _RecentlyReadScreenState extends State<RecentlyReadScreen> {
     }
 
     // 날짜순 정렬 (최신순)
-    final sortedKeys = grouped.keys.toList()
-      ..sort((a, b) {
-        try {
-          final dateA = DateFormat('yyyy년 MM월 dd일').parse(a);
-          final dateB = DateFormat('yyyy년 MM월 dd일').parse(b);
-          return dateB.compareTo(dateA);
-        } catch (e) {
-          return 0;
-        }
-      });
+    final sortedKeys =
+        grouped.keys.toList()..sort((a, b) {
+          try {
+            final dateA = DateFormat('yyyy년 MM월 dd일').parse(a);
+            final dateB = DateFormat('yyyy년 MM월 dd일').parse(b);
+            return dateB.compareTo(dateA);
+          } catch (e) {
+            return 0;
+          }
+        });
 
     return {for (var key in sortedKeys) key: grouped[key]!};
   }
@@ -303,14 +307,10 @@ class _RecentlyReadScreenState extends State<RecentlyReadScreen> {
     // 각 카드에 뷰모드와 웹오픈모드 설정 전달
     if (item.type == ReadItemType.rss) {
       final rssItem = item.toRssItem();
-      return RssItemCard(
-        item: rssItem,
-      );
+      return RssItemCard(item: rssItem);
     } else {
       final news = item.toNews();
-      return NewsItemCard(
-        news: news,
-      );
+      return NewsItemCard(news: news);
     }
   }
 
@@ -350,8 +350,10 @@ class _RecentlyReadScreenState extends State<RecentlyReadScreen> {
                 foregroundColor: Colors.white,
                 backgroundColor: theme.primaryColor,
                 elevation: 0,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),

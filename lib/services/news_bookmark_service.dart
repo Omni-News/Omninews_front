@@ -62,17 +62,21 @@ class NewsBookmarkService {
       final newsApiItems = await getBookmarkedNewsApi();
 
       // NewsApi를 News 형식으로 변환
-      final convertedApiItems = newsApiItems
-          .map((apiItem) => News(
-                newsId: 0, // 로컬 용도라 ID는 0으로 설정
-                newsTitle: _removeHtmlTags(apiItem.newsTitle),
-                newsLink: apiItem.newsOriginalLink,
-                newsDescription: _removeHtmlTags(apiItem.newsDescription),
-                newsPubDate: apiItem.newsPubDate,
-                newsSource: _extractDomain(apiItem.newsOriginalLink),
-                newsImageLink: '', // API에서 이미지 URL이 없을 수 있음
-              ))
-          .toList();
+      final convertedApiItems =
+          newsApiItems
+              .map(
+                (apiItem) => News(
+                  newsId: 0, // 로컬 용도라 ID는 0으로 설정
+                  newsTitle: _removeHtmlTags(apiItem.newsTitle),
+                  newsLink: apiItem.newsOriginalLink,
+                  newsDescription: _removeHtmlTags(apiItem.newsDescription),
+                  newsSummary: apiItem.newsDescription,
+                  newsPubDate: apiItem.newsPubDate,
+                  newsSource: _extractDomain(apiItem.newsOriginalLink),
+                  newsImageLink: '', // API에서 이미지 URL이 없을 수 있음
+                ),
+              )
+              .toList();
 
       // 두 목록 합치기
       final allItems = [...newsItems, ...convertedApiItems];
@@ -285,7 +289,7 @@ class NewsBookmarkService {
     return isNewsApiBookmark;
   }
 
-// 북마크된 모든 뉴스 항목을 원본 타입으로 구분해서 가져오기
+  // 북마크된 모든 뉴스 항목을 원본 타입으로 구분해서 가져오기
   static Future<Map<String, List<dynamic>>> getAllBookmarkedNewsByType() async {
     try {
       // News 타입 북마크 가져오기
@@ -294,51 +298,44 @@ class NewsBookmarkService {
       // NewsApi 타입 북마크 가져오기
       final newsApiItems = await getBookmarkedNewsApi();
 
-      return {
-        'news': newsItems,
-        'newsApi': newsApiItems,
-      };
+      return {'news': newsItems, 'newsApi': newsApiItems};
     } catch (e) {
       debugPrint('Error getting all bookmarked news by type: $e');
-      return {
-        'news': [],
-        'newsApi': [],
-      };
+      return {'news': [], 'newsApi': []};
     }
   }
 
-// 통합 검색 기능 (타입별로 분리)
+  // 통합 검색 기능 (타입별로 분리)
   static Future<Map<String, List<dynamic>>> searchAllBookmarkedNewsByType(
-      String query) async {
+    String query,
+  ) async {
     try {
       // News 북마크 검색
       final newsItems = await getBookmarkedNews();
-      final filteredNews = newsItems.where((news) {
-        return news.newsTitle.toLowerCase().contains(query.toLowerCase()) ||
-            news.newsDescription.toLowerCase().contains(query.toLowerCase());
-      }).toList();
+      final filteredNews =
+          newsItems.where((news) {
+            return news.newsTitle.toLowerCase().contains(query.toLowerCase()) ||
+                news.newsDescription.toLowerCase().contains(
+                  query.toLowerCase(),
+                );
+          }).toList();
 
       // NewsApi 북마크 검색
       final newsApiItems = await getBookmarkedNewsApi();
-      final filteredNewsApi = newsApiItems.where((newsApi) {
-        return _removeHtmlTags(newsApi.newsTitle)
-                .toLowerCase()
-                .contains(query.toLowerCase()) ||
-            _removeHtmlTags(newsApi.newsDescription)
-                .toLowerCase()
-                .contains(query.toLowerCase());
-      }).toList();
+      final filteredNewsApi =
+          newsApiItems.where((newsApi) {
+            return _removeHtmlTags(
+                  newsApi.newsTitle,
+                ).toLowerCase().contains(query.toLowerCase()) ||
+                _removeHtmlTags(
+                  newsApi.newsDescription,
+                ).toLowerCase().contains(query.toLowerCase());
+          }).toList();
 
-      return {
-        'news': filteredNews,
-        'newsApi': filteredNewsApi,
-      };
+      return {'news': filteredNews, 'newsApi': filteredNewsApi};
     } catch (e) {
       debugPrint('Error searching bookmarked news by type: $e');
-      return {
-        'news': [],
-        'newsApi': [],
-      };
+      return {'news': [], 'newsApi': []};
     }
   }
 }

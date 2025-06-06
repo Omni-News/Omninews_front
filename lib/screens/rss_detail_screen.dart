@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_flutter/models/app_setting.dart';
-import 'package:omninews_flutter/models/news.dart';
-import 'package:omninews_flutter/services/recently_read_service.dart';
+import 'package:omninews_flutter/models/rss_channel.dart';
+import 'package:omninews_flutter/models/rss_item.dart';
+import 'package:provider/provider.dart';
 import 'package:share/share.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
-import 'package:provider/provider.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
 import 'package:omninews_flutter/utils/url_launcher_helper.dart';
 
-class NewsDetailScreen extends StatelessWidget {
-  final News news;
+class RssDetailScreen extends StatelessWidget {
+  final RssItem rssItem;
+  final RssChannel? channel; // 채널 정보는 옵션
 
-  const NewsDetailScreen({super.key, required this.news});
+  const RssDetailScreen({super.key, required this.rssItem, this.channel});
 
   @override
   Widget build(BuildContext context) {
@@ -19,9 +19,10 @@ class NewsDetailScreen extends StatelessWidget {
     final textTheme = detailTheme.textTheme;
     final colorScheme = detailTheme.colorScheme;
     final settings = Provider.of<SettingsProvider>(context).settings;
+
+    // 이미지가 있는지 확인
     final hasImage =
-        news.newsImageLink.isNotEmpty &&
-        settings.viewMode == ViewMode.textAndImage;
+        rssItem.rssImageLink != null && rssItem.rssImageLink!.isNotEmpty;
 
     return Scaffold(
       backgroundColor: detailTheme.scaffoldBackgroundColor,
@@ -31,6 +32,7 @@ class NewsDetailScreen extends StatelessWidget {
             CustomScrollView(
               physics: const BouncingScrollPhysics(),
               slivers: [
+                // 앱바 (이미지 있을 때만 확장)
                 SliverAppBar(
                   expandedHeight: hasImage ? 240.0 : 0,
                   pinned: true,
@@ -62,7 +64,7 @@ class NewsDetailScreen extends StatelessWidget {
                       hasImage
                           ? FlexibleSpaceBar(
                             background: Image.network(
-                              news.newsImageLink,
+                              rssItem.rssImageLink!,
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
                                 return Container(
@@ -83,84 +85,84 @@ class NewsDetailScreen extends StatelessWidget {
                           )
                           : null,
                 ),
+
+                // 콘텐츠 영역
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 24, 20, 100),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 출처 및 날짜
-                        Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                news.newsSource,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: colorScheme.onPrimaryContainer,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Text(
-                              _formatDate(news.newsPubDate),
-                              style: textTheme.bodySmall,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        // 제목
-                        Text(news.newsTitle, style: textTheme.titleLarge),
-                        const SizedBox(height: 24),
+                        // RSS 채널 정보 표시
+                        if (channel != null)
+                          _buildChannelInfo(channel!, colorScheme, textTheme),
 
-                        // 더 모던하고 센스있는 AI 요약 라벨
+                        const SizedBox(height: 16),
+
+                        // 날짜 및 저자 정보
                         Row(
                           children: [
                             Icon(
-                              Icons.auto_awesome_rounded,
-                              color: colorScheme.primary,
-                              size: 18,
+                              Icons.access_time_rounded,
+                              size: 16,
+                              color: colorScheme.secondary,
                             ),
-                            const SizedBox(width: 7),
+                            const SizedBox(width: 6),
                             Text(
-                              'AI 뉴스 본문 요약',
-                              style: textTheme.labelLarge?.copyWith(
-                                color: colorScheme.primary,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.7,
+                              _formatDate(rssItem.rssPubDate),
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.secondary,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Container(
-                              width: 6,
-                              height: 6,
-                              decoration: BoxDecoration(
-                                color: colorScheme.primary,
-                                shape: BoxShape.circle,
+
+                            // 저자 정보가 있으면 표시
+                            if (rssItem.rssAuthor != null &&
+                                rssItem.rssAuthor!.isNotEmpty) ...[
+                              const SizedBox(width: 12),
+                              Icon(
+                                Icons.person_outline,
+                                size: 16,
+                                color: colorScheme.secondary,
                               ),
-                            ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  rssItem.rssAuthor!,
+                                  style: textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.secondary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
-                        const SizedBox(height: 12),
 
-                        // 본문 설명
-                        Text(news.newsSummary, style: textTheme.bodyLarge),
+                        const SizedBox(height: 20),
+
+                        // 제목
+                        Text(
+                          rssItem.rssTitle,
+                          style: textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+
+                        const SizedBox(height: 24),
+
+                        // RSS 본문 콘텐츠
+                        Text(
+                          _cleanHtml(rssItem.rssDescription),
+                          style: textTheme.bodyLarge,
+                        ),
                       ],
                     ),
                   ),
                 ),
               ],
             ),
-            // 하단 고정 버튼 영역 (이전 코드 그대로)
+
+            // 하단 버튼 영역
             Positioned(
               left: 0,
               right: 0,
@@ -189,7 +191,7 @@ class NewsDetailScreen extends StatelessWidget {
                         child: ElevatedButton.icon(
                           onPressed: () {
                             Share.share(
-                              '${news.newsTitle}\n\n${news.newsLink}',
+                              '${rssItem.rssTitle}\n\n${rssItem.rssLink}',
                             );
                           },
                           icon: const Icon(Icons.share, size: 18),
@@ -218,16 +220,17 @@ class NewsDetailScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+
                     // 원문 보기 버튼
                     Expanded(
                       child: Padding(
                         padding: const EdgeInsets.only(left: 8),
                         child: ElevatedButton.icon(
                           onPressed: () {
-                            RecentlyReadService.addNews(news);
+                            // 최근 읽은 기사 추가 등의 코드를 여기 추가할 수 있음
                             UrlLauncherHelper.openUrl(
                               context,
-                              news.newsLink,
+                              rssItem.rssLink,
                               settings.webOpenMode,
                             );
                           },
@@ -261,6 +264,102 @@ class NewsDetailScreen extends StatelessWidget {
     );
   }
 
+  // RSS 채널 정보 위젯
+  Widget _buildChannelInfo(
+    RssChannel channel,
+    ColorScheme colorScheme,
+    TextTheme textTheme,
+  ) {
+    return Row(
+      children: [
+        // 채널 아이콘/로고 표시
+        if (channel.channelImageUrl != null &&
+            channel.channelImageUrl!.isNotEmpty)
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Image.network(
+              channel.channelImageUrl!,
+              width: 24,
+              height: 24,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(
+                    Icons.rss_feed,
+                    color: colorScheme.primary,
+                    size: 16,
+                  ),
+                );
+              },
+            ),
+          )
+        else
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(Icons.rss_feed, color: colorScheme.primary, size: 16),
+          ),
+
+        const SizedBox(width: 10),
+
+        // 채널 이름
+        Expanded(
+          child: Text(
+            channel.channelTitle,
+            style: textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: colorScheme.primary,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+
+        // 채널 언어 표시
+        if (channel.channelLanguage != null &&
+            channel.channelLanguage != 'None')
+          Container(
+            margin: const EdgeInsets.only(left: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              channel.channelLanguage!,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: colorScheme.onPrimaryContainer,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // HTML 태그 제거 함수
+  String _cleanHtml(String html) {
+    // 기본적인 HTML 태그 제거 (더 정교한 구현이 필요하다면 html 패키지 사용 권장)
+    RegExp exp = RegExp(r"<[^>]*>", multiLine: true, caseSensitive: true);
+    return html
+        .replaceAll(exp, '')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>');
+  }
+
+  // 날짜 포맷팅 함수
   String _formatDate(String dateStr) {
     try {
       final date = DateTime.parse(dateStr);
@@ -270,6 +369,7 @@ class NewsDetailScreen extends StatelessWidget {
     }
   }
 
+  // 시간 포맷팅 함수
   String _formatTime(int hour, int minute) {
     final isPM = hour >= 12;
     final formattedHour =

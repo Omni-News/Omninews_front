@@ -96,7 +96,6 @@ class SubscribeService {
   // 아이템이 북마크되어 있는지 확인
   static Future<bool> isBookmarked(String itemLink) async {
     try {
-      // 북마크 API가 구현되기 전까지는 로컬 저장소 사용
       final prefs = await SharedPreferences.getInstance();
       final bookmarksJson = prefs.getStringList('bookmarks') ?? [];
 

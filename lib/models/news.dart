@@ -2,6 +2,7 @@ class News {
   final int newsId;
   final String newsTitle;
   final String newsDescription;
+  final String newsSummary;
   final String newsLink;
   final String newsSource;
   final String newsPubDate;
@@ -11,6 +12,7 @@ class News {
     required this.newsId,
     required this.newsTitle,
     required this.newsDescription,
+    required this.newsSummary,
     required this.newsLink,
     required this.newsSource,
     required this.newsPubDate,
@@ -22,6 +24,7 @@ class News {
       newsId: json['news_id'],
       newsTitle: json['news_title'],
       newsDescription: json['news_description'],
+      newsSummary: json['news_summary'] ?? '',
       newsLink: json['news_link'],
       newsSource: json['news_source'],
       newsPubDate: json['news_pub_date'] ?? 'Unknown',
@@ -34,6 +37,7 @@ class News {
       'news_id': newsId,
       'news_title': newsTitle,
       'news_description': newsDescription,
+      'news_summary': newsSummary,
       'news_link': newsLink,
       'news_source': newsSource,
       'news_pub_date': newsPubDate,

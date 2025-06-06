@@ -113,19 +113,19 @@ class _BookmarkScreenState extends State<BookmarkScreen>
     }
 
     // 최신 날짜부터 정렬
-    final sortedKeys = grouped.keys.toList()
-      ..sort((a, b) {
-        if (a == '날짜 없음') return 1;
-        if (b == '날짜 없음') return -1;
+    final sortedKeys =
+        grouped.keys.toList()..sort((a, b) {
+          if (a == '날짜 없음') return 1;
+          if (b == '날짜 없음') return -1;
 
-        try {
-          final dateA = DateFormat('yyyy년 MM월 dd일').parse(a);
-          final dateB = DateFormat('yyyy년 MM월 dd일').parse(b);
-          return dateB.compareTo(dateA);
-        } catch (e) {
-          return 0;
-        }
-      });
+          try {
+            final dateA = DateFormat('yyyy년 MM월 dd일').parse(a);
+            final dateB = DateFormat('yyyy년 MM월 dd일').parse(b);
+            return dateB.compareTo(dateA);
+          } catch (e) {
+            return 0;
+          }
+        });
 
     return {for (var key in sortedKeys) key: grouped[key]!};
   }
@@ -151,19 +151,19 @@ class _BookmarkScreenState extends State<BookmarkScreen>
       }
     }
 
-    final sortedKeys = grouped.keys.toList()
-      ..sort((a, b) {
-        if (a == '날짜 없음') return 1;
-        if (b == '날짜 없음') return -1;
+    final sortedKeys =
+        grouped.keys.toList()..sort((a, b) {
+          if (a == '날짜 없음') return 1;
+          if (b == '날짜 없음') return -1;
 
-        try {
-          final dateA = DateFormat('yyyy년 MM월 dd일').parse(a);
-          final dateB = DateFormat('yyyy년 MM월 dd일').parse(b);
-          return dateB.compareTo(dateA);
-        } catch (e) {
-          return 0;
-        }
-      });
+          try {
+            final dateA = DateFormat('yyyy년 MM월 dd일').parse(a);
+            final dateB = DateFormat('yyyy년 MM월 dd일').parse(b);
+            return dateB.compareTo(dateA);
+          } catch (e) {
+            return 0;
+          }
+        });
 
     return {for (var key in sortedKeys) key: grouped[key]!};
   }
@@ -206,8 +206,10 @@ class _BookmarkScreenState extends State<BookmarkScreen>
           return [
             SliverAppBar(
               leading: IconButton(
-                icon: Icon(Icons.menu,
-                    color: Theme.of(context).appBarTheme.iconTheme?.color),
+                icon: Icon(
+                  Icons.menu,
+                  color: Theme.of(context).appBarTheme.iconTheme?.color,
+                ),
                 onPressed: () {
                   homeScaffoldKey.currentState?.openDrawer();
                 },
@@ -216,12 +218,10 @@ class _BookmarkScreenState extends State<BookmarkScreen>
               elevation: 0,
               backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
               centerTitle: true,
-              title: _isSearching
-                  ? _buildSearchField()
-                  : Text(
-                      'Bookmarks',
-                      style: textTheme.headlineMedium,
-                    ),
+              title:
+                  _isSearching
+                      ? _buildSearchField()
+                      : Text('Bookmarks', style: textTheme.headlineMedium),
               actions: [
                 IconButton(
                   icon: Icon(
@@ -260,10 +260,7 @@ class _BookmarkScreenState extends State<BookmarkScreen>
         },
         body: TabBarView(
           controller: _tabController,
-          children: [
-            _buildDateView(),
-            _buildNewsView(),
-          ],
+          children: [_buildDateView(), _buildNewsView()],
         ),
       ),
     );
@@ -366,8 +363,9 @@ class _BookmarkScreenState extends State<BookmarkScreen>
                 header: _buildDateHeader(formattedDate, newsItems.length),
                 content: Column(
                   children: [
-                    ...newsItems
-                        .map((newsItem) => _buildNewsBookmarkItem(newsItem)),
+                    ...newsItems.map(
+                      (newsItem) => _buildNewsBookmarkItem(newsItem),
+                    ),
                     if (index < newsByDate.length - 1)
                       Container(
                         height: 8,
@@ -393,10 +391,7 @@ class _BookmarkScreenState extends State<BookmarkScreen>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Text(
-            date,
-            style: subscribeStyle.dateTextStyle,
-          ),
+          Text(date, style: subscribeStyle.dateTextStyle),
           const SizedBox(width: 8),
           Text(
             '·',
@@ -407,10 +402,7 @@ class _BookmarkScreenState extends State<BookmarkScreen>
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            '$itemCount개의 항목',
-            style: subscribeStyle.countTextStyle,
-          ),
+          Text('$itemCount개의 항목', style: subscribeStyle.countTextStyle),
         ],
       ),
     );
@@ -421,10 +413,7 @@ class _BookmarkScreenState extends State<BookmarkScreen>
 
     return Column(
       children: [
-        RssItemCard(
-          item: item,
-          onBookmarkChanged: _refreshBookmarks,
-        ),
+        RssItemCard(item: item, onBookmarkChanged: _refreshBookmarks),
         Divider(
           height: 1,
           indent: 16,
@@ -440,10 +429,7 @@ class _BookmarkScreenState extends State<BookmarkScreen>
 
     return Column(
       children: [
-        NewsItemCard(
-          news: news,
-          onBookmarkChanged: _refreshBookmarks,
-        ),
+        NewsItemCard(news: news, onBookmarkChanged: _refreshBookmarks),
         Divider(
           height: 1,
           indent: 16,
@@ -506,8 +492,10 @@ class _BookmarkScreenState extends State<BookmarkScreen>
                 foregroundColor: Colors.white,
                 backgroundColor: Theme.of(context).primaryColor,
                 elevation: 0,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -528,11 +516,7 @@ class _BookmarkScreenState extends State<BookmarkScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 64,
-              color: subscribeStyle.emptyIconColor,
-            ),
+            Icon(icon, size: 64, color: subscribeStyle.emptyIconColor),
             const SizedBox(height: 20),
             Text(
               message,
@@ -558,8 +542,10 @@ class _BookmarkScreenState extends State<BookmarkScreen>
               const SizedBox(height: 20),
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 32),
-                padding:
-                    const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 16,
+                ),
                 decoration: BoxDecoration(
                   color: subscribeStyle.hintBoxBackground,
                   borderRadius: BorderRadius.circular(12),
@@ -590,19 +576,23 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
-        boxShadow: overlapsContent
-            ? [
-                BoxShadow(
-                  color: Theme.of(context).shadowColor,
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : [],
+        boxShadow:
+            overlapsContent
+                ? [
+                  BoxShadow(
+                    color: Theme.of(context).shadowColor,
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+                : [],
       ),
       height: 48.0,
       child: child,

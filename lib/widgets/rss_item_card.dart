@@ -6,7 +6,7 @@ import 'package:omninews_flutter/services/recently_read_service.dart';
 import 'package:omninews_flutter/services/rss_service.dart';
 import 'package:omninews_flutter/services/subscribe_service.dart';
 import 'package:intl/intl.dart';
-import 'package:omninews_flutter/utils/url_launcher_helper.dart';
+import 'package:omninews_flutter/screens/rss_detail_screen.dart'; // 추가: RssDetailScreen 임포트
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
@@ -153,12 +153,23 @@ class _RssItemCardState extends State<RssItemCard> {
 
     return InkWell(
       onTap: () {
+        // 읽은 기록 추가
         RecentlyReadService.addRssItem(widget.item);
+
+        // 순위 업데이트
         RssService.updateRssRank(widget.item.rssId);
-        UrlLauncherHelper.openUrl(
+
+        // 변경: URL 직접 열기 대신 RssDetailScreen으로 이동
+        Navigator.push(
           context,
-          widget.item.rssLink,
-          settings.webOpenMode,
+          MaterialPageRoute(
+            builder:
+                (context) => RssDetailScreen(
+                  rssItem: widget.item,
+                  // 옵션: channel 정보가 있다면 전달할 수 있음
+                  // channel: null, // 필요시 채널 정보 로드 후 전달
+                ),
+          ),
         );
       },
       child: Padding(

@@ -2,22 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:omninews_flutter/models/news.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
+import 'package:omninews_flutter/screens/news_detail_screen.dart'; // 추가: NewsDetailScreen 임포트
 import 'package:omninews_flutter/services/news_bookmark_service.dart';
 import 'package:omninews_flutter/services/recently_read_service.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
 import 'package:omninews_flutter/models/app_setting.dart';
-import 'package:omninews_flutter/utils/url_launcher_helper.dart';
 import 'package:provider/provider.dart';
 
 class NewsItemCard extends StatefulWidget {
   final News news;
   final VoidCallback? onBookmarkChanged;
 
-  const NewsItemCard({
-    super.key,
-    required this.news,
-    this.onBookmarkChanged,
-  });
+  const NewsItemCard({super.key, required this.news, this.onBookmarkChanged});
 
   @override
   State<NewsItemCard> createState() => _NewsItemCardState();
@@ -34,8 +30,9 @@ class _NewsItemCardState extends State<NewsItemCard> {
   }
 
   Future<void> _checkBookmarkStatus() async {
-    final isBookmarked =
-        await NewsBookmarkService.isAnyBookmarked(widget.news.newsLink);
+    final isBookmarked = await NewsBookmarkService.isAnyBookmarked(
+      widget.news.newsLink,
+    );
     if (mounted) {
       setState(() {
         _isBookmarked = isBookmarked;
@@ -53,8 +50,9 @@ class _NewsItemCardState extends State<NewsItemCard> {
     try {
       bool success;
       if (_isBookmarked) {
-        success =
-            await NewsBookmarkService.removeNewsBookmark(widget.news.newsLink);
+        success = await NewsBookmarkService.removeNewsBookmark(
+          widget.news.newsLink,
+        );
       } else {
         success = await NewsBookmarkService.addNewsBookmark(widget.news);
       }
@@ -98,11 +96,18 @@ class _NewsItemCardState extends State<NewsItemCard> {
     }
   }
 
-  void _openNewsLink(AppSettings settings) {
+  // 뉴스 상세 페이지로 이동하는 메서드
+  void _openNewsDetail() {
+    // 최근 읽은 뉴스에 추가
     RecentlyReadService.addNews(widget.news);
-    // 설정된 웹 열기 방식을 사용하여 URL 열기
-    UrlLauncherHelper.openUrl(
-        context, widget.news.newsLink, settings.webOpenMode);
+
+    // NewsDetailScreen으로 이동
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => NewsDetailScreen(news: widget.news),
+      ),
+    );
   }
 
   @override
@@ -117,34 +122,37 @@ class _NewsItemCardState extends State<NewsItemCard> {
         hasValidImage && settings.viewMode == ViewMode.textAndImage;
 
     return InkWell(
-      onTap: () => _openNewsLink(settings),
+      onTap: _openNewsDetail, // URL 열기 대신 상세 페이지로 이동
       child: Padding(
         padding: cardStyle.cardPadding,
-        child: settings.viewMode == ViewMode.textOnly
-            ? _buildTextOnlyLayout(theme, cardStyle)
-            : Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 좌측: 텍스트 정보
-                  Expanded(
-                    flex: 3,
-                    child: _buildNewsContent(theme, cardStyle),
-                  ),
+        child:
+            settings.viewMode == ViewMode.textOnly
+                ? _buildTextOnlyLayout(theme, cardStyle)
+                : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 좌측: 텍스트 정보
+                    Expanded(
+                      flex: 3,
+                      child: _buildNewsContent(theme, cardStyle),
+                    ),
 
-                  // 여백과 이미지 (이미지 모드이고 유효한 이미지가 있을 경우)
-                  if (showImage) ...[
-                    const SizedBox(width: 12),
-                    _buildThumbnail(),
+                    // 여백과 이미지 (이미지 모드이고 유효한 이미지가 있을 경우)
+                    if (showImage) ...[
+                      const SizedBox(width: 12),
+                      _buildThumbnail(),
+                    ],
                   ],
-                ],
-              ),
+                ),
       ),
     );
   }
 
   // 텍스트 전용 레이아웃
   Widget _buildTextOnlyLayout(
-      ThemeData theme, NewsCardStyleExtension cardStyle) {
+    ThemeData theme,
+    NewsCardStyleExtension cardStyle,
+  ) {
     return _buildNewsContent(theme, cardStyle);
   }
 
@@ -168,22 +176,24 @@ class _NewsItemCardState extends State<NewsItemCard> {
             IconButton(
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
-              icon: _isLoading
-                  ? SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: theme.primaryColor,
+              icon:
+                  _isLoading
+                      ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: theme.primaryColor,
+                        ),
+                      )
+                      : Icon(
+                        _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                        color:
+                            _isBookmarked
+                                ? cardStyle.bookmarkActiveColor
+                                : cardStyle.bookmarkInactiveColor,
+                        size: 20,
                       ),
-                    )
-                  : Icon(
-                      _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                      color: _isBookmarked
-                          ? cardStyle.bookmarkActiveColor
-                          : cardStyle.bookmarkInactiveColor,
-                      size: 20,
-                    ),
               onPressed: _toggleBookmark,
             ),
           ],
@@ -203,10 +213,7 @@ class _NewsItemCardState extends State<NewsItemCard> {
         // 출처 및 날짜
         Row(
           children: [
-            Text(
-              widget.news.newsSource,
-              style: cardStyle.sourceStyle,
-            ),
+            Text(widget.news.newsSource, style: cardStyle.sourceStyle),
             const SizedBox(width: 8),
             Text(
               _formatDate(widget.news.newsPubDate),
@@ -228,20 +235,23 @@ class _NewsItemCardState extends State<NewsItemCard> {
       child: ClipRRect(
         borderRadius: BorderRadius.circular(4),
         child: Hero(
-          tag: 'news_image_${widget.news.newsLink}', // Hero 애니메이션 추가
+          // Hero 태그를 고유하게 수정하여 충돌 방지
+          tag: 'news_item_list_${widget.news.newsLink}_image',
           child: Image.network(
             widget.news.newsImageLink,
             fit: BoxFit.cover,
             errorBuilder: (context, error, stackTrace) {
               return Container(
-                color: theme.brightness == Brightness.dark
-                    ? Colors.grey[800]
-                    : Colors.grey[200],
+                color:
+                    theme.brightness == Brightness.dark
+                        ? Colors.grey[800]
+                        : Colors.grey[200],
                 child: Icon(
                   Icons.image_not_supported_outlined,
-                  color: theme.brightness == Brightness.dark
-                      ? Colors.grey[600]
-                      : Colors.grey[400],
+                  color:
+                      theme.brightness == Brightness.dark
+                          ? Colors.grey[600]
+                          : Colors.grey[400],
                   size: 24,
                 ),
               );
