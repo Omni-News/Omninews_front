@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:omninews_flutter/screens/about_screen.dart';
-import 'package:omninews_flutter/screens/help_feedback_screen.dart';
+import 'package:omninews_flutter/screens/help_screen.dart';
 import 'package:omninews_flutter/screens/settings_screen.dart';
 import 'package:omninews_flutter/screens/subscribe_screen.dart';
 import 'package:omninews_flutter/screens/bookmark_screen.dart';
@@ -235,13 +235,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   _buildDrawerItem(
                     icon: Icons.help_outline,
-                    title: 'Help & Feedback',
+                    title: 'Help',
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const HelpFeedbackScreen(),
+                          builder: (context) => const HelpScreen(),
                         ),
                       );
                     },
