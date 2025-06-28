@@ -234,4 +234,21 @@ class SubscribeService {
       return false;
     }
   }
+
+  // SubscribeService 클래스에 추가할 메서드
+  static Future<List<RssItem>> getSubscribedItemsByChannelIds(
+    List<int> channelIds,
+  ) async {
+    try {
+      if (channelIds.isEmpty) {
+        return [];
+      }
+
+      // 서버에 요청하여 구독 아이템 가져오기
+      return await RssService.fetchSubscribedItems(channelIds);
+    } catch (e) {
+      debugPrint('Error getting items by channel IDs: $e');
+      return [];
+    }
+  }
 }

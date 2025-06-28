@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
 import 'package:omninews_flutter/models/rss_channel.dart';
+import 'package:omninews_flutter/models/rss_folder.dart';
 import 'package:omninews_flutter/services/subscribe_service.dart';
+import 'package:omninews_flutter/services/rss_folder_service.dart';
 import 'package:omninews_flutter/widgets/subscribe_date_view.dart';
-import 'package:omninews_flutter/widgets/subscribe_channel_view.dart';
+import 'package:omninews_flutter/widgets/subscribe_folder_view.dart';
 import 'package:omninews_flutter/screens/home_screen.dart';
 
 class SubscribeScreen extends StatefulWidget {
@@ -17,14 +19,14 @@ class _SubscribeScreenState extends State<SubscribeScreen>
     with AutomaticKeepAliveClientMixin, TickerProviderStateMixin {
   late TabController _tabController;
   late Future<List<RssItem>> _subscribedItems;
-  late Future<Map<RssChannel, List<RssItem>>> _channelItems;
+  late Future<List<RssFolder>> _folders;
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
   String _searchQuery = '';
-  final List<String> _tabs = ['날짜별 보기', '채널별 보기'];
+  final List<String> _tabs = ['날짜별 보기', '폴더별 보기'];
 
   @override
-  bool get wantKeepAlive => true; // 탭 전환 시 상태 유지
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -43,7 +45,7 @@ class _SubscribeScreenState extends State<SubscribeScreen>
   void _refreshData() {
     setState(() {
       _subscribedItems = SubscribeService.getSubscribedItems();
-      _channelItems = SubscribeService.getItemsByChannel();
+      _folders = RssFolderService.fetchFolders();
     });
   }
 
@@ -63,18 +65,89 @@ class _SubscribeScreenState extends State<SubscribeScreen>
       _searchQuery = query;
       if (query.isNotEmpty) {
         _subscribedItems = SubscribeService.searchBookmarkedItems(query);
-        _channelItems = SubscribeService.searchItemsByChannel(query);
       } else {
         _refreshData();
       }
     });
   }
 
+  Future<void> _showCreateFolderDialog() async {
+    final TextEditingController folderNameController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    final result = await showDialog<String>(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Text('새 폴더 만들기'),
+            content: Form(
+              key: formKey,
+              child: TextFormField(
+                controller: folderNameController,
+                decoration: const InputDecoration(
+                  labelText: '폴더 이름',
+                  hintText: '폴더 이름을 입력하세요',
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return '폴더 이름을 입력해주세요';
+                  }
+                  return null;
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('취소'),
+              ),
+              TextButton(
+                onPressed: () {
+                  if (formKey.currentState!.validate()) {
+                    Navigator.of(context).pop(folderNameController.text);
+                  }
+                },
+                child: const Text('생성'),
+              ),
+            ],
+          ),
+    );
+
+    if (result != null && result.isNotEmpty) {
+      try {
+        final success = await RssFolderService.createFolder(result);
+        if (success && mounted) {
+          _refreshData();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('폴더 "$result"가 생성되었습니다'),
+              duration: const Duration(seconds: 2),
+              backgroundColor: Theme.of(context).primaryColor,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('폴더 생성 중 오류가 발생했습니다: $e'),
+              backgroundColor: Theme.of(context).colorScheme.error,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    super.build(context); // AutomaticKeepAliveClientMixin 필수
+    super.build(context);
 
-    // 테마 및 스타일 속성 가져오기
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
 
@@ -97,12 +170,10 @@ class _SubscribeScreenState extends State<SubscribeScreen>
               elevation: 0,
               centerTitle: true,
               backgroundColor: theme.appBarTheme.backgroundColor,
-              title: _isSearching
-                  ? _buildSearchField()
-                  : Text(
-                      'Subscribe',
-                      style: textTheme.headlineMedium,
-                    ),
+              title:
+                  _isSearching
+                      ? _buildSearchField()
+                      : Text('Subscribe', style: textTheme.headlineMedium),
               actions: [
                 IconButton(
                   icon: Icon(
@@ -111,6 +182,15 @@ class _SubscribeScreenState extends State<SubscribeScreen>
                   ),
                   onPressed: _toggleSearch,
                 ),
+                if (_tabController.index == 1 && !_isSearching)
+                  IconButton(
+                    icon: Icon(
+                      Icons.create_new_folder_outlined,
+                      color: theme.appBarTheme.iconTheme?.color,
+                    ),
+                    onPressed: _showCreateFolderDialog,
+                    tooltip: '새 폴더 만들기',
+                  ),
                 IconButton(
                   icon: Icon(
                     Icons.refresh,
@@ -132,7 +212,6 @@ class _SubscribeScreenState extends State<SubscribeScreen>
                   unselectedLabelStyle: textTheme.labelMedium,
                   tabs: _tabs.map((String tab) => Tab(text: tab)).toList(),
                 ),
-                theme: theme,
               ),
               floating: true,
               pinned: true,
@@ -148,12 +227,12 @@ class _SubscribeScreenState extends State<SubscribeScreen>
               searchQuery: _searchQuery,
               onRefresh: _refreshData,
             ),
-
-            // 채널별 보기 탭
-            SubscribeChannelView(
-              channelItems: _channelItems,
+            // 폴더별 보기 탭
+            SubscribeFolderView(
+              folders: _folders,
               searchQuery: _searchQuery,
               onRefresh: _refreshData,
+              onCreateFolder: _showCreateFolderDialog,
             ),
           ],
         ),
@@ -163,7 +242,6 @@ class _SubscribeScreenState extends State<SubscribeScreen>
 
   Widget _buildSearchField() {
     final theme = Theme.of(context);
-
     return TextField(
       controller: _searchController,
       autofocus: true,
@@ -173,37 +251,39 @@ class _SubscribeScreenState extends State<SubscribeScreen>
         border: InputBorder.none,
         contentPadding: const EdgeInsets.symmetric(vertical: 15),
       ),
-      style: TextStyle(
-        color: theme.textTheme.bodyLarge?.color,
-        fontSize: 16,
-      ),
+      style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 16),
       onChanged: _handleSearch,
     );
   }
 }
 
-// TabBar를 SliverPersistentHeader로 만들기 위한 delegate 클래스
+// SliverPersistentHeaderDelegate 구현
 class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   final Widget child;
-  final ThemeData theme;
 
-  _SliverAppBarDelegate(this.child, {required this.theme});
+  _SliverAppBarDelegate(this.child);
 
   @override
   Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    final theme = Theme.of(context);
+
     return Container(
       decoration: BoxDecoration(
         color: theme.cardColor,
-        boxShadow: overlapsContent
-            ? [
-                BoxShadow(
-                  color: theme.shadowColor.withOpacity(0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : [],
+        boxShadow:
+            overlapsContent
+                ? [
+                  BoxShadow(
+                    color: theme.shadowColor.withOpacity(0.1),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+                : [],
       ),
       height: 48.0,
       child: child,
@@ -212,12 +292,8 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   double get maxExtent => 48.0;
-
   @override
   double get minExtent => 48.0;
-
   @override
-  bool shouldRebuild(covariant _SliverAppBarDelegate oldDelegate) {
-    return true;
-  }
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => false;
 }
