@@ -19,6 +19,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 // 앱 초기화 함수
+// _initializeApp 함수의 일부만 수정
 Future<void> _initializeApp() async {
   // Flutter 위젯 바인딩 초기화
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,7 +39,6 @@ Future<void> _initializeApp() async {
       carPlay: false,
       criticalAlert: false,
       provisional: false,
-      sound: true,
     );
   }
 
@@ -54,8 +54,10 @@ Future<void> _initializeApp() async {
     print('시뮬레이터나 웹에서는 FCM 토큰을 가져오지 않습니다.');
   }
 
+  // AuthService 초기화 - 자동 로그인 준비
   final authService = AuthService();
   await authService.initialize();
+  print('AuthService 초기화 완료: 토큰 있음=${authService.accessToken != null}');
 }
 
 // 시뮬레이터 여부 확인 함수 (iOS)
