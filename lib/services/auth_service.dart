@@ -460,4 +460,119 @@ class AuthService {
   String? getAuthProvider() {
     return _user?['provider'];
   }
+
+  // ============ 자동 로그인 기능 추가 ============
+
+  // 액세스 토큰 유효성 검증
+  Future<bool> verifyAccessToken() async {
+    if (_accessToken == null) {
+      debugPrint('액세스 토큰이 없음');
+      return false;
+    }
+
+    // 액세스 토큰 만료 시간 검증 (로컬)
+    if (_accessTokenExpiresAt != null &&
+        _accessTokenExpiresAt!.isBefore(DateTime.now())) {
+      debugPrint('액세스 토큰 만료됨: ${_accessTokenExpiresAt?.toIso8601String()}');
+      return await refreshAccessToken();
+    }
+
+    try {
+      // 서버에 토큰 검증 요청
+      final response = await http.get(
+        Uri.parse('$apiBaseUrl/user/access-token'),
+        headers: {
+          'Authorization': 'Bearer $_accessToken',
+          'Accept': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        debugPrint('액세스 토큰 검증 성공');
+        return true;
+      } else {
+        debugPrint('액세스 토큰 검증 실패: ${response.statusCode}');
+        // 토큰 갱신 시도
+        return await refreshAccessToken();
+      }
+    } catch (e) {
+      debugPrint('토큰 검증 중 오류 발생: $e');
+      return false;
+    }
+  }
+
+  // 리프레시 토큰으로 액세스 토큰 갱신
+  Future<bool> refreshAccessToken() async {
+    if (_refreshToken == null || _user == null || _user?['email'] == null) {
+      debugPrint('리프레시 토큰 또는 사용자 정보 없음');
+      return false;
+    }
+
+    // 리프레시 토큰 만료 체크
+    if (_refreshTokenExpiresAt != null &&
+        _refreshTokenExpiresAt!.isBefore(DateTime.now())) {
+      debugPrint('리프레시 토큰 만료됨');
+      return false;
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('$apiBaseUrl/user/refresh-token'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: json.encode({
+          'refresh_token': _refreshToken,
+          'user_email': _user?['email'],
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+
+        // 새로운 액세스 토큰 저장
+        if (data['access_token'] != null) {
+          _accessToken = data['access_token'];
+
+          if (data['access_token_expires_at'] != null) {
+            _accessTokenExpiresAt = DateTime.parse(
+              data['access_token_expires_at'],
+            );
+          }
+
+          await _saveAuthData();
+          debugPrint('액세스 토큰 갱신 성공');
+          return true;
+        }
+      }
+
+      debugPrint('토큰 갱신 실패: ${response.statusCode}, ${response.body}');
+      return false;
+    } catch (e) {
+      debugPrint('토큰 갱신 중 오류 발생: $e');
+      return false;
+    }
+  }
+
+  // 자동 로그인 시도 - 토큰 검증 및 필요시 갱신
+  Future<bool> tryAutoLogin() async {
+    await ensureInitialized();
+
+    if (_accessToken == null) {
+      debugPrint('저장된 액세스 토큰 없음, 자동 로그인 실패');
+      return false;
+    }
+
+    final isValid = await verifyAccessToken();
+
+    if (!isValid) {
+      debugPrint('토큰 검증 실패, 로그아웃 처리');
+      await _clearAuthData();
+      return false;
+    }
+
+    debugPrint('자동 로그인 성공: ${_user?['displayName']}');
+    return true;
+  }
 }

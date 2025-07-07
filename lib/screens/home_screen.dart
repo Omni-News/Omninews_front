@@ -10,7 +10,7 @@ import 'package:omninews_flutter/screens/search_screen.dart';
 import 'package:omninews_flutter/screens/recently_read_screen.dart';
 import 'package:omninews_flutter/services/auth_service.dart';
 import 'package:omninews_flutter/theme/theme_selection_dialog.dart';
-import 'package:omninews_flutter/screens/login_screen.dart'; // 추가
+import 'package:omninews_flutter/screens/login_screen.dart';
 
 // 전역 키를 선언하여 어디서든 접근할 수 있게 합니다
 final GlobalKey<ScaffoldState> homeScaffoldKey = GlobalKey<ScaffoldState>();
@@ -33,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late int _selectedIndex; // 초기화를 지연
   late bool _isLoggedIn;
   late List<Widget> _pages;
+  bool _isLoading = true; // 로딩 상태 추가
 
   @override
   void initState() {
@@ -47,6 +48,43 @@ class _HomeScreenState extends State<HomeScreen> {
       const BookmarkScreen(),
       const SearchScreen(),
     ];
+
+    // 자동 로그인 시도
+    _tryAutoLogin();
+  }
+
+  // 자동 로그인 시도
+  Future<void> _tryAutoLogin() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // AuthService의 자동 로그인 메소드 호출
+      final authService = AuthService();
+      final success = await authService.tryAutoLogin();
+
+      if (success) {
+        setState(() {
+          _isLoggedIn = true;
+        });
+        debugPrint('자동 로그인 성공');
+      } else {
+        setState(() {
+          _isLoggedIn = false;
+        });
+        debugPrint('자동 로그인 실패, 로그인 화면으로 이동');
+      }
+    } catch (e) {
+      debugPrint('자동 로그인 중 오류: $e');
+      setState(() {
+        _isLoggedIn = false;
+      });
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   // 로그인 성공 후 호출될 함수
@@ -69,6 +107,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 로딩 중일 때는 로딩 인디케이터를 표시
+    if (_isLoading) {
+      return Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     // 로그인이 되어 있지 않으면 로그인 화면을 표시
     if (!_isLoggedIn) {
       return LoginScreen(onLoginSuccess: _onLoginSuccess);
