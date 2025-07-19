@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:omninews_flutter/services/auth_service.dart';
 
 class NewsService {
-  static const String baseUrl = 'http://61.253.113.42:1027';
+  static String baseUrl = AuthService.apiBaseUrl;
   static final AuthService _authService = AuthService();
 
   static Future<List<News>> fetchNews(String category) async {

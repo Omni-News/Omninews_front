@@ -5,8 +5,7 @@ import 'package:omninews_flutter/models/rss_folder.dart';
 import 'package:omninews_flutter/services/auth_service.dart';
 
 class RssFolderService {
-  static const String baseUrl = 'http://61.253.113.42:1027';
-
+  static String baseUrl = AuthService.apiBaseUrl;
   // 인증 서비스 인스턴스
   static final AuthService _authService = AuthService();
 
