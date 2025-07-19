@@ -1,10 +1,16 @@
+import 'dart:io';
+import 'dart:math';
+
+import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:kakao_flutter_sdk/kakao_flutter_sdk.dart' as kakao;
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 class AuthService {
   // 싱글톤 패턴 구현
@@ -74,11 +80,11 @@ class AuthService {
     try {
       // 소셜 로그인 SDK 로그아웃
       await _googleSignIn.signOut();
-      try {
-        await kakao.UserApi.instance.logout();
-      } catch (e) {
-        debugPrint('카카오 로그아웃 실패: $e');
-      }
+      //      try {
+      //        await kakao.UserApi.instance.logout();
+      //      } catch (e) {
+      //        debugPrint('카카오 로그아웃 실패: $e');
+      //      }
 
       // 서버에 로그아웃 요청 - 이미 인증된 사용자만 로그아웃 가능
       if (_accessToken != null) {
@@ -182,27 +188,79 @@ class AuthService {
     }
   }
 
-  // 애플 로그인 (틀만 구현)
+  // 애플 로그인
   Future<bool> signInWithApple() async {
     try {
-      debugPrint('애플 로그인 시작');
+      // nonce 생성 추가
+      final rawNonce = generateNonce();
+      final nonce = sha256ofString(rawNonce);
 
-      // TODO: 애플 로그인 구현 (실기기 테스트 필요.)
+      final credential = await SignInWithApple.getAppleIDCredential(
+        scopes: [
+          AppleIDAuthorizationScopes.email,
+          AppleIDAuthorizationScopes.fullName,
+        ],
+        nonce: nonce, // nonce 추가
+      );
 
-      // 서버에 인증 정보 전송 (예시)
-      // final paramUser = {
-      //   'user_email': appleUser.email,
-      //   'user_display_name': appleUser.displayName,
-      //   'user_photo_url': appleUser.photoUrl,
-      //   'user_social_login_provider': 'apple',
-      //   'user_social_provider_id': appleUser.id,
-      //   'user_notification_push': true,
-      // };
-      //
-      // return await _authenticateWithServer(paramUser);
+      // 로그인 결과 정보 디버깅
+      debugPrint('Apple ID 정보 받음');
+      debugPrint('이메일: ${credential.email}');
+      debugPrint('이름: ${credential.givenName}');
+      debugPrint('성: ${credential.familyName}');
+      debugPrint('ID: ${credential.userIdentifier}');
 
-      // 임시 반환
-      throw UnimplementedError('애플 로그인이 아직 구현되지 않았습니다.');
+      // 사용자 이름 처리 (Apple은 최초 로그인시에만 이름 제공)
+      String? displayName;
+      if (credential.givenName != null) {
+        displayName =
+            credential.familyName != null
+                ? '${credential.givenName} ${credential.familyName}'
+                : credential.givenName;
+      }
+
+      // 이메일 처리 (익명 이메일일 수 있음)
+      String? email = credential.email;
+
+      // 애플 로그인은 최초 로그인 시에만 이메일을 제공하므로, 이후에는 null이 될 수 있음
+      if (email == null || credential.userIdentifier != null) {
+        debugPrint('로그인을 시도합니다.');
+        if (await verifyAccessToken()) {
+          // 이미 로그인된 상태라면 애플 로그인은 필요 없음
+          debugPrint('이미 로그인된 사용자입니다.');
+          return true;
+        }
+
+        bool success = await _appleLogin(credential.userIdentifier!);
+        if (success) {
+          return true;
+        } else {
+          return false;
+        }
+      }
+
+      debugPrint('회원가입을 시도합니다.');
+
+      // 서버에 인증 정보 전송 (ParamUser 형식에 맞춤)
+      final paramUser = {
+        'user_email': email,
+        'user_display_name': displayName,
+        'user_photo_url': null, // Apple은 사진 제공 안함
+        'user_social_login_provider': 'apple',
+        'user_social_provider_id': credential.userIdentifier,
+        'user_identity_token': credential.identityToken, // Apple 전용 토큰
+        'user_authorization_code': credential.authorizationCode, // Apple 전용 코드
+      };
+
+      bool success = await _authenticateWithServer(paramUser);
+
+      if (success) {
+        bool hasPermission = await requestNotificationPermissions();
+        debugPrint('알림 권한 요청 결과: $hasPermission');
+        return true;
+      } else {
+        return false;
+      }
     } catch (e) {
       debugPrint('애플 로그인 오류: $e');
       return false;
@@ -212,8 +270,6 @@ class AuthService {
   // 서버로 인증 정보 전송
   Future<bool> _authenticateWithServer(Map<String, dynamic> paramUser) async {
     try {
-      debugPrint('서버 인증 요청: $paramUser');
-
       final response = await http.post(
         Uri.parse('$apiBaseUrl/user/login'),
         headers: {
@@ -574,4 +630,152 @@ class AuthService {
     debugPrint('자동 로그인 성공: ${_user?['displayName']}');
     return true;
   }
+
+  Future<bool> requestNotificationPermissions() async {
+    //  이미 로그인된 사용자만 권한 요청
+    if (!isLoggedIn) return false;
+
+    // iOS에서 권한 요청
+    if (Platform.isIOS) {
+      final settings = await FirebaseMessaging.instance.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+        try {
+          // 여러번 시도
+          for (int i = 0; i < 3; i++) {
+            final apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+            if (apnsToken != null) {
+              String? token = await FirebaseMessaging.instance.getToken();
+              debugPrint("token: ${token}");
+              if (token != null) {
+                return await saveUserNotificationSettings(token);
+              }
+              break;
+            }
+            await Future.delayed(Duration(seconds: 2));
+          }
+        } catch (e) {
+          print('FCM 토큰 처리 오류: $e');
+        }
+      }
+      return settings.authorizationStatus == AuthorizationStatus.authorized;
+    }
+    // Android는 기본적으로 권한이 있음 (Android 13+ 제외)
+    try {
+      String? token = await FirebaseMessaging.instance.getToken();
+      debugPrint('Android FCM 토큰: $token');
+      if (token != null) {
+        return await saveUserNotificationSettings(token);
+      }
+    } catch (e) {
+      debugPrint('Android FCM 토큰 가져오기 오류: $e');
+    }
+    return false;
+  }
+
+  // 알림 끄기
+  Future<bool> disableNotifications() async {
+    try {
+      if (Platform.isIOS) {
+        // iOS에서는 APNS 토큰 확인 후 진행
+        await FirebaseMessaging.instance.getAPNSToken();
+      }
+
+      String? token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        return await saveUserNotificationSettings(token, enablePush: false);
+      }
+    } catch (e) {
+      debugPrint('알림 끄기 오류: $e');
+    }
+    return false;
+  }
+
+  // 서버에 FCM 토큰 저장
+  Future<bool> saveUserNotificationSettings(
+    String fcmToken, {
+    bool enablePush = true,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('${apiBaseUrl}/user/notification'),
+        headers: getAuthHeaders(),
+        body: json.encode({
+          'user_notification_push': enablePush,
+          'user_fcm_token': fcmToken,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        print('알림 설정 저장 성공, fcm token: $fcmToken');
+        return true;
+      } else {
+        print('알림 설정 저장 실패: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('알림 설정 저장 오류: $e');
+      return false;
+    }
+  }
+
+  Future<bool> _appleLogin(String userSocialProviderId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$apiBaseUrl/user/apple/login'),
+        headers: getAuthHeaders(),
+        body: json.encode({'user_social_provider_id': userSocialProviderId}),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        debugPrint('서버 응답: $data');
+
+        // 이메일로 사용자 정보 설정
+        _user = {
+          'email': 'apple login',
+          'displayName': 'apple login',
+          'photoUrl': 'apple login',
+          'provider': 'apple login',
+          'social_provider_id': userSocialProviderId,
+        };
+
+        // 서버에서 토큰 정보 전달받음 - 토큰이 이미 유효하면 null이 올 수 있음
+        _handleTokenResponse(data);
+
+        // 로컬 저장소에 저장
+        await _saveAuthData();
+
+        debugPrint('서버 인증 성공: ${_user?['displayName']}');
+        return true;
+      } else {
+        print('애플 로그인 실패: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('애플 로그인 오류: $e');
+      return false;
+    }
+  }
+}
+
+// nonce 생성 및 sha256 변환 함수 추가
+String generateNonce([int length = 32]) {
+  const charset =
+      '0123456789ABCDEFGHIJKLMNOPQRSTUVXYZabcdefghijklmnopqrstuvwxyz-._';
+  final random = Random.secure();
+  return List.generate(
+    length,
+    (_) => charset[random.nextInt(charset.length)],
+  ).join();
+}
+
+String sha256ofString(String input) {
+  final bytes = utf8.encode(input);
+  final digest = sha256.convert(bytes);
+  return digest.toString();
 }
