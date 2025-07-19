@@ -6,9 +6,8 @@ import 'package:omninews_flutter/models/rss_item.dart';
 import 'package:omninews_flutter/services/auth_service.dart'; // 인증 서비스 임포트
 
 class RssService {
-  static const String baseUrl = 'http://61.253.113.42:1027';
-
   // 인증 서비스 인스턴스
+  static String baseUrl = AuthService.apiBaseUrl;
   static final AuthService _authService = AuthService();
 
   // 추천 채널 가져오기
@@ -225,14 +224,12 @@ class RssService {
       // 인증 헤더 가져오기
       final headers = _authService.getAuthHeaders();
 
-      // 채널 ID 배열을 ChannelId 객체 배열로 변환
-      final List<Map<String, int>> channelIdObjects =
-          channelIds.map((id) => {"channel_id": id}).toList();
+      // 채널 ID 배열을 콤마로 구분된 문자열로 변환
+      final String channelIdsString = channelIds.join(',');
 
-      final response = await http.post(
-        Uri.parse('$baseUrl/subscription/items'),
+      final response = await http.get(
+        Uri.parse('$baseUrl/subscription/items?channel_ids=$channelIdsString'),
         headers: headers,
-        body: json.encode(channelIdObjects),
       );
 
       if (response.statusCode == 200) {

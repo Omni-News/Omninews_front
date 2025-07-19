@@ -29,8 +29,7 @@ class AuthService {
         '1008455298981-96a4gkqhnmr1hhbqab80df7rljbhocai.apps.googleusercontent.com',
   );
 
-  // API 기본 URL - 실제 서버 URL로 변경 필요
-  static const String apiBaseUrl = 'http://61.253.113.42:1027';
+  static String apiBaseUrl = 'http://61.253.113.42:1027/v1/api';
 
   // 토큰 정보
   String? _accessToken;

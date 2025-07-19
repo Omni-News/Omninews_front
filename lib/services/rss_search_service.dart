@@ -7,9 +7,7 @@ import 'package:omninews_flutter/services/auth_service.dart';
 import 'package:omninews_flutter/services/subscribe_service.dart';
 
 class RssSearchService {
-  // baseUrl 사용
-  static final String baseUrl = SubscribeService.baseUrl;
-
+  static String baseUrl = AuthService.apiBaseUrl;
   static final AuthService _authService = AuthService();
 
   // RSS 피드 검색
@@ -25,7 +23,7 @@ class RssSearchService {
       // RSS 검색 API 호출
       final response = await http.get(
         Uri.parse(
-          '$baseUrl/search/rss?search_value=$query&search_type=$searchType',
+          '$baseUrl/search/item?search_value=$query&search_type=$searchType',
         ),
         headers: headers,
       );
@@ -63,7 +61,7 @@ class RssSearchService {
       // 채널 검색 API 호출
       final response = await http.get(
         Uri.parse(
-          '$baseUrl/search/channel?search_value=$query&search_type=$searchType',
+          '$baseUrl/search/channels?search_value=$query&search_type=$searchType',
         ),
         headers: headers,
       );

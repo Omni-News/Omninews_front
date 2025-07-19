@@ -8,7 +8,6 @@ import 'package:omninews_flutter/services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SubscribeService {
-  static const String baseUrl = 'http://61.253.113.42:1027';
   static final AuthService _authService = AuthService();
 
   // 구독한 채널의 아이템 가져오기
