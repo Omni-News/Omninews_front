@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'dart:math';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:omninews_flutter/services/auth_service.dart';
@@ -84,17 +88,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         _buildKakaoLoginButton(),
 
                         const SizedBox(height: 24.0),
-
-                        // Skip for now option
-                        TextButton(
-                          onPressed: widget.onLoginSuccess,
-                          child: Text(
-                            "Skip for now",
-                            style: TextStyle(
-                              color: theme.colorScheme.secondary,
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                 ],
@@ -243,41 +236,15 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       setState(() => _isLoading = true);
       debugPrint('애플 로그인 시작');
-      final result = await SignInWithApple.getAppleIDCredential(
-        scopes: [
-          AppleIDAuthorizationScopes.email,
-          AppleIDAuthorizationScopes.fullName,
-        ],
-      );
-
-      // 사용자이메일, 설정에 따라 비공개 올 수 있음. 첫 로그인만 오고 그 후는 null.
-      print(result.email ?? '');
-
-      // 사용자 이름 (성)
-      print(result.familyName ?? '');
-
-      // 사용자 이름 (이름)
-      print(result.givenName ?? '');
-
-      // Apple 고유 식별자
-      print(result.userIdentifier ?? '');
-
-      // Apple에서 발급ㅎ는 인증 토큰 (JWT)
-      print(result.identityToken ?? '');
-
-      // 짧은 기간 유효한 인증 코드.
-      print(result.authorizationCode ?? '');
-
-      // 현재는 구현되지 않았으므로 안내 메시지 표시
-      _showErrorSnackbar('애플 로그인은 아직 준비 중입니다.');
 
       // 추후 구현 시 아래 코드 활성화
-      // final success = await _authService.signInWithApple();
-      // if (success) {
-      //   widget.onLoginSuccess();
-      // }
+      final success = await _authService.signInWithApple();
+      if (success) {
+        widget.onLoginSuccess();
+      }
     } catch (e) {
       debugPrint('애플 로그인 오류: $e');
+      _showErrorSnackbar('로그인 처리 중 오류가 발생했습니다. 나중에 다시 시도해주세요.');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

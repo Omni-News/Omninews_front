@@ -30,30 +30,6 @@ Future<void> _initializeApp() async {
   // FCM 백그라운드 핸들러 등록
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // iOS에서만 권한 요청
-  if (Platform.isIOS) {
-    await FirebaseMessaging.instance.requestPermission(
-      alert: true,
-      announcement: false,
-      badge: true,
-      carPlay: false,
-      criticalAlert: false,
-      provisional: false,
-    );
-  }
-
-  // FCM 토큰 가져오기 시도 (시뮬레이터가 아닌 실제 기기에서만)
-  if (!kIsWeb && !(Platform.isIOS && !isRealDevice())) {
-    try {
-      String? token = await FirebaseMessaging.instance.getToken();
-      print('FCM 토큰: $token');
-    } catch (e) {
-      print('FCM 토큰 가져오기 실패: $e');
-    }
-  } else {
-    print('시뮬레이터나 웹에서는 FCM 토큰을 가져오지 않습니다.');
-  }
-
   // AuthService 초기화 - 자동 로그인 준비
   final authService = AuthService();
   await authService.initialize();
