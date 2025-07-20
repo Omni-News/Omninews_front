@@ -38,7 +38,7 @@ class NewsService {
       final headers = _authService.getAuthHeaders();
       final response = await http.get(
         Uri.parse(
-          '$baseUrl/news/api?query=$category&display=$display&sort=$sort',
+          '$baseUrl/search/news_api?query=$category&display=$display&sort=$sort',
         ),
         headers: headers,
       );

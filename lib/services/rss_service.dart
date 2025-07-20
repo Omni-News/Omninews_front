@@ -82,9 +82,9 @@ class RssService {
     try {
       final headers = _authService.getAuthHeaders();
       final response = await http.post(
-        Uri.parse('$baseUrl/rss'),
+        Uri.parse('$baseUrl/rss/channel'),
         headers: headers,
-        body: json.encode({"link": rssLink}),
+        body: json.encode({"rss_link": rssLink}),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -120,7 +120,7 @@ class RssService {
       final headers = _authService.getAuthHeaders();
 
       final response = await http.post(
-        Uri.parse('$baseUrl/subscription/channel'),
+        Uri.parse('$baseUrl/subscription/channel_sub'),
         headers: headers,
         body: json.encode({"channel_id": channelId}),
       );
