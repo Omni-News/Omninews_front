@@ -17,7 +17,9 @@ class NewsApiService {
       }
       final headers = _authService.getAuthHeaders();
       final response = await http.get(
-        Uri.parse("$baseUrl/news/api?query=$query&display=$display&sort=$sort"),
+        Uri.parse(
+          "$baseUrl/search/news_api?query=$query&display=$display&sort=$sort",
+        ),
         headers: headers,
       );
 
