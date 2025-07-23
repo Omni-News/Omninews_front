@@ -223,7 +223,7 @@ class AuthService {
       String? email = credential.email;
 
       // 애플 로그인은 최초 로그인 시에만 이메일을 제공하므로, 이후에는 null이 될 수 있음
-      if (email == null || credential.userIdentifier != null) {
+      if (email == null && credential.userIdentifier != null) {
         debugPrint('로그인을 시도합니다.');
         if (await verifyAccessToken()) {
           // 이미 로그인된 상태라면 애플 로그인은 필요 없음
