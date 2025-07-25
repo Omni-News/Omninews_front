@@ -67,10 +67,9 @@ class _RssAddScreenState extends State<RssAddScreen> {
         // 서버에 이미 존재하는지 확인
         final exists = await RssService.checkRssExists(url);
         // 이미 구독 중인지 확인
-        final alreadySubscribed =
-            await RssService.isChannelAlreadySubscribedByLink(
-              preview.channelRssLink,
-            );
+        final alreadySubscribed = await RssService.isChannelAlreadySubscribed(
+          preview.channelRssLink,
+        );
         debugPrint('Preview channel: ${alreadySubscribed}');
 
         if (mounted) {

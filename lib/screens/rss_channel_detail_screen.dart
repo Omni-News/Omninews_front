@@ -28,10 +28,12 @@ class RssChannelDetailScreen extends StatefulWidget {
 class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
   late Future<List<RssItem>> _rssItems;
   bool _isSubscribing = false;
+  late bool _localIsSubscribed; // 추가된 지역 상태
 
   @override
   void initState() {
     super.initState();
+    _localIsSubscribed = widget.isSubscribed; // 초기값 설정
     _loadRssItems();
   }
 
@@ -48,7 +50,7 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
 
     try {
       bool success;
-      if (widget.isSubscribed) {
+      if (_localIsSubscribed) {
         success = await RssService.unsubscribeChannel(widget.channel.channelId);
       } else {
         success = await RssService.subscribeChannel(widget.channel.channelId);
@@ -56,15 +58,19 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
 
       if (success && mounted) {
         widget.onSubscriptionChanged();
+        setState(() {
+          _localIsSubscribed = !_localIsSubscribed; // 내부 상태 토글
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(widget.isSubscribed ? '구독이 취소되었습니다' : '구독되었습니다'),
+            content: Text(_localIsSubscribed ? '구독되었습니다' : '구독이 취소되었습니다'),
             duration: const Duration(seconds: 2),
             backgroundColor: Theme.of(context).primaryColor,
             behavior: SnackBarBehavior.floating,
           ),
         );
-        Navigator.of(context).pop();
+        // Navigator.of(context).pop(); // 제거: 화면을 닫지 않고 상태 업데이트만 수행
       }
     } catch (e) {
       if (mounted) {
@@ -308,18 +314,18 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
 
           const SizedBox(height: 20),
 
-          // 구독/구독취소 버튼
+          // 구독/구독취소 버튼 - _localIsSubscribed 상태 사용으로 변경
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: _isSubscribing ? null : _toggleSubscription,
               style: ElevatedButton.styleFrom(
                 backgroundColor:
-                    widget.isSubscribed
+                    _localIsSubscribed
                         ? theme.colorScheme.error
                         : rssTheme.subscribeButtonActiveBackground,
                 foregroundColor:
-                    widget.isSubscribed
+                    _localIsSubscribed
                         ? Colors.white
                         : rssTheme.subscribeButtonActiveText,
                 elevation: 0,
@@ -328,7 +334,7 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 disabledBackgroundColor:
-                    widget.isSubscribed
+                    _localIsSubscribed
                         ? theme.colorScheme.error.withOpacity(0.6)
                         : theme.primaryColor.withOpacity(0.6),
               ),
@@ -343,13 +349,13 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
                         ),
                       )
                       : Icon(
-                        widget.isSubscribed
+                        _localIsSubscribed
                             ? Icons.remove_circle_outline
                             : Icons.add_circle_outline,
                         size: 20,
                       ),
               label: Text(
-                widget.isSubscribed ? '구독 취소' : '구독하기',
+                _localIsSubscribed ? '구독 취소' : '구독하기',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
