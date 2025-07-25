@@ -39,9 +39,10 @@ class ThemeSelectionDialog extends StatelessWidget {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  tileColor: isSelected
-                      ? theme.colorScheme.primaryContainer.withOpacity(0.3)
-                      : null,
+                  tileColor:
+                      isSelected
+                          ? theme.colorScheme.primaryContainer.withOpacity(0.3)
+                          : null,
                   leading: Container(
                     width: 40,
                     height: 40,
@@ -49,9 +50,10 @@ class ThemeSelectionDialog extends StatelessWidget {
                       color: AppTheme.themeColors[themeKey],
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: isSelected
-                            ? theme.primaryColor
-                            : Colors.grey.withOpacity(0.3),
+                        color:
+                            isSelected
+                                ? theme.primaryColor
+                                : Colors.grey.withOpacity(0.3),
                         width: isSelected ? 2 : 1,
                       ),
                       boxShadow: [
@@ -62,15 +64,16 @@ class ThemeSelectionDialog extends StatelessWidget {
                         ),
                       ],
                     ),
-                    child: isSelected
-                        ? Center(
-                            child: Icon(
-                              Icons.check_circle,
-                              color: theme.primaryColor,
-                              size: 20,
-                            ),
-                          )
-                        : null,
+                    child:
+                        isSelected
+                            ? Center(
+                              child: Icon(
+                                Icons.check_circle,
+                                color: theme.primaryColor,
+                                size: 20,
+                              ),
+                            )
+                            : null,
                   ),
                   title: Text(
                     AppTheme.themeNames[themeKey]!,
@@ -80,8 +83,9 @@ class ThemeSelectionDialog extends StatelessWidget {
                       color: theme.textTheme.titleMedium?.color,
                     ),
                   ),
-                  onTap: () {
-                    themeProvider.setTheme(themeKey);
+                  onTap: () async {
+                    // 테마 변경 및 서버에 저장 (모두 setTheme 메서드 내에서 처리)
+                    await themeProvider.setTheme(themeKey);
                     Navigator.of(context).pop();
                   },
                 ),
@@ -96,7 +100,9 @@ class ThemeSelectionDialog extends StatelessWidget {
                   style: TextButton.styleFrom(
                     foregroundColor: theme.primaryColor,
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
                   ),
                   child: const Text('CANCEL'),
                 ),

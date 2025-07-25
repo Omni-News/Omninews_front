@@ -283,51 +283,26 @@ class RssService {
       // 인증 헤더 가져오기
       final headers = _authService.getAuthHeaders();
 
-      final response = await http.get(
-        Uri.parse(
-          '$baseUrl/subscription/status?channel_rss_link=$channelRssLink',
-        ),
-        headers: headers,
-      );
+      // URL 인코딩 적용
+      final encodedLink = Uri.encodeComponent(channelRssLink);
+      debugPrint("Checking subscription status for (encoded): $encodedLink");
+
+      final uri = Uri.parse(
+        '$baseUrl/subscription/status',
+      ).replace(queryParameters: {'channel_rss_link': channelRssLink});
+
+      debugPrint("Full request URI: ${uri.toString()}");
+
+      final response = await http.get(uri, headers: headers);
 
       if (response.statusCode == 200) {
         final decodedResponse = utf8.decode(response.bodyBytes);
-        final jsonResponse = json.decode(decodedResponse);
-        bool subscribed = jsonResponse == true;
-        return subscribed;
-      } else {
-        debugPrint(
-          'Failed to check subscription status: ${response.statusCode}',
-        );
-        return false;
-      }
-    } catch (e) {
-      debugPrint('Error checking if channel is subscribed: $e');
-      return false;
-    }
-  }
-
-  static Future<bool> isChannelAlreadySubscribedByLink(
-    String channelRssLink,
-  ) async {
-    try {
-      // 인증 헤더 가져오기
-      final headers = _authService.getAuthHeaders();
-
-      final response = await http.get(
-        Uri.parse(
-          '$baseUrl/subscription/status?channel_rss_link=$channelRssLink',
-        ),
-        headers: headers,
-      );
-
-      if (response.statusCode == 200) {
-        final decodedResponse = utf8.decode(response.bodyBytes);
+        debugPrint("Response body: $decodedResponse");
         final jsonResponse = json.decode(decodedResponse);
         return jsonResponse == true;
       } else {
         debugPrint(
-          'Failed to check subscription status: ${response.statusCode}',
+          'Failed to check subscription status: ${response.statusCode} - ${response.body}',
         );
         return false;
       }

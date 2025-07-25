@@ -289,6 +289,7 @@ class AuthService {
           'displayName': paramUser['user_display_name'],
           'photoUrl': paramUser['user_photo_url'],
           'provider': paramUser['user_social_login_provider'],
+          'theme': data['theme'], // 서버에서 받은 테마 정보 저장
         };
 
         // 서버에서 토큰 정보 전달받음 - 토큰이 이미 유효하면 null이 올 수 있음

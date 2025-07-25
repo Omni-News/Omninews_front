@@ -462,18 +462,52 @@ class _RssScreenState extends State<RssScreen>
         .toList();
   }
 
-  void _navigateToChannelDetail(RssChannel channel) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) => RssChannelDetailScreen(
-              channel: channel,
-              isSubscribed: true,
-              onSubscriptionChanged: _refreshData,
-            ),
-      ),
-    ).then((_) => _refreshData());
+  Future<void> _navigateToChannelDetail(RssChannel channel) async {
+    try {
+      // 상태 변수가 설정된 경우, 로딩 중 표시
+      setState(() {
+        _subscribingStatus[channel.channelRssLink] = true;
+      });
+
+      // 서버에서 실제 구독 상태 확인
+
+      final isSubscribed = await RssService.isChannelAlreadySubscribed(
+        channel.channelRssLink,
+      );
+
+      if (mounted) {
+        // 화면으로 이동
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (context) => RssChannelDetailScreen(
+                  channel: channel,
+                  isSubscribed: isSubscribed, // 실제 구독 상태 전달
+                  onSubscriptionChanged: _refreshData,
+                ),
+          ),
+        ).then((_) => _refreshData());
+      }
+    } catch (e) {
+      debugPrint('Error navigating to channel detail: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('채널 정보를 불러오는 중 오류가 발생했습니다'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(8),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _subscribingStatus[channel.channelRssLink] = false;
+        });
+      }
+    }
   }
 
   Future<void> _navigateToAddRss() async {

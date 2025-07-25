@@ -11,6 +11,9 @@ import 'package:omninews_flutter/screens/recently_read_screen.dart';
 import 'package:omninews_flutter/services/auth_service.dart';
 import 'package:omninews_flutter/theme/theme_selection_dialog.dart';
 import 'package:omninews_flutter/screens/login_screen.dart';
+import 'package:provider/provider.dart';
+
+import '../provider/theme_provider.dart';
 
 // 전역 키를 선언하여 어디서든 접근할 수 있게 합니다
 final GlobalKey<ScaffoldState> homeScaffoldKey = GlobalKey<ScaffoldState>();
@@ -88,10 +91,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // 로그인 성공 후 호출될 함수
+  // 로그인 성공 후 호출될 함수
   void _onLoginSuccess() {
     setState(() {
       _isLoggedIn = true;
     });
+
+    // 로그인 성공 후 테마 정보 로드
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    themeProvider.initializeAfterLogin();
   }
 
   void _onItemTapped(int index) {
