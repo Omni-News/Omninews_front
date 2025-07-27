@@ -255,8 +255,6 @@ class AuthService {
       bool success = await _authenticateWithServer(paramUser);
 
       if (success) {
-        bool hasPermission = await requestNotificationPermissions();
-        debugPrint('알림 권한 요청 결과: $hasPermission');
         return true;
       } else {
         return false;

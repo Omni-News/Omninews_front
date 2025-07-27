@@ -1,34 +1,77 @@
-// lib/providers/settings_provider.dart
+// lib/provider/settings_provider.dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/app_setting.dart';
-import 'package:omninews_flutter/services/settings_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsProvider extends ChangeNotifier {
-  AppSettings _settings = AppSettings();
+  static const String _settingsKey = 'app_settings';
+
+  AppSettings _settings = AppSettings(); // 기본 설정으로 초기화
   bool _isLoading = true;
 
+  // 설정 및 로딩 상태 getters
   AppSettings get settings => _settings;
   bool get isLoading => _isLoading;
 
+  // 생성자
   SettingsProvider() {
     _loadSettings();
   }
 
+  // 설정 불러오기
   Future<void> _loadSettings() async {
-    _settings = await SettingsService.loadSettings();
-    _isLoading = false;
-    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final settingsJson = prefs.getString(_settingsKey);
+
+      if (settingsJson != null) {
+        _settings = AppSettings.fromJsonString(settingsJson);
+      }
+    } catch (e) {
+      debugPrint('설정 불러오기 오류: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
-  Future<void> updateViewMode(ViewMode viewMode) async {
+  // 설정 저장하기
+  Future<void> _saveSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final settingsJson = jsonEncode(_settings.toJson());
+      await prefs.setString(_settingsKey, settingsJson);
+    } catch (e) {
+      debugPrint('설정 저장 오류: $e');
+    }
+  }
+
+  // 콘텐츠 표시 모드 업데이트
+  void updateViewMode(ViewMode viewMode) {
     _settings = _settings.copyWith(viewMode: viewMode);
-    await SettingsService.saveSettings(_settings);
+    _saveSettings();
     notifyListeners();
   }
 
-  Future<void> updateWebOpenMode(WebOpenMode webOpenMode) async {
+  // 웹 링크 열기 모드 업데이트
+  void updateWebOpenMode(WebOpenMode webOpenMode) {
     _settings = _settings.copyWith(webOpenMode: webOpenMode);
-    await SettingsService.saveSettings(_settings);
+    _saveSettings();
+    notifyListeners();
+  }
+
+  // 알림 설정 업데이트 추가
+  void updateNotificationsEnabled(bool enabled) {
+    _settings = _settings.copyWith(notificationsEnabled: enabled);
+    _saveSettings();
+    notifyListeners();
+  }
+
+  // 앱 설정 초기화
+  Future<void> resetSettings() async {
+    _settings = AppSettings(); // 기본 설정으로 복원
+    await _saveSettings();
     notifyListeners();
   }
 }

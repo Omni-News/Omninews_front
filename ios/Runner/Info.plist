@@ -64,6 +64,7 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
-	</array>
+	<key>NSUserNotificationUsageDescription</key>
+  <string>앱에서 중요한 알림을 보내기 위해 알림 권한이 필요합니다</string></array>
 </dict>
 </plist>
