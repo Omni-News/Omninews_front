@@ -191,8 +191,11 @@ class _LoginScreenState extends State<LoginScreen> {
       final success = await _authService.signInWithGoogle();
 
       if (success) {
-        debugPrint('Google 로그인 성공: ${_authService.user?['displayName']}');
-        debugPrint('이메일: ${_authService.user?['email']}');
+        // 알림 권한 요청 추가
+        bool hasPermission =
+            await _authService.requestNotificationPermissions();
+        debugPrint('알림 권한 요청 결과: $hasPermission');
+
         widget.onLoginSuccess();
       } else {
         debugPrint('Google 로그인 취소 또는 실패');
@@ -216,7 +219,11 @@ class _LoginScreenState extends State<LoginScreen> {
       final success = await _authService.signInWithKakao();
 
       if (success) {
-        debugPrint('카카오 로그인 성공: ${_authService.user?['displayName']}');
+        // 알림 권한 요청 추가
+        bool hasPermission =
+            await _authService.requestNotificationPermissions();
+        debugPrint('알림 권한 요청 결과: $hasPermission');
+
         widget.onLoginSuccess();
       } else {
         debugPrint('카카오 로그인 취소 또는 실패');
@@ -237,9 +244,12 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _isLoading = true);
       debugPrint('애플 로그인 시작');
 
-      // 추후 구현 시 아래 코드 활성화
       final success = await _authService.signInWithApple();
       if (success) {
+        bool hasPermission =
+            await _authService.requestNotificationPermissions();
+        debugPrint('알림 권한 요청 결과: $hasPermission');
+
         widget.onLoginSuccess();
       }
     } catch (e) {

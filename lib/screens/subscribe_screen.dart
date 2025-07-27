@@ -25,6 +25,9 @@ class _SubscribeScreenState extends State<SubscribeScreen>
   String _searchQuery = '';
   final List<String> _tabs = ['날짜별 보기', '폴더별 보기'];
 
+  // 테마 체크를 위한 변수
+  ThemeData? _currentTheme;
+
   @override
   bool get wantKeepAlive => true;
 
@@ -33,6 +36,24 @@ class _SubscribeScreenState extends State<SubscribeScreen>
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
     _refreshData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // 테마 변경 감지
+    final newTheme = Theme.of(context);
+    if (_currentTheme != null && _currentTheme != newTheme) {
+      // 테마가 변경되었을 때 TabController 재생성
+      _tabController = TabController(
+        length: _tabs.length,
+        vsync: this,
+        initialIndex: _tabController.index,
+      );
+      setState(() {});
+    }
+    _currentTheme = newTheme;
   }
 
   @override
@@ -212,6 +233,7 @@ class _SubscribeScreenState extends State<SubscribeScreen>
                   unselectedLabelStyle: textTheme.labelMedium,
                   tabs: _tabs.map((String tab) => Tab(text: tab)).toList(),
                 ),
+                theme, // 테마 전달하여 변경 감지할 수 있게 함
               ),
               floating: true,
               pinned: true,
@@ -260,8 +282,9 @@ class _SubscribeScreenState extends State<SubscribeScreen>
 // SliverPersistentHeaderDelegate 구현
 class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   final Widget child;
+  final ThemeData theme; // 테마 추가
 
-  _SliverAppBarDelegate(this.child);
+  _SliverAppBarDelegate(this.child, this.theme);
 
   @override
   Widget build(
@@ -269,8 +292,6 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    final theme = Theme.of(context);
-
     return Container(
       decoration: BoxDecoration(
         color: theme.cardColor,
@@ -294,6 +315,10 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => 48.0;
   @override
   double get minExtent => 48.0;
+
   @override
-  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) => false;
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    // 테마가 변경되었을 때 다시 빌드되도록 함
+    return oldDelegate.theme != theme;
+  }
 }
