@@ -79,12 +79,21 @@ class AuthService {
   Future<bool> signOut() async {
     try {
       // 소셜 로그인 SDK 로그아웃
-      await _googleSignIn.signOut();
-      //      try {
-      //        await kakao.UserApi.instance.logout();
-      //      } catch (e) {
-      //        debugPrint('카카오 로그아웃 실패: $e');
-      //      }
+      String? provider = getAuthProvider();
+
+      // 구글 로그아웃
+      if (provider == 'google') {
+        await _googleSignIn.signOut();
+      }
+
+      // 카카오 로그아웃
+      if (provider == 'kakao') {
+        try {
+          await kakao.UserApi.instance.logout();
+        } catch (e) {
+          debugPrint('카카오 로그아웃 실패: $e');
+        }
+      }
 
       // 서버에 로그아웃 요청 - 이미 인증된 사용자만 로그아웃 가능
       if (_accessToken != null) {
@@ -123,7 +132,7 @@ class AuthService {
         return false;
       }
 
-      final GoogleSignInAuthentication googleAuth =
+      final GoogleSignInAuthentication _googleAuth =
           await googleUser.authentication;
 
       // 서버에 인증 정보 전송 (ParamUser 형식에 맞춤)
@@ -181,6 +190,7 @@ class AuthService {
         'user_notification_push': true,
       };
 
+      debugPrint('카카오 사용자 정보: $paramUser');
       return await _authenticateWithServer(paramUser);
     } catch (e) {
       debugPrint('카카오 로그인 오류: $e');

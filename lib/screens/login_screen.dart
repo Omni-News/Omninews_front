@@ -41,11 +41,15 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // App Logo
-                  Icon(
-                    Icons.article_rounded,
-                    size: 80.0,
-                    color: theme.primaryColor,
+                  // App Logo (앱 아이콘으로 교체)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.asset(
+                      'resources/omninews_icon.png', // 여기에 앱 아이콘 경로를 넣으세요.
+                      width: 80,
+                      height: 80,
+                      fit: BoxFit.cover,
+                    ),
                   ),
                   const SizedBox(height: 24.0),
 
