@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_flutter/screens/about_screen.dart';
 import 'package:omninews_flutter/screens/help_screen.dart';
 import 'package:omninews_flutter/screens/settings_screen.dart';
 import 'package:omninews_flutter/screens/subscribe_screen.dart';
@@ -268,21 +267,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
 
                   const Divider(),
-
-                  // 추가 섹션 - About & Help
-                  _buildDrawerItem(
-                    icon: Icons.info_outline,
-                    title: 'About',
-                    onTap: () {
-                      Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const AboutScreen(),
-                        ),
-                      );
-                    },
-                  ),
 
                   _buildDrawerItem(
                     icon: Icons.help_outline,
