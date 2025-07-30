@@ -2,16 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/rss_channel.dart';
 import 'package:omninews_flutter/services/subscribe_service.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
-import 'package:omninews_flutter/models/app_setting.dart'; // 추가
 
 class SearchRssChannelCard extends StatefulWidget {
   final RssChannel channel;
   final VoidCallback? onSubscriptionChanged;
 
+  final bool? isSubscribedOverride;
+
   const SearchRssChannelCard({
     super.key,
     required this.channel,
     this.onSubscriptionChanged,
+    this.isSubscribedOverride,
   });
 
   @override
@@ -21,22 +23,62 @@ class SearchRssChannelCard extends StatefulWidget {
 class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
   bool _isSubscribed = false;
   bool _isLoading = false;
+  bool _initialCheckDone = false;
 
   @override
   void initState() {
     super.initState();
-    _checkSubscriptionStatus();
+
+    // 외부에서 구독 상태가 제공되면 사용하고, 그렇지 않으면 API 호출
+    if (widget.isSubscribedOverride != null) {
+      _isSubscribed = widget.isSubscribedOverride!;
+      _initialCheckDone = true;
+    } else {
+      _checkSubscriptionStatus();
+    }
+  }
+
+  @override
+  void didUpdateWidget(SearchRssChannelCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // 외부에서 구독 상태가 변경되면 반영
+    if (widget.isSubscribedOverride != oldWidget.isSubscribedOverride &&
+        widget.isSubscribedOverride != null) {
+      setState(() {
+        _isSubscribed = widget.isSubscribedOverride!;
+        _initialCheckDone = true;
+      });
+    }
   }
 
   Future<void> _checkSubscriptionStatus() async {
-    final channeRssLink = widget.channel.channelRssLink;
-    if (channeRssLink == '') return;
+    if (_initialCheckDone) return; // 이미 확인했으면 건너뜀
 
-    final isSubscribed = await SubscribeService.isSubscribed(channeRssLink);
-    if (mounted) {
-      setState(() {
-        _isSubscribed = isSubscribed;
-      });
+    final channelRssLink = widget.channel.channelRssLink;
+    if (channelRssLink.isEmpty) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final isSubscribed = await SubscribeService.isSubscribed(channelRssLink);
+      if (mounted) {
+        setState(() {
+          _isSubscribed = isSubscribed;
+          _isLoading = false;
+          _initialCheckDone = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _initialCheckDone = true;
+        });
+      }
+      print('구독 상태 확인 중 오류: $e');
     }
   }
 
@@ -50,7 +92,7 @@ class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
     try {
       bool success;
       final channelId = widget.channel.channelId;
-      if (channelId == 0) throw Exception('구독 URL이 없습니다');
+      if (channelId == null || channelId == 0) throw Exception('구독 URL이 없습니다');
 
       if (_isSubscribed) {
         success = await SubscribeService.unsubscribe(channelId);
@@ -61,8 +103,10 @@ class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
       if (success && mounted) {
         setState(() {
           _isSubscribed = !_isSubscribed;
+          _isLoading = false;
         });
 
+        // 구독 상태 변경 콜백 호출
         if (widget.onSubscriptionChanged != null) {
           widget.onSubscriptionChanged!();
         }
@@ -75,9 +119,16 @@ class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
             backgroundColor: Theme.of(context).primaryColor,
           ),
         );
+      } else {
+        setState(() {
+          _isLoading = false;
+        });
       }
     } catch (e) {
       if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('구독 변경 중 오류가 발생했습니다: $e'),
@@ -86,12 +137,6 @@ class _SearchRssChannelCardState extends State<SearchRssChannelCard> {
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
       }
     }
   }

@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/news.dart';
 import 'package:omninews_flutter/models/rss_channel.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
+import 'package:omninews_flutter/services/subscribe_service.dart'; // 추가
 import 'package:omninews_flutter/services/unified_search_service.dart';
 import 'package:omninews_flutter/widgets/news_api_item_card.dart';
 import 'package:omninews_flutter/widgets/search_rss_channel_card.dart';
 import 'package:omninews_flutter/widgets/search_rss_item_card.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
+import 'package:visibility_detector/visibility_detector.dart'; // 추가
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -53,6 +55,12 @@ class SearchScreenState extends State<SearchScreen>
   // 결과 필터링 - 탭으로 변환
   final List<String> _tabs = ['뉴스', 'RSS 피드', '채널'];
 
+  // 구독 상태 캐싱 맵 추가
+  final Map<int, bool> _subscriptionCache = {};
+
+  // 구독 상태 확인 중인 채널 ID 세트 (중복 요청 방지)
+  final Set<int> _checkingSubscriptionIds = {};
+
   @override
   void initState() {
     super.initState();
@@ -68,6 +76,11 @@ class SearchScreenState extends State<SearchScreen>
         if (_pageController.hasClients) {
           // 탭 변경 시 페이지 뷰 즉시 업데이트
           _pageController.jumpToPage(_tabController.index);
+        }
+
+        // 채널 탭으로 변경되면 화면에 보이는 채널들의 구독 상태 로드
+        if (_tabController.index == 2) {
+          _preloadVisibleChannelsSubscriptionStatus();
         }
       }
     });
@@ -135,6 +148,88 @@ class SearchScreenState extends State<SearchScreen>
     });
   }
 
+  // 구독 상태 캐싱 함수 추가
+  Future<bool> _checkSubscriptionStatus(
+    int channelId,
+    String channelRssLink,
+  ) async {
+    // 이미 캐시에 있으면 캐시된 값 반환
+    if (_subscriptionCache.containsKey(channelId)) {
+      return _subscriptionCache[channelId]!;
+    }
+
+    // 이미 확인 중인 채널이면 기본값 반환 (중복 요청 방지)
+    if (_checkingSubscriptionIds.contains(channelId)) {
+      return false;
+    }
+
+    // 확인 중인 채널로 등록
+    _checkingSubscriptionIds.add(channelId);
+
+    try {
+      // 구독 상태 API 호출
+      final isSubscribed = await SubscribeService.isSubscribed(channelRssLink);
+
+      // 캐시에 저장
+      _subscriptionCache[channelId] = isSubscribed;
+
+      return isSubscribed;
+    } catch (e) {
+      print('구독 상태 확인 중 오류 발생: $e');
+      return false;
+    } finally {
+      // 확인 완료된 채널 ID 제거
+      _checkingSubscriptionIds.remove(channelId);
+    }
+  }
+
+  // 화면에 보이는 채널들의 구독 상태 미리 로드 (추가)
+  void _preloadVisibleChannelsSubscriptionStatus() {
+    if (_tabController.index != 2 ||
+        _searchResult == null ||
+        _searchResult!.rssChannelResults.isEmpty) {
+      return;
+    }
+
+    // 현재 스크롤 위치 계산
+    final scrollPosition = _channelScrollController.position.pixels;
+    final viewportHeight = _channelScrollController.position.viewportDimension;
+
+    // 대략적인 아이템 높이 (실제 위젯 높이에 맞게 조정 필요)
+    const estimatedItemHeight = 100.0;
+
+    // 화면에 보이는 첫 번째 아이템 인덱스 추정
+    final firstVisibleIndex = (scrollPosition / estimatedItemHeight).floor();
+
+    // 화면에 표시되는 아이템 개수 추정
+    final visibleItemCount = (viewportHeight / estimatedItemHeight).ceil() + 1;
+
+    // 화면에 보이는 마지막 아이템 인덱스 추정
+    final lastVisibleIndex = firstVisibleIndex + visibleItemCount;
+
+    // 화면에 보이는 채널들의 구독 상태만 미리 로드
+    for (
+      var i = firstVisibleIndex;
+      i < lastVisibleIndex && i < _searchResult!.rssChannelResults.length;
+      i++
+    ) {
+      if (i >= 0) {
+        final channel = _searchResult!.rssChannelResults[i];
+        final channelId = channel.channelId;
+
+        if (channelId != null &&
+            channelId > 0 &&
+            !_subscriptionCache.containsKey(channelId) &&
+            !_checkingSubscriptionIds.contains(channelId)) {
+          // 상태를 비동기로 확인하고 UI 갱신
+          _checkSubscriptionStatus(channelId, channel.channelRssLink).then((_) {
+            if (mounted) setState(() {});
+          });
+        }
+      }
+    }
+  }
+
   void _handleNewsScroll() {
     // 스크롤 상태 업데이트
     _updateScrollState(_newsScrollController, true);
@@ -175,6 +270,12 @@ class SearchScreenState extends State<SearchScreen>
         _loadMoreData(2); // 채널 탭
       });
     }
+
+    // 스크롤 시 구독 상태 로드 (디바운스 적용)
+    _debounce(
+      _preloadVisibleChannelsSubscriptionStatus,
+      duration: const Duration(milliseconds: 300),
+    );
   }
 
   // 현재 활성화된 스크롤 컨트롤러 가져오기
@@ -294,6 +395,13 @@ class SearchScreenState extends State<SearchScreen>
           _currentPage = nextPage;
           _isLoadingMore = false;
         });
+
+        // 채널 탭이면서 새 결과가 있으면 화면에 보이는 채널들의 구독 상태 로드
+        if (tabIndex == 2 && result.rssChannelResults.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _preloadVisibleChannelsSubscriptionStatus();
+          });
+        }
       }
     } catch (e) {
       print('추가 데이터 로딩 중 오류 발생: $e');
@@ -357,6 +465,11 @@ class SearchScreenState extends State<SearchScreen>
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && _hasResults()) {
             _checkAndUpdateTab(currentTabIndex);
+
+            // 채널 탭이면 화면에 보이는 채널들의 구독 상태 로드
+            if (_tabController.index == 2) {
+              _preloadVisibleChannelsSubscriptionStatus();
+            }
           }
         });
       }
@@ -516,6 +629,11 @@ class SearchScreenState extends State<SearchScreen>
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted && _hasResults()) {
             _checkAndUpdateTab(currentTabIndex);
+
+            // 채널 탭이면 화면에 보이는 채널들의 구독 상태 로드
+            if (_tabController.index == 2) {
+              _preloadVisibleChannelsSubscriptionStatus();
+            }
           }
         });
       }
@@ -540,6 +658,11 @@ class SearchScreenState extends State<SearchScreen>
         );
       }
     }
+  }
+
+  // 구독 상태 변경 시 캐시 업데이트 (추가)
+  void _updateSubscriptionCache(int channelId, bool isSubscribed) {
+    _subscriptionCache[channelId] = isSubscribed;
   }
 
   Future<void> _addToNewsCategories(String query) async {
@@ -1091,12 +1214,44 @@ class SearchScreenState extends State<SearchScreen>
     }
 
     for (var i = 0; i < _searchResult!.rssChannelResults.length; i++) {
+      final channel = _searchResult!.rssChannelResults[i];
+      final channelId = channel.channelId;
+
+      // VisibilityDetector로 감싸서 화면에 보이는지 감지
       resultWidgets.add(
-        SearchRssChannelCard(
-          channel: _searchResult!.rssChannelResults[i],
-          onSubscriptionChanged: () {
-            setState(() {});
+        VisibilityDetector(
+          key: Key('channel-${channelId}'),
+          onVisibilityChanged: (info) {
+            // 채널이 충분히 화면에 보이면 구독 상태 확인
+            if (info.visibleFraction > 0.5 &&
+                channelId != null &&
+                channelId > 0) {
+              if (!_subscriptionCache.containsKey(channelId) &&
+                  !_checkingSubscriptionIds.contains(channelId)) {
+                // 상태를 비동기로 확인하고 UI 갱신
+                _checkSubscriptionStatus(
+                  channelId,
+                  channel.channelRssLink,
+                ).then((_) {
+                  if (mounted) setState(() {});
+                });
+              }
+            }
           },
+          child: CachedChannelCard(
+            channel: channel,
+            isSubscribed:
+                channelId != null
+                    ? _subscriptionCache[channelId] ?? false
+                    : false,
+            onSubscriptionChanged: (bool newStatus) {
+              if (channelId != null) {
+                setState(() {
+                  _updateSubscriptionCache(channelId, newStatus);
+                });
+              }
+            },
+          ),
         ),
       );
 
@@ -1328,5 +1483,31 @@ class SearchScreenState extends State<SearchScreen>
     return _searchResult!.newsResults.isNotEmpty ||
         _searchResult!.rssItemResults.isNotEmpty ||
         _searchResult!.rssChannelResults.isNotEmpty;
+  }
+}
+
+// 캐싱된 구독 상태를 사용하는 채널 카드 위젯 (추가)
+class CachedChannelCard extends StatelessWidget {
+  final RssChannel channel;
+  final bool isSubscribed;
+  final ValueChanged<bool> onSubscriptionChanged;
+
+  const CachedChannelCard({
+    Key? key,
+    required this.channel,
+    required this.isSubscribed,
+    required this.onSubscriptionChanged,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return SearchRssChannelCard(
+      channel: channel,
+      isSubscribedOverride: isSubscribed, // 캐시된 구독 상태 전달
+      onSubscriptionChanged: () {
+        // 상태가 변경되면 반대 값으로 캐시 업데이트
+        onSubscriptionChanged(!isSubscribed);
+      },
+    );
   }
 }

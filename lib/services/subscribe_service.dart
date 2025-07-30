@@ -204,7 +204,8 @@ class SubscribeService {
     return removeLocalBookmark(itemLink);
   }
 
-  // 채널 구독 여부 확인
+  // TODO 심하게 많이 반복됨, 채널 구독 여부 확인
+  // 서버에 배열로다가 채널 구독여부 받아오는 API 만들어서 요청하기
   static Future<bool> isSubscribed(String channelRssLink) async {
     try {
       return await RssService.isChannelAlreadySubscribed(channelRssLink);
