@@ -1,0 +1,133 @@
+{
+  "appPolicies" : {
+    "eula" : "",
+    "policies" : [
+      {
+        "locale" : "en_US",
+        "policyText" : "",
+        "policyURL" : ""
+      }
+    ]
+  },
+  "identifier" : "29A921D4",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationInternalID" : "6746567181",
+    "_compatibilityTimeRate" : {
+      "3" : 4
+    },
+    "_developerTeamID" : "GGR9HG6DB8",
+    "_failTransactionsEnabled" : false,
+    "_lastSynchronizedDate" : 775903369.46162403,
+    "_locale" : "ko",
+    "_storefront" : "KOR",
+    "_storeKitErrors" : [
+      {
+        "current" : {
+          "index" : 2,
+          "type" : "generic"
+        },
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : {
+          "index" : 1,
+          "type" : "purchase"
+        },
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : {
+          "index" : 3,
+          "type" : "generic"
+        },
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : {
+          "index" : 3,
+          "type" : "generic"
+        },
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ],
+    "_timeRate" : 11
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21745813",
+      "localizations" : [
+
+      ],
+      "name" : "omninews_subscription",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "2200",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "6749501010",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "옴니뉴스 구독",
+              "displayName" : "옴니뉴스 구독",
+              "locale" : "ko"
+            }
+          ],
+          "productID" : "kdh.omninews.premium",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "kdh.omninews.premium",
+          "subscriptionGroupID" : "21745813",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

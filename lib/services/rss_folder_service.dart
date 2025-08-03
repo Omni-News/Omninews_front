@@ -12,12 +12,8 @@ class RssFolderService {
   // 폴더 목록 조회
   static Future<List<RssFolder>> fetchFolders() async {
     try {
-      final headers = _authService.getAuthHeaders();
-
-      final response = await http.get(
-        Uri.parse("$baseUrl/folder"),
-        headers: headers,
-      );
+      // AuthService.apiRequest 사용으로 수정
+      final response = await _authService.apiRequest('GET', '/folder');
 
       if (response.statusCode == 200) {
         String decodedResponse = utf8.decode(response.bodyBytes);
@@ -40,14 +36,13 @@ class RssFolderService {
   // 새 폴더 생성
   static Future<bool> createFolder(String name) async {
     try {
-      final headers = _authService.getAuthHeaders();
-
       final body = {"folder_name": name};
 
-      final response = await http.post(
-        Uri.parse("$baseUrl/folder"),
-        headers: headers,
-        body: json.encode(body),
+      // AuthService.apiRequest 사용으로 수정
+      final response = await _authService.apiRequest(
+        'POST',
+        '/folder',
+        body: body,
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -67,13 +62,13 @@ class RssFolderService {
   // 폴더 삭제
   static Future<bool> deleteFolder(int folderId) async {
     try {
-      final headers = _authService.getAuthHeaders();
-
       final body = {"folder_id": folderId};
-      final response = await http.delete(
-        Uri.parse("$baseUrl/folder"),
-        headers: headers,
-        body: json.encode(body),
+
+      // AuthService.apiRequest 사용으로 수정
+      final response = await _authService.apiRequest(
+        'DELETE',
+        '/folder',
+        body: body,
       );
 
       if (response.statusCode == 200) {
@@ -93,14 +88,13 @@ class RssFolderService {
   // 채널을 폴더에 추가
   static Future<bool> addChannelToFolder(int channelId, int folderId) async {
     try {
-      final headers = _authService.getAuthHeaders();
-
       final body = {"folder_id": folderId, "channel_id": channelId};
 
-      final response = await http.post(
-        Uri.parse("$baseUrl/folder/channel"),
-        headers: headers,
-        body: json.encode(body),
+      // AuthService.apiRequest 사용으로 수정
+      final response = await _authService.apiRequest(
+        'POST',
+        '/folder/channel',
+        body: body,
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -123,15 +117,13 @@ class RssFolderService {
     int folderId,
   ) async {
     try {
-      final headers = _authService.getAuthHeaders();
-
       final body = {"channel_id": channelId, "folder_id": folderId};
 
-      // 엔드포인트 수정: '/folder' -> '/folder/channel'
-      final response = await http.delete(
-        Uri.parse("$baseUrl/folder/channel"),
-        headers: headers,
-        body: json.encode(body),
+      // AuthService.apiRequest 사용으로 수정
+      final response = await _authService.apiRequest(
+        'DELETE',
+        '/folder/channel',
+        body: body,
       );
 
       if (response.statusCode == 200) {
@@ -151,8 +143,6 @@ class RssFolderService {
   // 폴더 수정 (이름/설명 변경)
   static Future<bool> updateFolder(String folderId, String? name) async {
     try {
-      final headers = _authService.getAuthHeaders();
-
       final Map<String, dynamic> updateData = {};
       if (name != null) updateData['folder_name'] = name;
 
@@ -161,10 +151,11 @@ class RssFolderService {
 
       updateData['folder_id'] = folderId;
 
-      final response = await http.put(
-        Uri.parse("$baseUrl/folder"),
-        headers: headers,
-        body: json.encode(updateData),
+      // AuthService.apiRequest 사용으로 수정
+      final response = await _authService.apiRequest(
+        'PUT',
+        '/folder',
+        body: updateData,
       );
 
       if (response.statusCode == 200) {

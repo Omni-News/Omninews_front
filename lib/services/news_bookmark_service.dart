@@ -2,10 +2,17 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/news.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:html_unescape/html_unescape.dart';
 
 class NewsBookmarkService {
   static const String newsBookmarksKey = 'news_bookmarks';
   static const String newsApiBookmarksKey = 'news_api_bookmarks';
+  static final HtmlUnescape _unescape = HtmlUnescape();
+
+  // HTML 엔티티 디코딩 함수 (문자열만 처리)
+  static String _decodeHtmlString(String text) {
+    return _unescape.convert(text);
+  }
 
   // 북마크된 뉴스 가져오기 (News)
   static Future<List<News>> getBookmarkedNews() async {
@@ -13,9 +20,28 @@ class NewsBookmarkService {
       final prefs = await SharedPreferences.getInstance();
       final bookmarksJson = prefs.getStringList(newsBookmarksKey) ?? [];
 
-      return bookmarksJson
-          .map((json) => News.fromJson(jsonDecode(json)))
-          .toList()
+      return bookmarksJson.map((json) {
+          Map<String, dynamic> data = jsonDecode(json);
+
+          // 문자열 필드만 디코딩
+          if (data['title'] is String) {
+            data['title'] = _decodeHtmlString(data['title']);
+          }
+          if (data['description'] is String) {
+            data['description'] = _decodeHtmlString(data['description']);
+          }
+          if (data['content'] is String) {
+            data['content'] = _decodeHtmlString(data['content']);
+          }
+          if (data['summary'] is String) {
+            data['summary'] = _decodeHtmlString(data['summary']);
+          }
+          if (data['source'] is String) {
+            data['source'] = _decodeHtmlString(data['source']);
+          }
+
+          return News.fromJson(data);
+        }).toList()
         ..sort((a, b) {
           try {
             final dateA = DateTime.parse(a.newsPubDate);
@@ -37,9 +63,25 @@ class NewsBookmarkService {
       final prefs = await SharedPreferences.getInstance();
       final bookmarksJson = prefs.getStringList(newsApiBookmarksKey) ?? [];
 
-      return bookmarksJson
-          .map((json) => NewsApi.fromJson(jsonDecode(json)))
-          .toList()
+      return bookmarksJson.map((json) {
+          Map<String, dynamic> data = jsonDecode(json);
+
+          // 문자열 필드만 디코딩
+          if (data['title'] is String) {
+            data['title'] = _decodeHtmlString(data['title']);
+          }
+          if (data['description'] is String) {
+            data['description'] = _decodeHtmlString(data['description']);
+          }
+          if (data['link'] is String) {
+            data['link'] = _decodeHtmlString(data['link']);
+          }
+          if (data['originallink'] is String) {
+            data['originallink'] = _decodeHtmlString(data['originallink']);
+          }
+
+          return NewsApi.fromJson(data);
+        }).toList()
         ..sort((a, b) {
           try {
             final dateA = DateTime.parse(a.newsPubDate);
@@ -67,10 +109,14 @@ class NewsBookmarkService {
               .map(
                 (apiItem) => News(
                   newsId: 0, // 로컬 용도라 ID는 0으로 설정
-                  newsTitle: _removeHtmlTags(apiItem.newsTitle),
+                  newsTitle: _removeHtmlTags(
+                    _decodeHtmlString(apiItem.newsTitle),
+                  ),
                   newsLink: apiItem.newsOriginalLink,
-                  newsDescription: _removeHtmlTags(apiItem.newsDescription),
-                  newsSummary: apiItem.newsDescription,
+                  newsDescription: _removeHtmlTags(
+                    _decodeHtmlString(apiItem.newsDescription),
+                  ),
+                  newsSummary: _decodeHtmlString(apiItem.newsDescription),
                   newsPubDate: apiItem.newsPubDate,
                   newsSource: _extractDomain(apiItem.newsOriginalLink),
                   newsImageLink: '', // API에서 이미지 URL이 없을 수 있음
@@ -112,7 +158,10 @@ class NewsBookmarkService {
       });
 
       if (!exists) {
-        bookmarksJson.add(jsonEncode(news.toJson()));
+        // 저장 전 HTML 엔티티 디코딩
+        Map<String, dynamic> newsJson = news.toJson();
+
+        bookmarksJson.add(jsonEncode(newsJson));
         await prefs.setStringList(newsBookmarksKey, bookmarksJson);
       }
       return true;
@@ -135,7 +184,10 @@ class NewsBookmarkService {
       });
 
       if (!exists) {
-        bookmarksJson.add(jsonEncode(news.toJson()));
+        // 저장 전 HTML 엔티티 디코딩
+        Map<String, dynamic> newsJson = news.toJson();
+
+        bookmarksJson.add(jsonEncode(newsJson));
         await prefs.setStringList(newsApiBookmarksKey, bookmarksJson);
       }
       return true;
@@ -156,8 +208,9 @@ class NewsBookmarkService {
       int initialNewsCount = newsBookmarksJson.length;
 
       newsBookmarksJson.removeWhere((json) {
-        final news = News.fromJson(jsonDecode(json));
-        return news.newsLink == newsLink;
+        Map<String, dynamic> data = jsonDecode(json);
+        String link = data['link']?.toString() ?? '';
+        return link == newsLink;
       });
 
       // 북마크가 제거되었는지 확인
@@ -173,9 +226,10 @@ class NewsBookmarkService {
         int initialApiNewsCount = newsApiBookmarksJson.length;
 
         newsApiBookmarksJson.removeWhere((json) {
-          final newsApi = NewsApi.fromJson(jsonDecode(json));
-          return newsApi.newsOriginalLink == newsLink ||
-              newsApi.newsLink == newsLink;
+          Map<String, dynamic> data = jsonDecode(json);
+          String originalLink = data['originallink']?.toString() ?? '';
+          String link = data['link']?.toString() ?? '';
+          return originalLink == newsLink || link == newsLink;
         });
 
         // NewsApi 북마크에서 제거되었는지 확인
@@ -199,8 +253,9 @@ class NewsBookmarkService {
       final bookmarksJson = prefs.getStringList(newsApiBookmarksKey) ?? [];
 
       bookmarksJson.removeWhere((json) {
-        final news = NewsApi.fromJson(jsonDecode(json));
-        return news.newsOriginalLink == newsLink;
+        Map<String, dynamic> data = jsonDecode(json);
+        String originalLink = data['originallink']?.toString() ?? '';
+        return originalLink == newsLink;
       });
 
       await prefs.setStringList(newsApiBookmarksKey, bookmarksJson);
@@ -218,8 +273,9 @@ class NewsBookmarkService {
       final bookmarksJson = prefs.getStringList(newsBookmarksKey) ?? [];
 
       return bookmarksJson.any((json) {
-        final news = News.fromJson(jsonDecode(json));
-        return news.newsLink == newsLink;
+        Map<String, dynamic> data = jsonDecode(json);
+        String link = data['link']?.toString() ?? '';
+        return link == newsLink;
       });
     } catch (e) {
       debugPrint('Error checking news bookmark status: $e');
@@ -234,8 +290,9 @@ class NewsBookmarkService {
       final bookmarksJson = prefs.getStringList(newsApiBookmarksKey) ?? [];
 
       return bookmarksJson.any((json) {
-        final news = NewsApi.fromJson(jsonDecode(json));
-        return news.newsOriginalLink == newsLink;
+        Map<String, dynamic> data = jsonDecode(json);
+        String originalLink = data['originallink']?.toString() ?? '';
+        return originalLink == newsLink;
       });
     } catch (e) {
       debugPrint('Error checking news API bookmark status: $e');
@@ -247,11 +304,16 @@ class NewsBookmarkService {
   static Future<List<News>> searchAllBookmarkedNews(String query) async {
     try {
       final allBookmarkedNews = await getAllBookmarkedNewsAsNews();
-      final lowercaseQuery = query.toLowerCase();
+      final decodedQuery = _decodeHtmlString(query.toLowerCase());
 
       return allBookmarkedNews.where((news) {
-        return news.newsTitle.toLowerCase().contains(lowercaseQuery) ||
-            news.newsDescription.toLowerCase().contains(lowercaseQuery);
+        String decodedTitle = _decodeHtmlString(news.newsTitle.toLowerCase());
+        String decodedDescription = _decodeHtmlString(
+          news.newsDescription.toLowerCase(),
+        );
+
+        return decodedTitle.contains(decodedQuery) ||
+            decodedDescription.contains(decodedQuery);
       }).toList();
     } catch (e) {
       debugPrint('Error searching bookmarked news: $e');
@@ -290,7 +352,7 @@ class NewsBookmarkService {
   }
 
   // 북마크된 모든 뉴스 항목을 원본 타입으로 구분해서 가져오기
-  static Future<Map<String, List<dynamic>>> getAllBookmarkedNewsByType() async {
+  static Future<Map<String, dynamic>> getAllBookmarkedNewsByType() async {
     try {
       // News 타입 북마크 가져오기
       final newsItems = await getBookmarkedNews();
@@ -298,44 +360,67 @@ class NewsBookmarkService {
       // NewsApi 타입 북마크 가져오기
       final newsApiItems = await getBookmarkedNewsApi();
 
-      return {'news': newsItems, 'newsApi': newsApiItems};
+      // 명시적으로 Map<String, dynamic> 타입으로 만듦
+      Map<String, dynamic> result = {
+        'news': newsItems,
+        'newsApi': newsApiItems,
+      };
+      return result;
     } catch (e) {
       debugPrint('Error getting all bookmarked news by type: $e');
-      return {'news': [], 'newsApi': []};
+      return {'news': <News>[], 'newsApi': <NewsApi>[]};
     }
   }
 
   // 통합 검색 기능 (타입별로 분리)
-  static Future<Map<String, List<dynamic>>> searchAllBookmarkedNewsByType(
+  static Future<Map<String, dynamic>> searchAllBookmarkedNewsByType(
     String query,
   ) async {
     try {
+      // 검색어 디코딩
+      final decodedQuery = _decodeHtmlString(query.toLowerCase());
+
       // News 북마크 검색
       final newsItems = await getBookmarkedNews();
       final filteredNews =
           newsItems.where((news) {
-            return news.newsTitle.toLowerCase().contains(query.toLowerCase()) ||
-                news.newsDescription.toLowerCase().contains(
-                  query.toLowerCase(),
-                );
+            String decodedTitle = _decodeHtmlString(
+              news.newsTitle.toLowerCase(),
+            );
+            String decodedDescription = _decodeHtmlString(
+              news.newsDescription.toLowerCase(),
+            );
+
+            return decodedTitle.contains(decodedQuery) ||
+                decodedDescription.contains(decodedQuery);
           }).toList();
 
       // NewsApi 북마크 검색
       final newsApiItems = await getBookmarkedNewsApi();
       final filteredNewsApi =
           newsApiItems.where((newsApi) {
-            return _removeHtmlTags(
-                  newsApi.newsTitle,
-                ).toLowerCase().contains(query.toLowerCase()) ||
-                _removeHtmlTags(
-                  newsApi.newsDescription,
-                ).toLowerCase().contains(query.toLowerCase());
+            String decodedTitle =
+                _decodeHtmlString(
+                  _removeHtmlTags(newsApi.newsTitle),
+                ).toLowerCase();
+            String decodedDescription =
+                _decodeHtmlString(
+                  _removeHtmlTags(newsApi.newsDescription),
+                ).toLowerCase();
+
+            return decodedTitle.contains(decodedQuery) ||
+                decodedDescription.contains(decodedQuery);
           }).toList();
 
-      return {'news': filteredNews, 'newsApi': filteredNewsApi};
+      // 명시적으로 Map<String, dynamic> 타입으로 만듦
+      Map<String, dynamic> result = {
+        'news': filteredNews,
+        'newsApi': filteredNewsApi,
+      };
+      return result;
     } catch (e) {
       debugPrint('Error searching bookmarked news by type: $e');
-      return {'news': [], 'newsApi': []};
+      return {'news': <News>[], 'newsApi': <NewsApi>[]};
     }
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:omninews_flutter/provider/subscription_provider.dart';
 import 'package:omninews_flutter/screens/help_screen.dart';
 import 'package:omninews_flutter/screens/settings_screen.dart';
 import 'package:omninews_flutter/screens/subscribe_screen.dart';
@@ -56,6 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // 자동 로그인 시도
+
   Future<void> _tryAutoLogin() async {
     setState(() {
       _isLoading = true;
@@ -70,7 +72,15 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _isLoggedIn = true;
         });
-        debugPrint('자동 로그인 성공');
+
+        // 로그인 성공시 구독 상태 한 번만 확인 (주요 변경 부분)
+        final subscriptionProvider = Provider.of<SubscriptionProvider>(
+          context,
+          listen: false,
+        );
+        await subscriptionProvider.checkSubscriptionOnLogin();
+
+        debugPrint('자동 로그인 성공 (kang1027)');
       } else {
         setState(() {
           _isLoggedIn = false;
@@ -90,15 +100,24 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // 로그인 성공 후 호출될 함수
-  // 로그인 성공 후 호출될 함수
-  void _onLoginSuccess() {
+  void _onLoginSuccess() async {
+    // 로그인 전 상태 기억
+    final wasLoggedInBefore = _isLoggedIn;
+
     setState(() {
       _isLoggedIn = true;
     });
 
     // 로그인 성공 후 테마 정보 로드
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    themeProvider.initializeAfterLogin();
+    await themeProvider.initializeAfterLogin();
+
+    // 로그인 성공 시 구독 상태 한 번만 확인
+    final subscriptionProvider = Provider.of<SubscriptionProvider>(
+      context,
+      listen: false,
+    );
+    await subscriptionProvider.checkSubscriptionOnLogin();
   }
 
   void _onItemTapped(int index) {

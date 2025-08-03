@@ -1,29 +1,53 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:omninews_flutter/models/rss_channel.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
-import 'package:omninews_flutter/services/auth_service.dart'; // 인증 서비스 임포트
+import 'package:omninews_flutter/services/auth_service.dart';
+import 'package:html_unescape/html_unescape.dart';
 
 class RssService {
-  // 인증 서비스 인스턴스
   static String baseUrl = AuthService.apiBaseUrl;
   static final AuthService _authService = AuthService();
+  static final HtmlUnescape _unescape = HtmlUnescape();
+
+  // HTML 엔티티 디코딩 함수 (문자열만 처리)
+  static String _decodeHtmlString(String text) {
+    return _unescape.convert(text);
+  }
 
   // 추천 채널 가져오기
   static Future<List<RssChannel>> fetchRecommendedChannels() async {
     try {
-      final headers = _authService.getAuthHeaders();
-
-      final response = await http.get(
-        Uri.parse("$baseUrl/rss/recommend/channel"),
-        headers: headers,
+      final response = await _authService.apiRequest(
+        'GET',
+        '/rss/recommend/channel',
       );
 
       if (response.statusCode == 200) {
         String decodedResponse = utf8.decode(response.bodyBytes);
-        List jsonResponse = json.decode(decodedResponse);
-        return jsonResponse.map((news) => RssChannel.fromJson(news)).toList();
+        List<dynamic> jsonResponse = json.decode(decodedResponse);
+
+        // HTML 엔티티 디코딩 - 각 채널의 필드별로 처리
+        return jsonResponse.map((channel) {
+          // 문자열 필드들만 디코딩
+          if (channel['channel_title'] is String) {
+            channel['channel_title'] = _decodeHtmlString(
+              channel['channel_title'],
+            );
+          }
+          if (channel['channel_description'] is String) {
+            channel['channel_description'] = _decodeHtmlString(
+              channel['channel_description'],
+            );
+          }
+          if (channel['channel_link'] is String) {
+            channel['channel_link'] = _decodeHtmlString(
+              channel['channel_link'],
+            );
+          }
+
+          return RssChannel.fromJson(channel);
+        }).toList();
       } else {
         throw Exception('Failed to load recommended channels');
       }
@@ -36,16 +60,35 @@ class RssService {
   // 특정 채널의 아이템 가져오기
   static Future<List<RssItem>> fetchChannelItems(int channelId) async {
     try {
-      final headers = _authService.getAuthHeaders();
-      final response = await http.get(
-        Uri.parse('$baseUrl/rss/items?channel_id=$channelId'),
-        headers: headers,
+      final response = await _authService.apiRequest(
+        'GET',
+        '/rss/items?channel_id=$channelId',
       );
 
       if (response.statusCode == 200) {
         String decodedResponse = utf8.decode(response.bodyBytes);
-        List jsonResponse = json.decode(decodedResponse);
-        return jsonResponse.map((item) => RssItem.fromJson(item)).toList();
+        List<dynamic> jsonResponse = json.decode(decodedResponse);
+
+        // HTML 엔티티 디코딩 - 각 아이템의 필드별로 처리
+        return jsonResponse.map((item) {
+          // 문자열 필드들만 디코딩
+          if (item['rss_title'] is String) {
+            item['rss_title'] = _decodeHtmlString(item['rss_title']);
+          }
+          if (item['rss_description'] is String) {
+            item['rss_description'] = _decodeHtmlString(
+              item['rss_description'],
+            );
+          }
+          if (item['rss_author'] is String) {
+            item['rss_author'] = _decodeHtmlString(item['rss_author']);
+          }
+          if (item['rss_source'] is String) {
+            item['rss_source'] = _decodeHtmlString(item['rss_source']);
+          }
+
+          return RssItem.fromJson(item);
+        }).toList();
       } else {
         throw Exception('Failed to load channel items');
       }
@@ -58,15 +101,32 @@ class RssService {
   // RSS 링크로부터 채널 미리보기 (새 RSS 추가 시)
   static Future<RssChannel?> previewRssFromUrl(String rssLink) async {
     try {
-      final headers = _authService.getAuthHeaders();
-      final response = await http.get(
-        Uri.parse('$baseUrl/rss/preview?rss_link=$rssLink'),
-        headers: headers,
+      final response = await _authService.apiRequest(
+        'GET',
+        '/rss/preview?rss_link=$rssLink',
       );
 
       if (response.statusCode == 200) {
         String decodedResponse = utf8.decode(response.bodyBytes);
-        dynamic jsonResponse = json.decode(decodedResponse);
+        Map<String, dynamic> jsonResponse = json.decode(decodedResponse);
+
+        // HTML 엔티티 디코딩 - 각 필드별로 처리
+        if (jsonResponse['channel_title'] is String) {
+          jsonResponse['channel_title'] = _decodeHtmlString(
+            jsonResponse['channel_title'],
+          );
+        }
+        if (jsonResponse['channel_description'] is String) {
+          jsonResponse['channel_description'] = _decodeHtmlString(
+            jsonResponse['channel_description'],
+          );
+        }
+        if (jsonResponse['channel_link'] is String) {
+          jsonResponse['channel_link'] = _decodeHtmlString(
+            jsonResponse['channel_link'],
+          );
+        }
+
         return RssChannel.fromJson(jsonResponse);
       } else {
         return null;
@@ -80,18 +140,14 @@ class RssService {
   // RSS를 DB에 추가하기
   static Future<int?> addRssToDb(String rssLink) async {
     try {
-      final headers = _authService.getAuthHeaders();
-      final response = await http.post(
-        Uri.parse('$baseUrl/rss/channel'),
-        headers: headers,
-        body: json.encode({"rss_link": rssLink}),
+      final response = await _authService.apiRequest(
+        'POST',
+        '/rss/channel',
+        body: {"rss_link": rssLink},
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // 서버 응답에서 채널 ID 추출
         String decodedResponse = utf8.decode(response.bodyBytes);
-
-        // 응답에서 id 필드 추출
         final value = json.decode(decodedResponse);
 
         if (value is int) {
@@ -103,7 +159,7 @@ class RssService {
         return null;
       } else {
         debugPrint(
-          'Failed to add RSS: ${response.statusCode} - ${response.body}',
+          'Failed to add RSS: ${response.statusCode}, ${response.body}',
         );
         return null;
       }
@@ -116,20 +172,17 @@ class RssService {
   // 채널 구독 - 새 API 스펙 사용
   static Future<bool> subscribeChannel(int channelId) async {
     try {
-      // 인증 헤더 가져오기
-      final headers = _authService.getAuthHeaders();
-
-      final response = await http.post(
-        Uri.parse('$baseUrl/subscription/channel_sub'),
-        headers: headers,
-        body: json.encode({"channel_id": channelId}),
+      final response = await _authService.apiRequest(
+        'POST',
+        '/subscription/channel_sub',
+        body: {"channel_id": channelId},
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return true;
       } else {
         debugPrint(
-          'Failed to subscribe channel: ${response.statusCode} - ${response.body}',
+          'Failed to subscribe channel: ${response.statusCode}, ${response.body}',
         );
         return false;
       }
@@ -141,23 +194,20 @@ class RssService {
 
   static Future<bool> subscribeChannelByRssLink(String channelRssLink) async {
     try {
-      // 인증 헤더 가져오기
-      final headers = _authService.getAuthHeaders();
-
       int? id = await getChannelId(channelRssLink);
       debugPrint('Channel ID: $id');
 
-      final response = await http.post(
-        Uri.parse('$baseUrl/subscription/channel'),
-        headers: headers,
-        body: json.encode({"channel_id": id}),
+      final response = await _authService.apiRequest(
+        'POST',
+        '/subscription/channel',
+        body: {"channel_id": id},
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return true;
       } else {
         debugPrint(
-          'Failed to subscribe channel: ${response.statusCode} - ${response.body}',
+          'Failed to subscribe channel: ${response.statusCode}, ${response.body}',
         );
         return false;
       }
@@ -170,10 +220,9 @@ class RssService {
   // rss link로 channel id 가져오기
   static Future<int> getChannelId(String channelRssLink) async {
     try {
-      final headers = _authService.getAuthHeaders();
-      final response = await http.get(
-        Uri.parse('$baseUrl/rss/id?channel_rss_link=$channelRssLink'),
-        headers: headers,
+      final response = await _authService.apiRequest(
+        'GET',
+        '/rss/id?channel_rss_link=$channelRssLink',
       );
 
       if (response.statusCode == 200) {
@@ -193,20 +242,17 @@ class RssService {
   // 채널 구독 취소 - 새 API 스펙 사용
   static Future<bool> unsubscribeChannel(int channelId) async {
     try {
-      // 인증 헤더 가져오기
-      final headers = _authService.getAuthHeaders();
-
-      final response = await http.delete(
-        Uri.parse('$baseUrl/subscription/channel'),
-        headers: headers,
-        body: json.encode({"channel_id": channelId}),
+      final response = await _authService.apiRequest(
+        'DELETE',
+        '/subscription/channel',
+        body: {"channel_id": channelId},
       );
 
       if (response.statusCode == 200) {
         return true;
       } else {
         debugPrint(
-          'Failed to unsubscribe channel: ${response.statusCode} - ${response.body}',
+          'Failed to unsubscribe channel: ${response.statusCode}, ${response.body}',
         );
         return false;
       }
@@ -221,24 +267,40 @@ class RssService {
     List<int> channelIds,
   ) async {
     try {
-      // 인증 헤더 가져오기
-      final headers = _authService.getAuthHeaders();
-
-      // 채널 ID 배열을 콤마로 구분된 문자열로 변환
       final String channelIdsString = channelIds.join(',');
 
-      final response = await http.get(
-        Uri.parse('$baseUrl/subscription/items?channel_ids=$channelIdsString'),
-        headers: headers,
+      final response = await _authService.apiRequest(
+        'GET',
+        '/subscription/items?channel_ids=$channelIdsString',
       );
 
       if (response.statusCode == 200) {
         String decodedResponse = utf8.decode(response.bodyBytes);
-        List jsonResponse = json.decode(decodedResponse);
-        return jsonResponse.map((item) => RssItem.fromJson(item)).toList();
+        List<dynamic> jsonResponse = json.decode(decodedResponse);
+
+        // HTML 엔티티 디코딩 - 각 아이템의 필드별로 처리
+        return jsonResponse.map((item) {
+          // 문자열 필드들만 디코딩
+          if (item['rss_title'] is String) {
+            item['rss_title'] = _decodeHtmlString(item['rss_title']);
+          }
+          if (item['rss_description'] is String) {
+            item['rss_description'] = _decodeHtmlString(
+              item['rss_description'],
+            );
+          }
+          if (item['rss_author'] is String) {
+            item['rss_author'] = _decodeHtmlString(item['rss_author']);
+          }
+          if (item['rss_source'] is String) {
+            item['rss_source'] = _decodeHtmlString(item['rss_source']);
+          }
+
+          return RssItem.fromJson(item);
+        }).toList();
       } else {
         debugPrint(
-          'Failed to fetch subscribed items: ${response.statusCode} - ${response.body}',
+          'Failed to fetch subscribed items: ${response.statusCode}, ${response.body}',
         );
         return [];
       }
@@ -251,23 +313,39 @@ class RssService {
   // 사용자 구독 채널 목록 가져오기
   static Future<List<RssChannel>> fetchSubscribedChannels() async {
     try {
-      // 인증 헤더 가져오기
-      final headers = _authService.getAuthHeaders();
-
-      final response = await http.get(
-        Uri.parse('$baseUrl/subscription/channels'),
-        headers: headers,
+      final response = await _authService.apiRequest(
+        'GET',
+        '/subscription/channels',
       );
 
       if (response.statusCode == 200) {
         String decodedResponse = utf8.decode(response.bodyBytes);
-        List jsonResponse = json.decode(decodedResponse);
-        return jsonResponse
-            .map((channel) => RssChannel.fromJson(channel))
-            .toList();
+        List<dynamic> jsonResponse = json.decode(decodedResponse);
+
+        // HTML 엔티티 디코딩 - 각 채널의 필드별로 처리
+        return jsonResponse.map((channel) {
+          // 문자열 필드들만 디코딩
+          if (channel['channel_title'] is String) {
+            channel['channel_title'] = _decodeHtmlString(
+              channel['channel_title'],
+            );
+          }
+          if (channel['channel_description'] is String) {
+            channel['channel_description'] = _decodeHtmlString(
+              channel['channel_description'],
+            );
+          }
+          if (channel['channel_link'] is String) {
+            channel['channel_link'] = _decodeHtmlString(
+              channel['channel_link'],
+            );
+          }
+
+          return RssChannel.fromJson(channel);
+        }).toList();
       } else {
         debugPrint(
-          'Failed to fetch subscribed channels: ${response.statusCode} - ${response.body}',
+          'Failed to fetch subscribed channels: ${response.statusCode}, ${response.body}',
         );
         return [];
       }
@@ -280,29 +358,18 @@ class RssService {
   // 채널이 이미 구독되어 있는지 확인
   static Future<bool> isChannelAlreadySubscribed(String channelRssLink) async {
     try {
-      // 인증 헤더 가져오기
-      final headers = _authService.getAuthHeaders();
-
-      // URL 인코딩 적용
-      final encodedLink = Uri.encodeComponent(channelRssLink);
-      debugPrint("Checking subscription status for (encoded): $encodedLink");
-
-      final uri = Uri.parse(
-        '$baseUrl/subscription/status',
-      ).replace(queryParameters: {'channel_rss_link': channelRssLink});
-
-      debugPrint("Full request URI: ${uri.toString()}");
-
-      final response = await http.get(uri, headers: headers);
+      final response = await _authService.apiRequest(
+        'GET',
+        '/subscription/status?channel_rss_link=$channelRssLink',
+      );
 
       if (response.statusCode == 200) {
         final decodedResponse = utf8.decode(response.bodyBytes);
-        debugPrint("Response body: $decodedResponse");
         final jsonResponse = json.decode(decodedResponse);
         return jsonResponse == true;
       } else {
         debugPrint(
-          'Failed to check subscription status: ${response.statusCode} - ${response.body}',
+          'Failed to check subscription status: ${response.statusCode}, ${response.body}',
         );
         return false;
       }
@@ -314,10 +381,9 @@ class RssService {
 
   static Future<bool> checkRssExists(String rssLink) async {
     try {
-      final headers = _authService.getAuthHeaders();
-      final response = await http.get(
-        Uri.parse('$baseUrl/rss/exist?rss_link=$rssLink'),
-        headers: headers,
+      final response = await _authService.apiRequest(
+        'GET',
+        '/rss/exist?rss_link=$rssLink',
       );
 
       if (response.statusCode == 200) {
@@ -336,18 +402,17 @@ class RssService {
 
   static Future<bool> updateRssRank(int rssId) async {
     try {
-      final headers = _authService.getAuthHeaders();
-      final response = await http.put(
-        Uri.parse('$baseUrl/rss/item/rank'),
-        headers: headers,
-        body: json.encode({"rss_id": rssId, "num": 1}),
+      final response = await _authService.apiRequest(
+        'PUT',
+        '/rss/item/rank',
+        body: {"rss_id": rssId, "num": 1},
       );
 
       if (response.statusCode == 200) {
         return true;
       } else {
         debugPrint(
-          'Failed to update RSS rank: ${response.statusCode} - ${response.body}',
+          'Failed to update RSS rank: ${response.statusCode}, ${response.body}',
         );
         return false;
       }
