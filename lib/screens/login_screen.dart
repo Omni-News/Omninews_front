@@ -187,6 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   // Google 로그인 처리
+
   Future<void> _handleGoogleLogin() async {
     try {
       setState(() => _isLoading = true);
@@ -199,6 +200,8 @@ class _LoginScreenState extends State<LoginScreen> {
         bool hasPermission =
             await _authService.requestNotificationPermissions();
         debugPrint('알림 권한 요청 결과: $hasPermission');
+
+        // 구독 상태 초기화 설정 (새 로그인이므로 recentLogin 플래그 유지)
 
         widget.onLoginSuccess();
       } else {

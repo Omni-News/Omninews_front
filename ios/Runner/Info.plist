@@ -29,8 +29,8 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-          <string>com.googleusercontent.apps.1008455298981-96a4gkqhnmr1hhbqab80df7rljbhocai</string>
-          <string>kakao89046ab727ea7019b5ec60e5aa53f5cb</string>
+				<string>com.googleusercontent.apps.1008455298981-96a4gkqhnmr1hhbqab80df7rljbhocai</string>
+				<string>kakao89046ab727ea7019b5ec60e5aa53f5cb</string>
 			</array>
 		</dict>
 	</array>
@@ -42,7 +42,7 @@
 		<string>https</string>
 		<string>kakaokompassauth</string>
 		<string>kakaolink</string>
-    <string>googlechromes</string>
+		<string>googlechromes</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
@@ -64,7 +64,18 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
-	<key>NSUserNotificationUsageDescription</key>
-  <string>앱에서 중요한 알림을 보내기 위해 알림 권한이 필요합니다</string></array>
+		<string>앱에서 중요한 알림을 보내기 위해 알림 권한이 필요합니다</string>
+	</array>
+	<key>SKAdNetworkItems</key>
+	<array>
+		<dict>
+			<key>SKAdNetworkIdentifier</key>
+			<string>cstr6suwn9.skadnetwork</string>
+		</dict>
+	</array>
+  <key>ITSAppUsesNonExemptEncryption</key>
+  <false/>
+  <key>StoreKit2Enabled</key>
+<true/>
 </dict>
 </plist>

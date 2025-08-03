@@ -1,29 +1,55 @@
 import 'package:omninews_flutter/models/custom_news.dart';
 import 'package:omninews_flutter/models/news.dart';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 import 'package:omninews_flutter/services/auth_service.dart';
+import 'package:flutter/material.dart';
+import 'package:html_unescape/html_unescape.dart';
 
 class NewsService {
   static String baseUrl = AuthService.apiBaseUrl;
   static final AuthService _authService = AuthService();
+  static final HtmlUnescape _unescape = HtmlUnescape();
+
+  // HTML 엔티티 디코딩 함수 (문자열만 처리)
+  static String _decodeHtmlString(String text) {
+    return _unescape.convert(text);
+  }
 
   static Future<List<News>> fetchNews(String category) async {
-    final headers = _authService.getAuthHeaders();
     try {
-      final response = await http.get(
-        Uri.parse("$baseUrl/news?category=$category"),
-        headers: headers,
+      // AuthService.apiRequest 사용하여 토큰 갱신 기능 활용
+      final response = await _authService.apiRequest(
+        'GET',
+        '/news?category=$category',
       );
 
       if (response.statusCode == 200) {
         String decodedResponse = utf8.decode(response.bodyBytes);
-        List jsonResponse = json.decode(decodedResponse);
-        return jsonResponse.map((news) => News.fromJson(news)).toList();
+        List<dynamic> jsonResponse = json.decode(decodedResponse);
+
+        // HTML 엔티티 디코딩 - 각 항목의 필드별로 처리
+        return jsonResponse.map((newsItem) {
+          // 문자열 필드들만 디코딩
+          if (newsItem['title'] is String) {
+            newsItem['title'] = _decodeHtmlString(newsItem['title']);
+          }
+          if (newsItem['content'] is String) {
+            newsItem['content'] = _decodeHtmlString(newsItem['content']);
+          }
+          if (newsItem['description'] is String) {
+            newsItem['description'] = _decodeHtmlString(
+              newsItem['description'],
+            );
+          }
+
+          return News.fromJson(newsItem);
+        }).toList();
       } else {
+        debugPrint('뉴스 로드 실패: ${response.statusCode}, ${response.body}');
         throw Exception('Failed to load News');
       }
     } catch (e) {
+      debugPrint('뉴스 로드 중 오류 발생: $e');
       throw Exception('Failed to load News $e');
     }
   }
@@ -35,22 +61,44 @@ class NewsService {
     String sort,
   ) async {
     try {
-      final headers = _authService.getAuthHeaders();
-      final response = await http.get(
-        Uri.parse(
-          '$baseUrl/search/news_api?query=$category&display=$display&sort=$sort',
-        ),
-        headers: headers,
+      // AuthService.apiRequest 사용하여 토큰 갱신 기능 활용
+      final response = await _authService.apiRequest(
+        'GET',
+        '/search/news_api?query=$category&display=$display&sort=$sort',
       );
 
       if (response.statusCode == 200) {
         String decodedResponse = utf8.decode(response.bodyBytes);
-        List jsonResponse = json.decode(decodedResponse);
-        return jsonResponse.map((news) => CustomNews.fromJson(news)).toList();
+        List<dynamic> jsonResponse = json.decode(decodedResponse);
+
+        // HTML 엔티티 디코딩 - 각 항목의 필드별로 처리
+        return jsonResponse.map((newsItem) {
+          // 문자열 필드들만 디코딩
+          if (newsItem['title'] is String) {
+            newsItem['title'] = _decodeHtmlString(newsItem['title']);
+          }
+          if (newsItem['description'] is String) {
+            newsItem['description'] = _decodeHtmlString(
+              newsItem['description'],
+            );
+          }
+          if (newsItem['originallink'] is String) {
+            newsItem['originallink'] = _decodeHtmlString(
+              newsItem['originallink'],
+            );
+          }
+          if (newsItem['link'] is String) {
+            newsItem['link'] = _decodeHtmlString(newsItem['link']);
+          }
+
+          return CustomNews.fromJson(newsItem);
+        }).toList();
       } else {
+        debugPrint('커스텀 뉴스 로드 실패: ${response.statusCode}, ${response.body}');
         throw Exception('Failed to load custom news: ${response.statusCode}');
       }
     } catch (e) {
+      debugPrint('커스텀 뉴스 로드 중 오류 발생: $e');
       throw Exception('Error fetching custom news: $e');
     }
   }

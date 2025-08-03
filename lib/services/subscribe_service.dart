@@ -1,14 +1,18 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:omninews_flutter/models/rss_channel.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
 import 'package:omninews_flutter/services/rss_service.dart';
-import 'package:omninews_flutter/services/auth_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:html_unescape/html_unescape.dart';
 
 class SubscribeService {
-  static final AuthService _authService = AuthService();
+  static final HtmlUnescape _unescape = HtmlUnescape();
+
+  // HTML 엔티티 디코딩 함수 (문자열만 처리)
+  static String _decodeHtmlString(String text) {
+    return _unescape.convert(text);
+  }
 
   // 구독한 채널의 아이템 가져오기
   static Future<List<RssItem>> getSubscribedItems() async {
@@ -63,7 +67,9 @@ class SubscribeService {
   static Future<List<RssItem>> searchBookmarkedItems(String query) async {
     try {
       final bookmarkedItems = await getLocalBookmarks();
-      return _filterItemsByQuery(bookmarkedItems, query);
+      // 검색어도 HTML 엔티티 디코딩
+      final decodedQuery = _decodeHtmlString(query);
+      return _filterItemsByQuery(bookmarkedItems, decodedQuery);
     } catch (e) {
       debugPrint('Error searching bookmarked items: $e');
       return [];
@@ -78,8 +84,11 @@ class SubscribeService {
       final allItems = await getItemsByChannel();
       final Map<RssChannel, List<RssItem>> result = {};
 
+      // 검색어도 HTML 엔티티 디코딩
+      final decodedQuery = _decodeHtmlString(query);
+
       for (var entry in allItems.entries) {
-        final filteredItems = _filterItemsByQuery(entry.value, query);
+        final filteredItems = _filterItemsByQuery(entry.value, decodedQuery);
         if (filteredItems.isNotEmpty) {
           result[entry.key] = filteredItems;
         }
@@ -119,9 +128,27 @@ class SubscribeService {
       final prefs = await SharedPreferences.getInstance();
       final bookmarksJson = prefs.getStringList('bookmarks') ?? [];
 
-      return bookmarksJson
-          .map((json) => RssItem.fromJson(jsonDecode(json)))
-          .toList()
+      return bookmarksJson.map((json) {
+          Map<String, dynamic> data = jsonDecode(json);
+
+          // 문자열 필드들만 디코딩
+          if (data['rss_title'] is String) {
+            data['rss_title'] = _decodeHtmlString(data['rss_title']);
+          }
+          if (data['rss_description'] is String) {
+            data['rss_description'] = _decodeHtmlString(
+              data['rss_description'],
+            );
+          }
+          if (data['rss_author'] is String) {
+            data['rss_author'] = _decodeHtmlString(data['rss_author']);
+          }
+          if (data['rss_source'] is String) {
+            data['rss_source'] = _decodeHtmlString(data['rss_source']);
+          }
+
+          return RssItem.fromJson(data);
+        }).toList()
         ..sort((a, b) {
           try {
             final dateA = DateTime.parse(a.rssPubDate);
@@ -144,6 +171,9 @@ class SubscribeService {
       final prefs = await SharedPreferences.getInstance();
       final bookmarksJson = prefs.getStringList('bookmarks') ?? [];
 
+      // 저장할 아이템 데이터 준비
+      Map<String, dynamic> itemJson = item.toJson();
+
       // 이미 있는지 확인
       final exists = bookmarksJson.any((json) {
         final existingItem = RssItem.fromJson(jsonDecode(json));
@@ -151,7 +181,7 @@ class SubscribeService {
       });
 
       if (!exists) {
-        bookmarksJson.add(jsonEncode(item.toJson()));
+        bookmarksJson.add(jsonEncode(itemJson));
         await prefs.setStringList('bookmarks', bookmarksJson);
       }
       return true;
@@ -189,8 +219,12 @@ class SubscribeService {
 
     final lowercaseQuery = query.toLowerCase();
     return items.where((item) {
-      return item.rssTitle.toLowerCase().contains(lowercaseQuery) ||
-          item.rssDescription.toLowerCase().contains(lowercaseQuery);
+      // 검색 시 디코딩된 텍스트로 비교
+      String title = _decodeHtmlString(item.rssTitle.toLowerCase());
+      String description = _decodeHtmlString(item.rssDescription.toLowerCase());
+
+      return title.contains(lowercaseQuery) ||
+          description.contains(lowercaseQuery);
     }).toList();
   }
 

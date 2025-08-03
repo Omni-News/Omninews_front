@@ -55,6 +55,9 @@ class AuthService {
   // 액세스 토큰 getter 추가
   String? get accessToken => _accessToken;
 
+  // 토큰 갱신 중 플래그 (중복 갱신 방지)
+  bool _isRefreshing = false;
+
   // 초기화 - 저장된 토큰과 사용자 정보 불러오기
   Future<void> initialize() async {
     // 중복 초기화 방지 및 대기 가능하게 처리
@@ -71,11 +74,31 @@ class AuthService {
 
     debugPrint('AuthService 초기화 시작');
     await _loadAuthData();
+
+    // 초기화 과정에서 액세스 토큰 유효성 확인 및 갱신
+    if (_accessToken != null && isTokenExpired()) {
+      debugPrint('초기화 중 만료된 액세스 토큰 감지, 갱신 시도');
+      await refreshAccessToken();
+    }
+
     _isInitialized = true;
     debugPrint('AuthService 초기화 완료: accessToken=${_accessToken != null}');
   }
 
+  // 토큰 만료 확인 헬퍼 메서드
+  bool isTokenExpired() {
+    // 만료 시간이 설정되지 않았다면 만료된 것으로 간주
+    if (_accessTokenExpiresAt == null) return true;
+
+    // 만료 시간 1분 전에 갱신하도록 설정 (버퍼)
+    final expiryWithBuffer = _accessTokenExpiresAt!.subtract(
+      Duration(minutes: 1),
+    );
+    return expiryWithBuffer.isBefore(DateTime.now());
+  }
+
   // 로그아웃
+
   Future<bool> signOut() async {
     try {
       // 소셜 로그인 SDK 로그아웃
@@ -111,8 +134,13 @@ class AuthService {
         }
       }
 
-      // 로컬 데이터 삭제
+      // 로컬 데이터 삭제 (구독 정보 포함)
       await _clearAuthData();
+
+      // 구독 정보도 삭제 (별도 처리)
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('cached_subscription');
+
       return true;
     } catch (e) {
       debugPrint('로그아웃 오류: $e');
@@ -276,6 +304,7 @@ class AuthService {
   }
 
   // 서버로 인증 정보 전송
+
   Future<bool> _authenticateWithServer(Map<String, dynamic> paramUser) async {
     try {
       final response = await http.post(
@@ -293,18 +322,33 @@ class AuthService {
 
         // 이메일로 사용자 정보 설정
         _user = {
-          'email': paramUser['user_email'],
-          'displayName': paramUser['user_display_name'],
+          'email': paramUser['user_email'] ?? 'unknown@example.com',
+          'displayName': paramUser['user_display_name'] ?? 'Unknown User',
           'photoUrl': paramUser['user_photo_url'],
           'provider': paramUser['user_social_login_provider'],
           'theme': data['theme'], // 서버에서 받은 테마 정보 저장
+          'recentLogin': true, // 최근 로그인 표시 추가
         };
+
+        // 저장 전 데이터 검증
+        if (_user!['email'] == null || _user!['email'].isEmpty) {
+          debugPrint('경고: 로그인은 성공했지만 사용자 이메일이 비어 있습니다.');
+          _user!['email'] = 'unknown@example.com';
+        }
 
         // 서버에서 토큰 정보 전달받음 - 토큰이 이미 유효하면 null이 올 수 있음
         _handleTokenResponse(data);
 
         // 로컬 저장소에 저장
         await _saveAuthData();
+
+        // 로그인 시간 기록 (계정 전환 탐지용)
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(
+          'last_login_time',
+          DateTime.now().toIso8601String(),
+        );
+        await prefs.setString('last_login_email', _user!['email']);
 
         debugPrint('서버 인증 성공: ${_user?['displayName']}');
         return true;
@@ -384,6 +428,7 @@ class AuthService {
       _refreshToken = prefs.getString('refresh_token');
 
       debugPrint('SharedPreferences에서 액세스 토큰 로드: $_accessToken');
+      debugPrint('SharedPreferences에서 리프레시 토큰 로드: $_refreshToken');
 
       final accessExpiry = prefs.getString('access_token_expires_at');
       if (accessExpiry != null) {
@@ -399,16 +444,46 @@ class AuthService {
       final userData = prefs.getString('user_data');
       if (userData != null) {
         _user = json.decode(userData);
+        debugPrint('로드된 사용자 정보: $_user');
+
+        // 사용자 이메일 검증
+        final email = _user?['email'];
+        if (email == null || email.isEmpty) {
+          debugPrint('경고: 사용자 정보에 이메일이 없거나 빈 값입니다!');
+        }
       }
 
       debugPrint('저장된 인증 데이터 로드: ${_user != null ? "성공" : "데이터 없음"}');
-      debugPrint('액세스 토큰: ${_accessToken != null ? "있음" : "없음"}');
 
       // 디버깅을 위해 SharedPreferences의 모든 키 출력
       final keys = prefs.getKeys();
       debugPrint('SharedPreferences에 저장된 모든 키: $keys');
+
+      // 핵심 값들을 검증
+      _validateLoadedAuthData();
     } catch (e) {
       debugPrint('인증 데이터 로드 오류: $e');
+    }
+  }
+
+  void _validateLoadedAuthData() {
+    if (_refreshToken == null || _refreshToken!.isEmpty) {
+      debugPrint('경고: 리프레시 토큰이 없거나 빈 값입니다');
+    }
+
+    if (_user == null) {
+      debugPrint('경고: 사용자 정보가 없습니다');
+      return;
+    }
+
+    // 필수 필드 검증
+    final requiredFields = ['email', 'displayName', 'provider'];
+    for (final field in requiredFields) {
+      if (!_user!.containsKey(field) ||
+          _user![field] == null ||
+          _user![field].isEmpty) {
+        debugPrint('경고: 사용자 정보에 $field 필드가 없거나 빈 값입니다');
+      }
     }
   }
 
@@ -455,14 +530,25 @@ class AuthService {
     }
   }
 
-  // API 요청 래퍼 메소드 - 모든 API 요청에 사용
+  // API 요청 래퍼 메소드 - 모든 API 요청에 사용 (자동 토큰 갱신 기능 추가)
   Future<http.Response> apiRequest(
     String method,
     String endpoint, {
     Map<String, dynamic>? body,
+    bool retrying = false, // 재시도 플래그 추가
   }) async {
     // 초기화 확인
     await ensureInitialized();
+
+    // 요청 전 토큰 상태 확인 (retrying이 false일 때만)
+    if (!retrying && (_accessToken == null || isTokenExpired())) {
+      debugPrint('액세스 토큰이 없거나 만료됨, 갱신 시도');
+      final refreshed = await refreshAccessToken();
+      if (!refreshed) {
+        debugPrint('토큰 갱신 실패, 로그인 필요');
+        throw Exception('인증이 필요합니다.');
+      }
+    }
 
     final headers = getAuthHeaders();
     final url = Uri.parse('$apiBaseUrl$endpoint');
@@ -498,6 +584,16 @@ class AuthService {
           throw Exception('지원하지 않는 HTTP 메소드: $method');
       }
 
+      // 401 응답을 받고 재시도하지 않은 경우 토큰 갱신 후 재시도
+      if (response.statusCode == 401 && !retrying) {
+        debugPrint('401 Unauthorized 응답, 토큰 갱신 시도');
+        final refreshed = await refreshAccessToken();
+        if (refreshed) {
+          // 재귀적으로 동일한 요청을 재시도 (무한 루프 방지를 위해 retrying 플래그 사용)
+          return apiRequest(method, endpoint, body: body, retrying: true);
+        }
+      }
+
       // 서버에서 새로운 토큰을 보내주면 저장
       if (response.statusCode == 200 || response.statusCode == 201) {
         try {
@@ -517,6 +613,20 @@ class AuthService {
     } catch (e) {
       debugPrint('API 요청 오류: $e');
       rethrow;
+    }
+  }
+
+  // 계정 전환 여부 확인
+  bool isRecentLogin() {
+    // user에 recentLogin 플래그가 있으면 최근 로그인
+    return _user != null && _user!['recentLogin'] == true;
+  }
+
+  // 최근 로그인 플래그 리셋
+  void resetRecentLoginFlag() {
+    if (_user != null) {
+      _user!['recentLogin'] = false;
+      _saveAuthData(); // 변경사항 저장
     }
   }
 
@@ -567,30 +677,68 @@ class AuthService {
 
   // 리프레시 토큰으로 액세스 토큰 갱신
   Future<bool> refreshAccessToken() async {
-    if (_refreshToken == null || _user == null || _user?['email'] == null) {
-      debugPrint('리프레시 토큰 또는 사용자 정보 없음');
-      return false;
+    // 이미 갱신 중이면 기다림
+    if (_isRefreshing) {
+      debugPrint('토큰 갱신이 이미 진행 중입니다.');
+      // 5초 동안 토큰 갱신이 완료될 때까지 대기
+      for (int i = 0; i < 10; i++) {
+        await Future.delayed(Duration(milliseconds: 500));
+        if (!_isRefreshing && _accessToken != null) {
+          return true;
+        }
+      }
+      return _accessToken != null;
     }
 
-    // 리프레시 토큰 만료 체크
-    if (_refreshTokenExpiresAt != null &&
-        _refreshTokenExpiresAt!.isBefore(DateTime.now())) {
-      debugPrint('리프레시 토큰 만료됨');
-      return false;
-    }
+    _isRefreshing = true;
 
     try {
+      // 데이터가 이미 로드되어 있는지 확인하고, 아니면 로드 시도
+      if (_user == null || _refreshToken == null) {
+        await _loadAuthData();
+      }
+
+      // 디버깅을 위해 현재 값들 출력
+      debugPrint('리프레시 토큰 값: $_refreshToken');
+      debugPrint('사용자 정보: $_user');
+
+      // 널 체크 강화
+      final refreshToken = _refreshToken;
+      final userEmail = _user?['email'];
+
+      if (refreshToken == null || refreshToken.isEmpty) {
+        debugPrint('리프레시 토큰이 없거나 빈 값입니다');
+        _isRefreshing = false;
+        return false;
+      }
+
+      if (userEmail == null || userEmail.isEmpty) {
+        debugPrint('사용자 이메일이 없거나 빈 값입니다');
+        _isRefreshing = false;
+        return false;
+      }
+
+      // 리프레시 토큰 만료 체크
+      if (_refreshTokenExpiresAt != null &&
+          _refreshTokenExpiresAt!.isBefore(DateTime.now())) {
+        debugPrint('리프레시 토큰 만료됨');
+        _isRefreshing = false;
+        return false;
+      }
+
+      debugPrint('리프레시 토큰 요청 - 토큰: $refreshToken, 이메일: $userEmail');
+
       final response = await http.post(
         Uri.parse('$apiBaseUrl/user/refresh-token'),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: json.encode({
-          'refresh_token': _refreshToken,
-          'user_email': _user?['email'],
-        }),
+        body: json.encode({'token': refreshToken, 'email': userEmail}),
       );
+
+      // 응답 로깅 추가
+      debugPrint('리프레시 토큰 응답: ${response.statusCode}, ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -607,33 +755,58 @@ class AuthService {
 
           await _saveAuthData();
           debugPrint('액세스 토큰 갱신 성공');
+          _isRefreshing = false;
           return true;
         }
       }
 
       debugPrint('토큰 갱신 실패: ${response.statusCode}, ${response.body}');
+      _isRefreshing = false;
       return false;
     } catch (e) {
       debugPrint('토큰 갱신 중 오류 발생: $e');
+      _isRefreshing = false;
       return false;
     }
   }
 
-  // 자동 로그인 시도 - 토큰 검증 및 필요시 갱신
+  // 자동 로그인 시도 - 토큰 검증 및 필요시 갱신 (개선됨)
   Future<bool> tryAutoLogin() async {
     await ensureInitialized();
 
-    if (_accessToken == null) {
-      debugPrint('저장된 액세스 토큰 없음, 자동 로그인 실패');
+    // 액세스 토큰이 없으면 리프레시 토큰으로 갱신 시도
+    if (_accessToken == null && _refreshToken != null) {
+      debugPrint('액세스 토큰 없음, 리프레시 토큰으로 갱신 시도');
+      final refreshed = await refreshAccessToken();
+      if (!refreshed) {
+        debugPrint('리프레시 토큰으로 갱신 실패, 로그아웃 처리');
+        await _clearAuthData();
+        return false;
+      }
+      return true;
+    } else if (_accessToken == null) {
+      // 두 토큰 모두 없으면 로그인 필요
+      debugPrint('저장된 토큰 없음, 자동 로그인 실패');
       return false;
     }
 
-    final isValid = await verifyAccessToken();
-
-    if (!isValid) {
-      debugPrint('토큰 검증 실패, 로그아웃 처리');
-      await _clearAuthData();
-      return false;
+    // 액세스 토큰이 있지만 만료된 경우
+    if (isTokenExpired()) {
+      debugPrint('액세스 토큰 만료됨, 갱신 시도');
+      final isValid = await refreshAccessToken();
+      if (!isValid) {
+        debugPrint('토큰 갱신 실패, 로그아웃 처리');
+        await _clearAuthData();
+        return false;
+      }
+    } else {
+      // 토큰이 있고 만료되지 않았을 때도 유효성 확인
+      final isValid = await verifyAccessToken();
+      if (!isValid) {
+        debugPrint('토큰 검증 실패, 로그아웃 처리');
+        await _clearAuthData();
+        return false;
+      }
     }
 
     debugPrint('자동 로그인 성공: ${_user?['displayName']}');
@@ -744,12 +917,12 @@ class AuthService {
         final data = json.decode(response.body);
         debugPrint('서버 응답: $data');
 
-        // 이메일로 사용자 정보 설정
+        // 이메일로 사용자 정보 설정 (서버 응답에서 이메일을 가져오거나 기본값 사용)
         _user = {
-          'email': 'apple login',
-          'displayName': 'apple login',
-          'photoUrl': 'apple login',
-          'provider': 'apple login',
+          'email': data['user_email'] ?? 'apple_user@example.com',
+          'displayName': data['user_display_name'] ?? 'Apple User',
+          'photoUrl': data['user_photo_url'],
+          'provider': 'apple',
           'social_provider_id': userSocialProviderId,
         };
 
@@ -767,6 +940,25 @@ class AuthService {
       }
     } catch (e) {
       print('애플 로그인 오류: $e');
+      return false;
+    }
+  }
+
+  // 테스트용 함수 - 앱에서 호출하여 토큰 갱신 테스트
+  Future<bool> testTokenRefresh() async {
+    // 액세스 토큰 강제로 무효화
+    _accessToken = null;
+    await _saveAuthData(); // 변경사항 저장
+
+    debugPrint('액세스 토큰을 강제로 삭제했습니다');
+
+    // 일반 API 요청으로 자동 갱신 테스트
+    try {
+      final response = await apiRequest('GET', '/user/profile');
+      debugPrint('API 요청 응답: ${response.statusCode}');
+      return response.statusCode == 200;
+    } catch (e) {
+      debugPrint('테스트 중 오류: $e');
       return false;
     }
   }

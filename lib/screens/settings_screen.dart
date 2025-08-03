@@ -1,7 +1,7 @@
-// lib/screens/settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/app_setting.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
+import 'package:omninews_flutter/screens/omninews_subscription/omninews_subscription_home.dart';
 import 'package:provider/provider.dart';
 import 'package:omninews_flutter/services/auth_service.dart'; // 알림 권한용 추가
 import 'package:permission_handler/permission_handler.dart'; // 권한 핸들러 추가
@@ -35,6 +35,10 @@ class SettingsScreen extends StatelessWidget {
           _buildSectionHeader(context, '알림 설정'),
           _buildNotificationSettings(context, settingsProvider),
           const Divider(),
+          // 구독 섹션 추가
+          _buildSectionHeader(context, '구독 관리'),
+          _buildSubscriptionSettings(context),
+          const Divider(),
         ],
       ),
     );
@@ -54,6 +58,26 @@ class SettingsScreen extends StatelessWidget {
           letterSpacing: 0.5,
         ),
       ),
+    );
+  }
+
+  // 구독 설정 위젯 추가
+  Widget _buildSubscriptionSettings(BuildContext context) {
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.card_membership),
+          title: const Text('구독 관리'),
+          subtitle: const Text('프리미엄 기능 및 구독 상태 확인'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => SubscriptionHomePage()),
+            );
+          },
+        ),
+      ],
     );
   }
 
