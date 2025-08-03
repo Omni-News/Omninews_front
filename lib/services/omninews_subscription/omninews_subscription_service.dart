@@ -4,7 +4,6 @@ import 'dart:async';
 
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:omninews_flutter/models/omninews_subscription.dart';
-import 'package:omninews_flutter/services/omninews_subscription/receipt_validator.dart';
 import 'package:flutter/foundation.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:omninews_flutter/services/auth_service.dart';
@@ -15,7 +14,6 @@ class SubscriptionService {
   StreamSubscription<List<PurchaseDetails>>? _purchaseUpdateSubscription;
   final _inAppPurchase = InAppPurchase.instance;
   final AuthService _authService = AuthService();
-  final ReceiptValidator _receiptValidator = ReceiptValidator();
   final bool skipInitialCheck;
 
   SubscriptionService({this.skipInitialCheck = false});
@@ -92,10 +90,9 @@ class SubscriptionService {
             try {
               expiryDate = DateTime.parse(data['expires_date']);
             } catch (e) {
-              expiryDate = DateTime.now().add(Duration(days: 30));
+              debugPrint('만료일 파싱 오류: $e');
+              // 만료일 파싱 실패 시 null로 설정 (임의 날짜 설정 없음)
             }
-          } else {
-            expiryDate = DateTime.now().add(Duration(days: 30));
           }
 
           return SubscriptionStatus(
@@ -114,10 +111,7 @@ class SubscriptionService {
   }
 
   // 서버에 구독 정보 등록
-  Future<bool> registerSubscriptionWithServer(
-    String userId,
-    PurchaseDetails purchase,
-  ) async {
+  Future<bool> registerSubscriptionWithServer(PurchaseDetails purchase) async {
     try {
       final receiptData = purchase.verificationData.serverVerificationData;
 
@@ -240,32 +234,20 @@ class SubscriptionService {
           // 구매 완료 또는 복원됨
           debugPrint('구매 완료 또는 복원됨: ${purchase.productID}');
 
-          // ReceiptValidator를 사용하여 영수증 검증
-          final validationResult = await _validateReceipt(purchase);
+          // 서버에 영수증 전송하여 등록 및 검증
+          final success = await registerSubscriptionWithServer(purchase);
 
-          if (validationResult.isValid) {
-            debugPrint('구매 검증 성공');
+          if (success) {
+            debugPrint('서버에 구독 등록 성공');
 
-            // 현재 사용자 ID 가져오기
-            final userId = _authService.user?['email'];
-
-            if (userId != null) {
-              // 서버에 구독 정보 등록
-              await registerSubscriptionWithServer(userId, purchase);
-            } else {
-              debugPrint('로그인되지 않은 상태에서 구매 완료');
-            }
-
-            // 상태 업데이트 - 서버에서 확인
+            // 서버에서 최신 구독 상태 확인
             final status = await checkSubscriptionStatus();
             _statusController.add(status);
           } else {
-            debugPrint(
-              '구매 검증 실패: ${validationResult.errorMessage ?? "알 수 없는 오류"}',
-            );
+            debugPrint('서버에 구독 등록 실패');
           }
 
-          // 트랜잭션 완료 처리
+          // 트랜잭션 완료 처리 (스토어에게 처리 완료 알림)
           if (purchase.pendingCompletePurchase) {
             await _inAppPurchase.completePurchase(purchase);
             debugPrint('트랜잭션 완료됨');
@@ -284,25 +266,6 @@ class SubscriptionService {
           debugPrint('구매가 취소되었습니다');
           break;
       }
-    }
-  }
-
-  // ReceiptValidator를 활용한 영수증 검증 메소드
-  Future<ReceiptValidationResult> _validateReceipt(
-    PurchaseDetails purchaseDetails,
-  ) async {
-    try {
-      // ReceiptValidator의 validateReceipt 메소드 사용
-      return await _receiptValidator.validateReceipt(
-        purchaseDetails.verificationData,
-      );
-    } catch (e) {
-      debugPrint('영수증 검증 중 오류: $e');
-      return ReceiptValidationResult(
-        isValid: false,
-        isActive: false,
-        errorMessage: e.toString(),
-      );
     }
   }
 
