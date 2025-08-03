@@ -3,7 +3,6 @@ import 'package:omninews_flutter/theme/app_theme.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:omninews_flutter/services/auth_service.dart';
 import 'dart:convert';
-import 'package:http/http.dart' as http;
 
 class ThemeProvider extends ChangeNotifier {
   String _currentThemeKey = "light"; // 기본 테마는 라이트

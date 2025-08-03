@@ -1,4 +1,3 @@
-import 'dart:io' show Platform;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +8,6 @@ import 'package:omninews_flutter/provider/settings_provider.dart';
 import 'package:omninews_flutter/provider/subscription_provider.dart';
 import 'package:omninews_flutter/services/auth_service.dart';
 import 'package:omninews_flutter/services/omninews_subscription/omninews_subscription_service.dart';
-import 'package:omninews_flutter/services/omninews_subscription/receipt_validator.dart';
 import 'package:provider/provider.dart';
 import 'provider/theme_provider.dart';
 import 'screens/home_screen.dart';

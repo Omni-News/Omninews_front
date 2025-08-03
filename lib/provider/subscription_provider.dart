@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:omninews_flutter/models/omninews_subscription.dart';
 import 'package:omninews_flutter/services/auth_service.dart';
 import 'package:omninews_flutter/services/omninews_subscription/omninews_subscription_service.dart';
@@ -7,7 +8,6 @@ class SubscriptionProvider with ChangeNotifier {
   SubscriptionStatus _status = SubscriptionStatus(isActive: false);
   List<SubscriptionPlan> _availablePlans = [];
   bool _isLoading = false;
-  bool _hasCheckedSubscription = false;
 
   SubscriptionStatus get status => _status;
   List<SubscriptionPlan> get availablePlans => _availablePlans;
@@ -42,12 +42,6 @@ class SubscriptionProvider with ChangeNotifier {
 
   // 로그인 시 한 번만 호출되는 구독 상태 확인 메서드
   Future<void> checkSubscriptionOnLogin() async {
-    // 이미 확인한 경우 중복 검증 방지
-    if (_hasCheckedSubscription) {
-      debugPrint('구독 상태 이미 확인됨, 중복 검증 방지');
-      return;
-    }
-
     _isLoading = true;
     notifyListeners();
 
@@ -65,7 +59,6 @@ class SubscriptionProvider with ChangeNotifier {
         _availablePlans = await _subscriptionService.loadSubscriptionPlans();
       }
 
-      _hasCheckedSubscription = true;
       debugPrint('로그인 후 구독 상태 확인 완료: ${_status.isActive ? "구독 중" : "구독 안함"}');
     } catch (e) {
       debugPrint('구독 상태 확인 중 오류: $e');
@@ -172,5 +165,15 @@ class SubscriptionProvider with ChangeNotifier {
   // 구독 취소 안내 메서드
   Future<bool> navigateToSubscriptionManagement() async {
     return await _subscriptionService.navigateToSubscriptionManagement();
+  }
+
+  Future<void> registerSubscriptionWithServer(PurchaseDetails purchase) async {
+    try {
+      // 서버에 구독 상태 등록
+      await _subscriptionService.registerSubscriptionWithServer(purchase);
+      debugPrint('구독 상태 서버 등록 성공: ${purchase.productID}');
+    } catch (e) {
+      debugPrint('구독 상태 서버 등록 오류: $e');
+    }
   }
 }
