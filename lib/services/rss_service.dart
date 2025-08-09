@@ -421,4 +421,45 @@ class RssService {
       return false;
     }
   }
+
+  // RSS 생성 API
+  static Future<RssChannel?> generateRss(String url, String kind) async {
+    try {
+      final response = await _authService.apiRequest(
+        'POST',
+        '/premium/rss/generate',
+        body: {"channel_link": url, "kind": kind},
+      );
+
+      if (response.statusCode == 200) {
+        String decodedResponse = utf8.decode(response.bodyBytes);
+        Map<String, dynamic> jsonResponse = json.decode(decodedResponse);
+
+        // HTML 엔티티 디코딩
+        if (jsonResponse['channel_title'] is String) {
+          jsonResponse['channel_title'] = _decodeHtmlString(
+            jsonResponse['channel_title'],
+          );
+        }
+        if (jsonResponse['channel_description'] is String) {
+          jsonResponse['channel_description'] = _decodeHtmlString(
+            jsonResponse['channel_description'],
+          );
+        }
+        if (jsonResponse['channel_link'] is String) {
+          jsonResponse['channel_link'] = _decodeHtmlString(
+            jsonResponse['channel_link'],
+          );
+        }
+
+        return RssChannel.fromJson(jsonResponse);
+      } else {
+        debugPrint('RSS 생성 실패: ${response.statusCode}, ${response.body}');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('RSS 생성 중 오류 발생: $e');
+      return null;
+    }
+  }
 }
