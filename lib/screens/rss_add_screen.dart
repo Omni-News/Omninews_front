@@ -43,7 +43,7 @@ class _RssAddScreenState extends State<RssAddScreen>
       'name': '네이버',
       'icon': Icons.public,
       'color': Color(0xFF03C75A),
-      'keywords': ['네이버', '네', 'naver', 'n'], // 검색 키워드
+      'keywords': ['네이버', '네', 'naver', 'n'],
     },
     {
       'id': 'Tistory',
@@ -73,9 +73,15 @@ class _RssAddScreenState extends State<RssAddScreen>
       'color': Color(0xFF1877F2),
       'keywords': ['페이스북', '페북', '페', 'facebook', 'fb', 'f'],
     },
+    // 새 항목: 기타 웹사이트(기본 파이프라인)
+    {
+      'id': 'Web',
+      'name': '기타 웹사이트',
+      'icon': Icons.language,
+      'color': Colors.blueGrey,
+      'keywords': ['기타', '웹', 'web', 'generic', 'any', '임의', 'w', 'g'],
+    },
   ];
-
-  // 필터링된 플랫폼 목록
   // 필터링된 플랫폼 목록
   List<Map<String, dynamic>> get _filteredPlatforms {
     if (_searchQuery.isEmpty) {
@@ -320,9 +326,12 @@ class _RssAddScreenState extends State<RssAddScreen>
 
     try {
       // 프리미엄 RSS 생성 API 호출
+      final platformForApi =
+          _selectedPlatform == 'Web' ? 'Default' : _selectedPlatform;
+
       final generatedChannel = await RssService.generateRss(
         url,
-        _selectedPlatform,
+        platformForApi,
       );
 
       if (generatedChannel != null) {
@@ -849,6 +858,8 @@ class _RssAddScreenState extends State<RssAddScreen>
         return 'https://www.instagram.com/사용자명';
       case 'Facebook':
         return 'https://www.facebook.com/사용자명';
+      case 'Web': // 추가
+        return 'https://example.com/원하는_페이지';
       default:
         return 'https://...';
     }
