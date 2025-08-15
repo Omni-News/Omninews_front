@@ -84,6 +84,23 @@ class SubscriptionProvider with ChangeNotifier {
     }
   }
 
+  Future<bool> purchaseSubscriptionTest() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final success = await _subscriptionService
+          .registerSubscriptionWithServerTest('Test');
+      return success;
+    } catch (e) {
+      debugPrint('구독 구매 중 오류: $e');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   // 초기화 - 앱 시작시 자동 복원 추가
   Future<void> initialize() async {
     _isLoading = true;

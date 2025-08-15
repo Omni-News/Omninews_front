@@ -5,7 +5,6 @@ import 'package:omninews_flutter/screens/home_screen.dart';
 import 'package:omninews_flutter/screens/omninews_subscription/omninews_subscription_home.dart';
 import 'package:omninews_flutter/services/omninews_subscription/omninews_subscription_service.dart';
 import 'package:omninews_flutter/services/rss_service.dart';
-import 'package:omninews_flutter/services/auth_service.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
 
 class RssAddScreen extends StatefulWidget {
@@ -22,9 +21,34 @@ class _RssAddScreenState extends State<RssAddScreen>
   final TextEditingController _urlController = TextEditingController();
   final TextEditingController _generateUrlController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
+
+  final TextEditingController _cssChannelLinkController =
+      TextEditingController();
+  final TextEditingController _cssChannelImageController =
+      TextEditingController();
+  final TextEditingController _cssChannelTitleController =
+      TextEditingController();
+  final TextEditingController _cssChannelDescController =
+      TextEditingController();
+  final TextEditingController _cssChannelLangController = TextEditingController(
+    text: "ko-KR",
+  );
+  final TextEditingController _cssItemTitleController = TextEditingController();
+  final TextEditingController _cssItemDescController = TextEditingController();
+  final TextEditingController _cssItemLinkController = TextEditingController();
+  final TextEditingController _cssItemAuthorController =
+      TextEditingController();
+  final TextEditingController _cssItemPubDateController =
+      TextEditingController();
+  final TextEditingController _cssItemImageController = TextEditingController();
+
+  bool _showCssForm = false;
+  bool _isCssGenerating = false;
+
   bool _isLoading = false;
   bool _isPreviewLoading = false;
   bool _isGenerating = false;
+
   RssChannel? _previewChannel;
   String? _errorMessage;
   bool _isExistingRss = false;
@@ -32,48 +56,46 @@ class _RssAddScreenState extends State<RssAddScreen>
   int? _channelId;
   late TabController _tabController;
   SubscriptionStatus? _subscriptionStatus;
-  String _selectedPlatform = 'Naver'; // 기본 플랫폼
+  String _selectedPlatform = 'Naver';
   bool _isLoadingSubscriptionStatus = true;
   String _searchQuery = '';
 
-  // RSS 생성을 위한 플랫폼 옵션 - 검색 키워드 추가
+  // 인스타그램 생성 후 아이템이 아직 수집 중인지 표시
+  bool _instagramItemsPending = false;
+
+  // 방금 generate 응답이 "이미 존재(is_exist=true)" 였는지 표시 (배너/안내용)
+  bool _generatedExisted = false;
+
+  // 플랫폼 목록 (Facebook 제거됨)
   final List<Map<String, dynamic>> _platforms = [
     {
       'id': 'Naver',
       'name': '네이버',
       'icon': Icons.public,
-      'color': Color(0xFF03C75A),
+      'color': const Color(0xFF03C75A),
       'keywords': ['네이버', '네', 'naver', 'n'],
     },
     {
       'id': 'Tistory',
       'name': '티스토리',
       'icon': Icons.web,
-      'color': Color(0xFFEA4335),
+      'color': const Color(0xFFEA4335),
       'keywords': ['티스토리', '티', 'tistory', 't'],
     },
     {
       'id': 'Medium',
       'name': '미디엄',
       'icon': Icons.article_outlined,
-      'color': Color(0xFF000000),
+      'color': const Color(0xFF000000),
       'keywords': ['미디엄', '미', 'medium', 'm'],
     },
     {
       'id': 'Instagram',
       'name': '인스타그램',
       'icon': Icons.camera_alt,
-      'color': Color(0xFFE1306C),
+      'color': const Color(0xFFE1306C),
       'keywords': ['인스타그램', '인스타', '인', 'instagram', 'insta', 'i'],
     },
-    {
-      'id': 'Facebook',
-      'name': '페이스북',
-      'icon': Icons.facebook,
-      'color': Color(0xFF1877F2),
-      'keywords': ['페이스북', '페북', '페', 'facebook', 'fb', 'f'],
-    },
-    // 새 항목: 기타 웹사이트(기본 파이프라인)
     {
       'id': 'Web',
       'name': '기타 웹사이트',
@@ -82,19 +104,13 @@ class _RssAddScreenState extends State<RssAddScreen>
       'keywords': ['기타', '웹', 'web', 'generic', 'any', '임의', 'w', 'g'],
     },
   ];
-  // 필터링된 플랫폼 목록
-  List<Map<String, dynamic>> get _filteredPlatforms {
-    if (_searchQuery.isEmpty) {
-      return _platforms;
-    }
 
-    return _platforms.where((platform) {
-      // 플랫폼의 키워드 목록에서 검색어를 포함하는지 확인
-      final keywords = platform['keywords'] as List;
+  List<Map<String, dynamic>> get _filteredPlatforms {
+    if (_searchQuery.isEmpty) return _platforms;
+    return _platforms.where((p) {
+      final keywords = p['keywords'] as List;
       return keywords.any(
-        (keyword) => keyword.toString().toLowerCase().contains(
-          _searchQuery.toLowerCase(),
-        ),
+        (k) => k.toString().toLowerCase().contains(_searchQuery.toLowerCase()),
       );
     }).toList();
   }
@@ -113,45 +129,49 @@ class _RssAddScreenState extends State<RssAddScreen>
     _generateUrlController.dispose();
     _searchController.dispose();
     _tabController.dispose();
+
+    _cssChannelLinkController.dispose();
+    _cssChannelImageController.dispose();
+    _cssChannelTitleController.dispose();
+    _cssChannelDescController.dispose();
+    _cssChannelLangController.dispose();
+    _cssItemTitleController.dispose();
+    _cssItemDescController.dispose();
+    _cssItemLinkController.dispose();
+    _cssItemAuthorController.dispose();
+    _cssItemPubDateController.dispose();
+    _cssItemImageController.dispose();
+
     super.dispose();
   }
 
-  // 검색어 변경 리스너
   void _onSearchChanged() {
     setState(() {
       _searchQuery = _searchController.text;
     });
   }
 
-  // 구독 상태 확인
   Future<void> _checkSubscriptionStatus() async {
+    setState(() => _isLoadingSubscriptionStatus = true);
+    final service = SubscriptionService();
+    final status = await service.checkSubscriptionStatus();
+    if (!mounted) return;
     setState(() {
-      _isLoadingSubscriptionStatus = true;
+      _subscriptionStatus = status;
+      _isLoadingSubscriptionStatus = false;
     });
-
-    final omninesSubscriptionService = SubscriptionService();
-    final status = await omninesSubscriptionService.checkSubscriptionStatus();
-
-    if (mounted) {
-      setState(() {
-        _subscriptionStatus = status;
-        _isLoadingSubscriptionStatus = false;
-      });
-    }
   }
 
-  // 유효한 이미지 URL인지 확인
   bool _isValidImageUrl(String? url) {
     if (url == null || url.isEmpty) return false;
     try {
       final uri = Uri.parse(url);
       return uri.scheme.isNotEmpty && uri.host.isNotEmpty;
-    } catch (e) {
+    } catch (_) {
       return false;
     }
   }
 
-  // RSS 미리보기 요청
   Future<void> _previewRss() async {
     final url = _urlController.text.trim();
     if (url.isEmpty) {
@@ -169,110 +189,142 @@ class _RssAddScreenState extends State<RssAddScreen>
       _isExistingRss = false;
       _isAlreadySubscribed = false;
       _channelId = null;
+      _instagramItemsPending = false;
+      _generatedExisted = false;
     });
 
     try {
-      // 채널 미리보기 가져오기
       final preview = await RssService.previewRssFromUrl(url);
-
       if (preview != null) {
-        // 서버에 이미 존재하는지 확인
         final exists = await RssService.checkRssExists(url);
-        // 이미 구독 중인지 확인
-        final alreadySubscribed = await RssService.isChannelAlreadySubscribed(
+        final already = await RssService.isChannelAlreadySubscribed(
           preview.channelRssLink,
         );
-        debugPrint('미리보기 채널: ${alreadySubscribed}');
-
-        if (mounted) {
-          setState(() {
-            _previewChannel = preview;
-            _isExistingRss = exists;
-            _isAlreadySubscribed = alreadySubscribed;
-          });
-
-          // 이미 구독 중인 경우 알림 표시
-          if (alreadySubscribed) {
-            _showSnackBar('이미 구독 중인 RSS 채널입니다');
-          }
-        }
+        if (!mounted) return;
+        setState(() {
+          _previewChannel = preview;
+          _isExistingRss = exists;
+          _isAlreadySubscribed = already;
+        });
+        if (already) _showSnackBar('이미 구독 중인 RSS 채널입니다');
       } else {
-        if (mounted) {
-          setState(() {
-            _errorMessage = 'RSS 피드를 불러올 수 없습니다';
-          });
-        }
+        if (!mounted) return;
+        setState(() => _errorMessage = 'RSS 피드를 불러올 수 없습니다');
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = '오류가 발생했습니다: $e';
-        });
-      }
+      if (!mounted) return;
+      setState(() => _errorMessage = '오류가 발생했습니다: $e');
     } finally {
       if (mounted) {
-        setState(() {
-          _isPreviewLoading = false;
-        });
+        setState(() => _isPreviewLoading = false);
       }
     }
   }
 
-  // RSS 서버에 추가 (구독은 하지 않음)
+  Future<void> _generateRssByCss() async {
+    if (_isCssGenerating) return;
+
+    setState(() {
+      _isCssGenerating = true;
+      _errorMessage = null;
+      _previewChannel = null;
+      _instagramItemsPending = false;
+      _generatedExisted = false;
+    });
+
+    // 필수값 체크 (예시: 채널링크, 타이틀, 주요 css)
+    if (_cssChannelLinkController.text.trim().isEmpty ||
+        _cssChannelTitleController.text.trim().isEmpty ||
+        _cssItemTitleController.text.trim().isEmpty ||
+        _cssItemLinkController.text.trim().isEmpty) {
+      setState(() {
+        _errorMessage = '필수 항목을 모두 입력해주세요.';
+        _isCssGenerating = false;
+      });
+      return;
+    }
+
+    try {
+      final body = {
+        "channel_link": _cssChannelLinkController.text.trim(),
+        "channel_image_link": _cssChannelImageController.text.trim(),
+        "channel_title": _cssChannelTitleController.text.trim(),
+        "channel_description": _cssChannelDescController.text.trim(),
+        "channel_language": _cssChannelLangController.text.trim(),
+        "item_title_css": _cssItemTitleController.text.trim(),
+        "item_description_css": _cssItemDescController.text.trim(),
+        "item_link_css": _cssItemLinkController.text.trim(),
+        "item_author_css": _cssItemAuthorController.text.trim(),
+        "item_pub_date_css": _cssItemPubDateController.text.trim(),
+        "item_image_css": _cssItemImageController.text.trim(),
+      };
+
+      final response = await RssService.generateRssByCss(body);
+
+      if (response != null) {
+        final existedBefore = RssService.lastGenerateIsExist == true;
+        setState(() {
+          _previewChannel = response;
+          _isExistingRss = true;
+          _channelId = response.channelId;
+          _generatedExisted = existedBefore;
+          _errorMessage = null;
+        });
+        if (existedBefore) {
+          _showSnackBar('이미 존재하는 RSS입니다. 바로 구독할 수 있습니다.');
+        } else {
+          _showSnackBar('RSS가 성공적으로 생성되었습니다. 이제 구독할 수 있습니다.');
+        }
+      } else {
+        setState(
+          () => _errorMessage = 'RSS 생성에 실패했습니다. CSS 셀렉터와 채널 정보를 확인하세요.',
+        );
+      }
+    } catch (e) {
+      setState(() => _errorMessage = '오류가 발생했습니다: $e');
+    } finally {
+      setState(() => _isCssGenerating = false);
+    }
+  }
+
   Future<void> _addRssToDb() async {
     if (_previewChannel == null) return;
-
     final url = _urlController.text.trim();
-
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
-
     try {
       final id = await RssService.addRssToDb(url);
-
       if (id != null && id != 0) {
-        _channelId = id; // 채널 ID 저장
-
-        if (mounted) {
-          setState(() {
-            _isExistingRss = true; // 이제 DB에 존재함을 표시
-            _isLoading = false;
-          });
-
-          _showSnackBar('RSS가 성공적으로 추가되었습니다. 이제 구독할 수 있습니다.');
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _errorMessage = 'RSS 추가 중 오류가 발생했습니다';
-            _isLoading = false;
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted) {
+        _channelId = id;
+        if (!mounted) return;
         setState(() {
-          _errorMessage = 'RSS 추가 중 오류가 발생했습니다: $e';
+          _isExistingRss = true;
+          _isLoading = false;
+        });
+        _showSnackBar('RSS가 성공적으로 추가되었습니다. 이제 구독할 수 있습니다.');
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _errorMessage = 'RSS 추가 중 오류가 발생했습니다';
           _isLoading = false;
         });
       }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'RSS 추가 중 오류가 발생했습니다: $e';
+        _isLoading = false;
+      });
     }
   }
 
-  // 채널 구독 처리
   Future<void> _subscribeChannel() async {
     if (_previewChannel == null) return;
-
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
       bool success;
-
-      // 채널 ID가 있으면 ID로 구독, 없으면 링크로 구독
       if (_channelId != null) {
         success = await RssService.subscribeChannel(_channelId!);
       } else {
@@ -280,41 +332,34 @@ class _RssAddScreenState extends State<RssAddScreen>
           _previewChannel!.channelRssLink,
         );
       }
-
       if (success) {
-        // 콜백 호출
         widget.onChannelAdded();
-
-        if (mounted) {
-          // RSS 화면으로 이동
-          _navigateToRssScreen();
-        }
+        if (!mounted) return;
+        _navigateToRssScreen();
       } else {
-        if (mounted) {
-          setState(() {
-            _errorMessage = '이미 구독 중인 채널입니다';
-            _isAlreadySubscribed = true;
-            _isLoading = false;
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted) {
+        if (!mounted) return;
         setState(() {
-          _errorMessage = '구독 중 오류가 발생했습니다: $e';
+          _errorMessage = '이미 구독 중인 채널입니다';
+          _isAlreadySubscribed = true;
           _isLoading = false;
         });
       }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = '구독 중 오류가 발생했습니다: $e';
+        _isLoading = false;
+      });
     }
   }
 
-  // RSS 생성 요청
   Future<void> _generateRss() async {
+    // 이미 로딩 중이면 아무 것도 안 함
+    if (_isGenerating) return;
+
     final url = _generateUrlController.text.trim();
     if (url.isEmpty) {
-      setState(() {
-        _errorMessage = 'URL을 입력해주세요';
-      });
+      setState(() => _errorMessage = 'URL을 입력해주세요');
       return;
     }
 
@@ -322,65 +367,65 @@ class _RssAddScreenState extends State<RssAddScreen>
       _isGenerating = true;
       _errorMessage = null;
       _previewChannel = null;
+      _instagramItemsPending = false;
+      _generatedExisted = false;
     });
 
     try {
-      // 프리미엄 RSS 생성 API 호출
       final platformForApi =
           _selectedPlatform == 'Web' ? 'Default' : _selectedPlatform;
-
       final generatedChannel = await RssService.generateRss(
         url,
         platformForApi,
       );
 
       if (generatedChannel != null) {
-        // 생성 성공 시 채널 미리보기 표시
+        final existedBefore = RssService.lastGenerateIsExist == true;
+
         setState(() {
           _previewChannel = generatedChannel;
-          _isExistingRss = true; // 이미 생성되었으므로 true
+          _isExistingRss = true;
           _channelId = generatedChannel.channelId;
+          _generatedExisted = existedBefore;
         });
 
-        _showSnackBar('RSS가 성공적으로 생성되었습니다. 이제 구독할 수 있습니다.');
+        if (existedBefore) {
+          _showSnackBar('이미 존재하는 RSS입니다. 바로 구독할 수 있습니다.');
+        } else {
+          if (_selectedPlatform == 'Instagram') {
+            _instagramItemsPending = true;
+            _showSnackBar('인스타그램 채널 생성 완료. 게시물 수집 중 (30~60초 후 자동 반영).');
+          } else {
+            _showSnackBar('RSS가 성공적으로 생성되었습니다. 이제 구독할 수 있습니다.');
+          }
+        }
       } else {
-        setState(() {
-          _errorMessage = 'RSS 생성에 실패했습니다. 유효한 URL인지 확인해주세요.';
-        });
+        setState(() => _errorMessage = 'RSS 생성에 실패했습니다. 유효한 URL인지 확인해주세요.');
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = '오류가 발생했습니다: $e';
-      });
+      setState(() => _errorMessage = '오류가 발생했습니다: $e');
     } finally {
-      setState(() {
-        _isGenerating = false;
-      });
+      setState(() => _isGenerating = false);
     }
   }
 
-  // RSS 화면으로 이동
   void _navigateToRssScreen() {
-    // 현재 화면을 스택에서 제거
     Navigator.pop(context);
-
-    // RSS 탭이 있는 홈 화면으로 이동
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
         builder: (context) => const HomeScreen(initialTabIndex: 1),
       ),
     );
-
     _showSnackBar('RSS 채널이 구독되었습니다');
   }
 
-  // 스낵바 표시 헬퍼 메서드
   void _showSnackBar(String message) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        duration: const Duration(seconds: 2),
+        duration: const Duration(seconds: 3),
         backgroundColor: Theme.of(context).primaryColor,
         behavior: SnackBarBehavior.floating,
       ),
@@ -411,110 +456,240 @@ class _RssAddScreenState extends State<RssAddScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          // 기존 RSS 추가 화면
-          SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 안내 텍스트
-                  Text(
-                    'RSS 피드 URL 입력',
-                    style: textTheme.titleLarge?.copyWith(fontSize: 18),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'RSS 주소를 입력하고 미리보기 버튼을 눌러주세요.',
-                    style: textTheme.bodyMedium,
-                  ),
-                  const SizedBox(height: 24),
-
-                  // URL 입력 필드
-                  _buildUrlInputField(theme),
-
-                  // 오류 메시지
-                  if (_errorMessage != null && _tabController.index == 0)
-                    _buildErrorMessage(colorScheme),
-
-                  // 미리보기 결과
-                  if (_previewChannel != null && _tabController.index == 0)
-                    _buildPreviewSection(theme, textTheme),
-
-                  const SizedBox(height: 30),
-                ],
-              ),
-            ),
-          ),
-
-          // 새로운 RSS 생성 화면
-          SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child:
-                  _isLoadingSubscriptionStatus
-                      ? const Center(child: CircularProgressIndicator())
-                      : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // 구독자 전용 표시
-                          _buildPremiumFeatureBanner(theme, textTheme),
-
-                          const SizedBox(height: 20),
-
-                          // 구독 중인 경우만 실제 기능 표시
-                          if (_subscriptionStatus?.isActive == true) ...[
-                            // 플랫폼 선택 섹션
-                            _buildPlatformSelectionSection(theme, textTheme),
-
-                            const SizedBox(height: 24),
-
-                            // URL 입력 필드
-                            Text(
-                              '사이트 URL 입력',
-                              style: textTheme.titleLarge?.copyWith(
-                                fontSize: 18,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              '선택한 플랫폼의 채널 또는 페이지 URL을 입력해주세요.',
-                              style: textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 12),
-                            _buildGenerateUrlInputField(theme),
-
-                            // 오류 메시지
-                            if (_errorMessage != null &&
-                                _tabController.index == 1)
-                              _buildErrorMessage(colorScheme),
-
-                            // 미리보기 결과
-                            if (_previewChannel != null &&
-                                _tabController.index == 1)
-                              _buildPreviewSection(theme, textTheme),
-                          ] else ...[
-                            // 구독자가 아닌 경우 구독 유도 메시지
-                            _buildSubscriptionPrompt(theme, textTheme),
-                          ],
-
-                          const SizedBox(height: 30),
-                        ],
-                      ),
-            ),
-          ),
+          _buildAddExistingTab(theme, textTheme, colorScheme),
+          _buildGenerateTab(theme, textTheme, colorScheme),
         ],
       ),
     );
   }
 
-  // 플랫폼 선택 섹션 (제목 + 검색창 + 플랫폼 목록)
-  // 플랫폼 선택 섹션 (제목 + 검색창 + 플랫폼 목록)
-  Widget _buildPlatformSelectionSection(ThemeData theme, TextTheme textTheme) {
+  Widget _buildAddExistingTab(
+    ThemeData theme,
+    TextTheme textTheme,
+    ColorScheme colorScheme,
+  ) {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'RSS 피드 URL 입력',
+              style: textTheme.titleLarge?.copyWith(fontSize: 18),
+            ),
+            const SizedBox(height: 8),
+            Text('RSS 주소를 입력하고 미리보기 버튼을 눌러주세요.', style: textTheme.bodyMedium),
+            const SizedBox(height: 24),
+            _buildUrlInputField(theme),
+            if (_errorMessage != null && _tabController.index == 0)
+              _buildErrorMessage(colorScheme),
+            if (_previewChannel != null && _tabController.index == 0)
+              _buildPreviewSection(theme, textTheme),
+            const SizedBox(height: 30),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGenerateTab(
+    ThemeData theme,
+    TextTheme textTheme,
+    ColorScheme colorScheme,
+  ) {
+    final isWebSelected = _selectedPlatform == "Web";
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child:
+            _isLoadingSubscriptionStatus
+                ? const Center(child: CircularProgressIndicator())
+                : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildPremiumFeatureBanner(theme, textTheme),
+                    const SizedBox(height: 20),
+                    if (_subscriptionStatus?.isActive == true) ...[
+                      _buildPlatformSelectionSection(theme, textTheme),
+                      const SizedBox(height: 24),
+                      if (isWebSelected && _showCssForm) ...[
+                        _buildCssRssForm(theme, textTheme),
+                        if (_errorMessage != null && _tabController.index == 1)
+                          _buildErrorMessage(colorScheme),
+                        if (_previewChannel != null &&
+                            _tabController.index == 1)
+                          _buildPreviewSection(theme, textTheme),
+                        const SizedBox(height: 10),
+                        Center(
+                          child: TextButton(
+                            onPressed: () {
+                              setState(() {
+                                _showCssForm = false;
+                                _errorMessage = null;
+                              });
+                            },
+                            child: const Text("자동 추출 방식으로 돌아가기"),
+                          ),
+                        ),
+                      ] else ...[
+                        Text(
+                          '사이트 URL 입력',
+                          style: textTheme.titleLarge?.copyWith(fontSize: 18),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          '선택한 플랫폼의 채널 또는 페이지 URL을 입력해주세요.',
+                          style: textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildGenerateUrlInputField(theme),
+                        if (_errorMessage != null && _tabController.index == 1)
+                          _buildErrorMessage(colorScheme),
+                        if (_previewChannel != null &&
+                            _tabController.index == 1)
+                          _buildPreviewSection(theme, textTheme),
+                        if (isWebSelected)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton(
+                                onPressed:
+                                    _isGenerating
+                                        ? null
+                                        : () =>
+                                            setState(() => _showCssForm = true),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: theme.primaryColor,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  side: BorderSide(color: theme.primaryColor),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: const Text('CSS 요소로 직접 생성하기'),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ] else ...[
+                      _buildSubscriptionPrompt(theme, textTheme),
+                    ],
+                    const SizedBox(height: 30),
+                  ],
+                ),
+      ),
+    );
+  }
+
+  Widget _buildCssRssForm(ThemeData theme, TextTheme textTheme) {
+    InputDecoration cssInputDeco(String label) => InputDecoration(
+      labelText: label,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 제목 영역
+        Text('채널 정보 입력', style: textTheme.titleLarge?.copyWith(fontSize: 16)),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _cssChannelLinkController,
+          decoration: cssInputDeco('채널 사이트 링크 (필수)'),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _cssChannelImageController,
+          decoration: cssInputDeco('채널 이미지 링크 (선택)'),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _cssChannelTitleController,
+          decoration: cssInputDeco('채널 제목 (필수)'),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _cssChannelDescController,
+          decoration: cssInputDeco('채널 설명'),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _cssChannelLangController,
+          decoration: cssInputDeco('채널 언어 (기본: ko-KR)'),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          '아이템 CSS 선택자 입력',
+          style: textTheme.titleLarge?.copyWith(fontSize: 16),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: _cssItemTitleController,
+          decoration: cssInputDeco('아이템 제목 CSS (필수)'),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _cssItemDescController,
+          decoration: cssInputDeco('아이템 설명 CSS'),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _cssItemLinkController,
+          decoration: cssInputDeco('아이템 링크 CSS (필수)'),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _cssItemAuthorController,
+          decoration: cssInputDeco('아이템 작성자 CSS'),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _cssItemPubDateController,
+          decoration: cssInputDeco('아이템 게시일 CSS'),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _cssItemImageController,
+          decoration: cssInputDeco('아이템 이미지 CSS'),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _isCssGenerating ? null : _generateRssByCss,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: theme.primaryColor,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child:
+                _isCssGenerating
+                    ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 2,
+                      ),
+                    )
+                    : const Text('CSS 요소로 RSS 생성하기'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPlatformSelectionSection(ThemeData theme, TextTheme textTheme) {
+    final platforms = _filteredPlatforms;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
         Padding(
           padding: const EdgeInsets.only(bottom: 12),
           child: Text(
@@ -525,20 +700,79 @@ class _RssAddScreenState extends State<RssAddScreen>
             ),
           ),
         ),
-
-        // 검색창 - 더 모던한 느낌
         _buildSearchField(theme),
-
         const SizedBox(height: 16),
-
-        // 플랫폼 선택기
-        _buildPlatformSelector(theme),
+        platforms.isEmpty
+            ? _buildEmptySearchResult(theme)
+            : SizedBox(
+              height: 90,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                itemCount: platforms.length,
+                itemBuilder: (context, index) {
+                  final p = platforms[index];
+                  final sel = _selectedPlatform == p['id'];
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _selectedPlatform = p['id'];
+                          _instagramItemsPending = false; // 플랫폼 변경 시 초기화
+                          _generatedExisted = false;
+                        });
+                      },
+                      child: Column(
+                        children: [
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: sel ? p['color'] : theme.cardColor,
+                              borderRadius: BorderRadius.circular(15),
+                              border: Border.all(
+                                color: sel ? p['color'] : theme.dividerColor,
+                                width: 2,
+                              ),
+                              boxShadow:
+                                  sel
+                                      ? [
+                                        BoxShadow(
+                                          color: p['color'].withOpacity(0.3),
+                                          blurRadius: 8,
+                                          spreadRadius: 2,
+                                        ),
+                                      ]
+                                      : [],
+                            ),
+                            child: Icon(
+                              p['icon'],
+                              color: sel ? Colors.white : p['color'],
+                              size: 28,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            p['name'],
+                            style: TextStyle(
+                              color: sel ? theme.primaryColor : theme.hintColor,
+                              fontWeight:
+                                  sel ? FontWeight.bold : FontWeight.normal,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
       ],
     );
   }
 
-  // 검색 입력 필드
-  // 검색 입력 필드 - 모던한 에어로 디자인
   Widget _buildSearchField(ThemeData theme) {
     return Container(
       height: 42,
@@ -557,92 +791,65 @@ class _RssAddScreenState extends State<RssAddScreen>
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () {
-              // 클릭 시 포커스 주기
-              FocusScope.of(context).requestFocus(FocusNode());
-              _searchController.selection = TextSelection(
-                baseOffset: 0,
-                extentOffset: _searchController.text.length,
-              );
-            },
-            highlightColor: theme.splashColor.withOpacity(0.1),
-            splashColor: theme.splashColor.withOpacity(0.1),
-            child: Row(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Icon(
-                    Icons.search_rounded,
-                    size: 20,
-                    color:
-                        theme.brightness == Brightness.dark
-                            ? Colors.grey.shade400
-                            : Colors.grey.shade600,
-                  ),
-                ),
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: '검색',
-                      hintStyle: TextStyle(
-                        color:
-                            theme.brightness == Brightness.dark
-                                ? Colors.grey.shade500
-                                : Colors.grey.shade500,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w400,
-                      ),
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                    style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15),
-                  ),
-                ),
-                if (_searchController.text.isNotEmpty)
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _searchController.clear();
-                        _searchQuery = '';
-                      });
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 12),
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color:
-                              theme.brightness == Brightness.dark
-                                  ? Colors.grey.shade700
-                                  : Colors.grey.shade300,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.close,
-                          size: 14,
-                          color:
-                              theme.brightness == Brightness.dark
-                                  ? Colors.grey.shade300
-                                  : Colors.grey.shade700,
-                        ),
-                      ),
-                    ),
-                  ),
-              ],
+      child: Row(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Icon(
+              Icons.search_rounded,
+              size: 20,
+              color:
+                  theme.brightness == Brightness.dark
+                      ? Colors.grey.shade400
+                      : Colors.grey.shade600,
             ),
           ),
-        ),
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              decoration: const InputDecoration(
+                hintText: '검색',
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(vertical: 12),
+              ),
+              style: theme.textTheme.bodyMedium?.copyWith(fontSize: 15),
+            ),
+          ),
+          if (_searchController.text.isNotEmpty)
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _searchController.clear();
+                  _searchQuery = '';
+                });
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(right: 12),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color:
+                        theme.brightness == Brightness.dark
+                            ? Colors.grey.shade700
+                            : Colors.grey.shade300,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.close,
+                    size: 14,
+                    color:
+                        theme.brightness == Brightness.dark
+                            ? Colors.grey.shade300
+                            : Colors.grey.shade700,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
 
-  // 구독자 전용 배너
   Widget _buildPremiumFeatureBanner(ThemeData theme, TextTheme textTheme) {
     return Container(
       width: double.infinity,
@@ -657,7 +864,7 @@ class _RssAddScreenState extends State<RssAddScreen>
       ),
       child: Row(
         children: [
-          Icon(Icons.star, color: Colors.white, size: 18),
+          const Icon(Icons.star, color: Colors.white, size: 18),
           const SizedBox(width: 8),
           Text(
             '프리미엄 기능',
@@ -671,94 +878,19 @@ class _RssAddScreenState extends State<RssAddScreen>
     );
   }
 
-  // URL 입력 필드와 미리보기 버튼
   Widget _buildUrlInputField(ThemeData theme) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: theme.shadowColor.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          TextField(
-            controller: _urlController,
-            decoration: InputDecoration(
-              hintText: 'https://example.com/rss',
-              hintStyle: TextStyle(color: theme.hintColor),
-              filled: true,
-              fillColor: theme.cardColor,
-              prefixIcon: Icon(
-                Icons.link,
-                color: theme.iconTheme.color?.withOpacity(0.7),
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide.none,
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: theme.dividerColor, width: 1),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: theme.primaryColor, width: 1.5),
-              ),
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 16,
-              ),
-            ),
-            style: theme.textTheme.bodyLarge?.copyWith(fontSize: 16),
-            onSubmitted: (_) => _previewRss(),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _isPreviewLoading ? null : _previewRss,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: theme.primaryColor,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                disabledBackgroundColor: theme.primaryColor.withOpacity(0.5),
-              ),
-              child:
-                  _isPreviewLoading
-                      ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          color: Colors.white,
-                          strokeWidth: 2,
-                        ),
-                      )
-                      : const Text(
-                        'RSS 미리보기',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-            ),
-          ),
-        ],
-      ),
+    return _buildUrlBox(
+      theme: theme,
+      controller: _urlController,
+      hint: 'https://example.com/rss',
+      onSubmit: _previewRss,
+      buttonLabel: 'RSS 미리보기',
+      loading: _isPreviewLoading,
+      onPressed: _previewRss,
+      mainColor: theme.primaryColor,
     );
   }
 
-  // RSS 생성을 위한 URL 입력 필드
   Widget _buildGenerateUrlInputField(ThemeData theme) {
     return Container(
       decoration: BoxDecoration(
@@ -796,7 +928,7 @@ class _RssAddScreenState extends State<RssAddScreen>
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: theme.primaryColor, width: 1.5),
+                borderSide: BorderSide(color: Colors.green, width: 1.5),
               ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
@@ -845,7 +977,101 @@ class _RssAddScreenState extends State<RssAddScreen>
     );
   }
 
-  // 플랫폼에 따른 URL 힌트
+  Widget _buildUrlBox({
+    required ThemeData theme,
+    required TextEditingController controller,
+    required String hint,
+    required VoidCallback onSubmit,
+    required VoidCallback onPressed,
+    required String buttonLabel,
+    required bool loading,
+    required Color mainColor,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: theme.shadowColor.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: controller,
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(color: theme.hintColor),
+              filled: true,
+              fillColor: theme.cardColor,
+              prefixIcon: Icon(
+                Icons.link,
+                color: theme.iconTheme.color?.withOpacity(0.7),
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide.none,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: theme.dividerColor, width: 1),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: mainColor, width: 1.5),
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
+            ),
+            style: theme.textTheme.bodyLarge?.copyWith(fontSize: 16),
+            onSubmitted: (_) => onSubmit(),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: loading ? null : onPressed,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: mainColor,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                disabledBackgroundColor: mainColor.withOpacity(0.5),
+              ),
+              child:
+                  loading
+                      ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                      : Text(
+                        buttonLabel,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _getUrlHintByPlatform() {
     switch (_selectedPlatform) {
       case 'Naver':
@@ -856,98 +1082,17 @@ class _RssAddScreenState extends State<RssAddScreen>
         return 'https://medium.com/@사용자명';
       case 'Instagram':
         return 'https://www.instagram.com/사용자명';
-      case 'Facebook':
-        return 'https://www.facebook.com/사용자명';
-      case 'Web': // 추가
+      case 'Web':
         return 'https://example.com/원하는_페이지';
       default:
         return 'https://...';
     }
   }
 
-  // 플랫폼 선택 위젯
-  Widget _buildPlatformSelector(ThemeData theme) {
-    final platforms = _filteredPlatforms;
-
-    return platforms.isEmpty
-        ? _buildEmptySearchResult(theme)
-        : Container(
-          height: 90,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: platforms.length,
-            itemBuilder: (context, index) {
-              final platform = platforms[index];
-              final isSelected = _selectedPlatform == platform['id'];
-
-              return Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedPlatform = platform['id'];
-                    });
-                  },
-                  child: Column(
-                    children: [
-                      AnimatedContainer(
-                        duration: Duration(milliseconds: 200),
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color:
-                              isSelected ? platform['color'] : theme.cardColor,
-                          borderRadius: BorderRadius.circular(15),
-                          border: Border.all(
-                            color:
-                                isSelected
-                                    ? platform['color']
-                                    : theme.dividerColor,
-                            width: 2,
-                          ),
-                          boxShadow:
-                              isSelected
-                                  ? [
-                                    BoxShadow(
-                                      color: platform['color'].withOpacity(0.3),
-                                      blurRadius: 8,
-                                      spreadRadius: 2,
-                                    ),
-                                  ]
-                                  : [],
-                        ),
-                        child: Icon(
-                          platform['icon'],
-                          color: isSelected ? Colors.white : platform['color'],
-                          size: 28,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        platform['name'],
-                        style: TextStyle(
-                          color:
-                              isSelected ? theme.primaryColor : theme.hintColor,
-                          fontWeight:
-                              isSelected ? FontWeight.bold : FontWeight.normal,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        );
-  }
-
-  // 검색 결과가 없을 때 표시할 위젯
   Widget _buildEmptySearchResult(ThemeData theme) {
-    return Container(
+    return SizedBox(
       height: 90,
       width: double.infinity,
-      alignment: Alignment.center,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -962,7 +1107,6 @@ class _RssAddScreenState extends State<RssAddScreen>
     );
   }
 
-  // 구독 유도 메시지
   Widget _buildSubscriptionPrompt(ThemeData theme, TextTheme textTheme) {
     return Container(
       width: double.infinity,
@@ -1009,7 +1153,6 @@ class _RssAddScreenState extends State<RssAddScreen>
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: () {
-              // 구독 페이지로 이동
               Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -1035,7 +1178,6 @@ class _RssAddScreenState extends State<RssAddScreen>
     );
   }
 
-  // 오류 메시지 표시
   Widget _buildErrorMessage(ColorScheme colorScheme) {
     return Padding(
       padding: const EdgeInsets.only(top: 20),
@@ -1063,7 +1205,6 @@ class _RssAddScreenState extends State<RssAddScreen>
     );
   }
 
-  // 미리보기 섹션
   Widget _buildPreviewSection(ThemeData theme, TextTheme textTheme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1080,17 +1221,72 @@ class _RssAddScreenState extends State<RssAddScreen>
           ],
         ),
         const SizedBox(height: 16),
+        if (_generatedExisted) _buildExistInfoBanner(theme),
+        if (_instagramItemsPending) _buildInstagramPendingBanner(theme),
         _buildPreviewCard(theme, textTheme),
       ],
     );
   }
 
-  // 채널 미리보기 카드
+  Widget _buildExistInfoBanner(ThemeData theme) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.info_outline, color: theme.colorScheme.primary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '이미 존재하는 RSS 채널입니다. 생성 없이 바로 구독할 수 있어요.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.primary,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInstagramPendingBanner(ThemeData theme) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.schedule, color: theme.colorScheme.primary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '인스타그램 채널이 생성되었습니다.\n게시물 아이템을 수집 중입니다 (약 30~60초). 잠시 후 새로고침하거나 홈에서 확인하세요.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.primary,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildPreviewCard(ThemeData theme, TextTheme textTheme) {
     if (_previewChannel == null) return const SizedBox.shrink();
-
     final rssTheme = AppTheme.rssThemeOf(context);
-
     return Container(
       decoration: BoxDecoration(
         color: theme.cardColor,
@@ -1109,11 +1305,9 @@ class _RssAddScreenState extends State<RssAddScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 채널 헤더 (이미지와 제목)
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // 채널 썸네일
                 ClipRRect(
                   borderRadius: BorderRadius.circular(
                     rssTheme.channelImageBorderRadius,
@@ -1131,10 +1325,7 @@ class _RssAddScreenState extends State<RssAddScreen>
                           )
                           : _buildDefaultChannelIcon(rssTheme),
                 ),
-
                 const SizedBox(width: 16),
-
-                // 채널 정보
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1160,20 +1351,14 @@ class _RssAddScreenState extends State<RssAddScreen>
                 ),
               ],
             ),
-
             const SizedBox(height: 16),
-
-            // 채널 설명
             Text(
               _previewChannel!.channelDescription,
               style: textTheme.bodyMedium?.copyWith(height: 1.5),
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
             ),
-
             const SizedBox(height: 16),
-
-            // 태그 정보
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -1196,7 +1381,6 @@ class _RssAddScreenState extends State<RssAddScreen>
                     icon: Icons.settings,
                     theme: theme,
                   ),
-                // 생성된 RSS인 경우 프리미엄 태그 추가
                 if (_tabController.index == 1)
                   _buildInfoChip(
                     label: '프리미엄 생성',
@@ -1204,12 +1388,16 @@ class _RssAddScreenState extends State<RssAddScreen>
                     iconColor: Colors.amber,
                     theme: theme,
                   ),
+                if (_instagramItemsPending)
+                  _buildInfoChip(
+                    label: '수집 중',
+                    icon: Icons.downloading,
+                    iconColor: theme.colorScheme.primary,
+                    theme: theme,
+                  ),
               ],
             ),
-
             const SizedBox(height: 24),
-
-            // 구독 버튼
             _buildSubscriptionButton(theme, rssTheme),
           ],
         ),
@@ -1217,7 +1405,6 @@ class _RssAddScreenState extends State<RssAddScreen>
     );
   }
 
-  // 정보 칩
   Widget _buildInfoChip({
     required String label,
     required IconData icon,
@@ -1225,7 +1412,6 @@ class _RssAddScreenState extends State<RssAddScreen>
     required ThemeData theme,
   }) {
     final chipTheme = theme.chipTheme;
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -1247,9 +1433,7 @@ class _RssAddScreenState extends State<RssAddScreen>
     );
   }
 
-  // 구독 버튼
   Widget _buildSubscriptionButton(ThemeData theme, dynamic rssTheme) {
-    // 이미 구독 중인 경우
     if (_isAlreadySubscribed) {
       return SizedBox(
         width: double.infinity,
@@ -1275,9 +1459,8 @@ class _RssAddScreenState extends State<RssAddScreen>
       );
     }
 
-    // RSS 추가 또는 구독 버튼 표시 (DB에 존재하는지에 따라)
-    final bool addingNew = !_isExistingRss;
-    final bool isGeneratedRss = _tabController.index == 1;
+    final addingNew = !_isExistingRss;
+    final isGeneratedRss = _tabController.index == 1;
 
     return SizedBox(
       width: double.infinity,
@@ -1323,7 +1506,6 @@ class _RssAddScreenState extends State<RssAddScreen>
     );
   }
 
-  // 기본 채널 아이콘
   Widget _buildDefaultChannelIcon(dynamic rssTheme) {
     return Container(
       width: 70,
