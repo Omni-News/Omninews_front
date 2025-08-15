@@ -142,6 +142,35 @@ class SubscriptionService {
     }
   }
 
+  Future<bool> registerSubscriptionWithServerTest(String receiptData) async {
+    try {
+      // 백엔드 스펙에 맞는 요청 구조 생성
+      final subscriptionRequest = SubscriptionRequest(
+        receiptData: receiptData,
+        platform: Platform.isIOS ? 'ios' : 'android',
+        isTest: !kReleaseMode,
+      );
+
+      // AuthService 사용하여 API 호출
+      final response = await _authService.apiRequest(
+        'POST',
+        '/subscription/register',
+        body: subscriptionRequest.toJson(),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        debugPrint('서버에 구독 등록 성공');
+        return true;
+      } else {
+        debugPrint('서버에 구독 등록 실패: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('서버에 구독 등록 실패: $e');
+      return false;
+    }
+  }
+
   // 구독 플랜 로드
   Future<List<SubscriptionPlan>> loadSubscriptionPlans() async {
     try {

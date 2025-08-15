@@ -9,6 +9,7 @@ class RssService {
   static String baseUrl = AuthService.apiBaseUrl;
   static final AuthService _authService = AuthService();
   static final HtmlUnescape _unescape = HtmlUnescape();
+  static bool? lastGenerateIsExist;
 
   // HTML 엔티티 디코딩 함수 (문자열만 처리)
   static String _decodeHtmlString(String text) {
@@ -423,6 +424,7 @@ class RssService {
   }
 
   // RSS 생성 API
+
   static Future<RssChannel?> generateRss(String url, String kind) async {
     try {
       final response = await _authService.apiRequest(
@@ -432,33 +434,80 @@ class RssService {
       );
 
       if (response.statusCode == 200) {
-        String decodedResponse = utf8.decode(response.bodyBytes);
-        Map<String, dynamic> jsonResponse = json.decode(decodedResponse);
+        final decodedResponse = utf8.decode(response.bodyBytes);
+        final Map<String, dynamic> jsonResponse = json.decode(decodedResponse);
+
+        // 새 형식: 래핑된 형태 처리
+        Map<String, dynamic> channelJson;
+        if (jsonResponse.containsKey('channel') &&
+            jsonResponse['channel'] is Map<String, dynamic>) {
+          // is_exist 플래그 저장
+          lastGenerateIsExist = jsonResponse['is_exist'] == true;
+
+          channelJson = Map<String, dynamic>.from(jsonResponse['channel']);
+        } else {
+          // 하위 호환: 기존 형식 (루트에 채널 필드가 직접 존재)
+          lastGenerateIsExist = null;
+          channelJson = Map<String, dynamic>.from(jsonResponse);
+        }
 
         // HTML 엔티티 디코딩
-        if (jsonResponse['channel_title'] is String) {
-          jsonResponse['channel_title'] = _decodeHtmlString(
-            jsonResponse['channel_title'],
+        if (channelJson['channel_title'] is String) {
+          channelJson['channel_title'] = _decodeHtmlString(
+            channelJson['channel_title'],
           );
         }
-        if (jsonResponse['channel_description'] is String) {
-          jsonResponse['channel_description'] = _decodeHtmlString(
-            jsonResponse['channel_description'],
+        if (channelJson['channel_description'] is String) {
+          channelJson['channel_description'] = _decodeHtmlString(
+            channelJson['channel_description'],
           );
         }
-        if (jsonResponse['channel_link'] is String) {
-          jsonResponse['channel_link'] = _decodeHtmlString(
-            jsonResponse['channel_link'],
+        if (channelJson['channel_link'] is String) {
+          channelJson['channel_link'] = _decodeHtmlString(
+            channelJson['channel_link'],
           );
         }
 
-        return RssChannel.fromJson(jsonResponse);
+        return RssChannel.fromJson(channelJson);
       } else {
         debugPrint('RSS 생성 실패: ${response.statusCode}, ${response.body}');
+        lastGenerateIsExist = null;
         return null;
       }
     } catch (e) {
       debugPrint('RSS 생성 중 오류 발생: $e');
+      lastGenerateIsExist = null;
+      return null;
+    }
+  }
+
+  static Future<RssChannel?> generateRssByCss(Map<String, String> body) async {
+    try {
+      final response = await _authService.apiRequest(
+        'POST',
+        '/premium/rss/generate_by_css',
+        body: body,
+      );
+      if (response.statusCode == 200) {
+        final decodedResponse = utf8.decode(response.bodyBytes);
+        final Map<String, dynamic> jsonResponse = json.decode(decodedResponse);
+
+        // is_exist 플래그 저장
+        lastGenerateIsExist = jsonResponse['is_exist'] == true;
+
+        if (jsonResponse.containsKey('channel') &&
+            jsonResponse['channel'] is Map<String, dynamic>) {
+          final channelJson = Map<String, dynamic>.from(
+            jsonResponse['channel'],
+          );
+          // HTML 엔티티 디코딩 필요시 기존처럼 추가
+          return RssChannel.fromJson(channelJson);
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('RSS CSS 방식 생성 오류: $e');
+      lastGenerateIsExist = null;
       return null;
     }
   }

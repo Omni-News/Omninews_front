@@ -247,6 +247,24 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
             _buildBenefitRow('오프라인 저장 및 읽기'),
             const SizedBox(height: 20),
 
+            // 임시 구독 버튼
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => _handleSubscribeTest(context, provider),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                // StoreKit에서 가져온 상품명 표시
+                child: Text('${plan?.name ?? 'OmniNews 프리미엄'} 구독하기'),
+              ),
+            ),
             // 구독 버튼 - 플랜 정보가 있을 경우에만 표시
             if (plan != null) ...[
               SizedBox(
@@ -329,6 +347,33 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
           );
         }
       }
+    } catch (e) {
+      // 오류 처리
+      Navigator.of(context, rootNavigator: true).pop(); // 로딩 닫기
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('구독 처리 중 오류가 발생했습니다: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleSubscribeTest(
+    BuildContext context,
+    SubscriptionProvider provider,
+  ) async {
+    // 로딩 표시
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      await provider.purchaseSubscriptionTest();
     } catch (e) {
       // 오류 처리
       Navigator.of(context, rootNavigator: true).pop(); // 로딩 닫기
