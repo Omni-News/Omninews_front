@@ -392,12 +392,8 @@ class _RssAddScreenState extends State<RssAddScreen>
         if (existedBefore) {
           _showSnackBar('이미 존재하는 RSS입니다. 바로 구독할 수 있습니다.');
         } else {
-          if (_selectedPlatform == 'Instagram') {
-            _instagramItemsPending = true;
-            _showSnackBar('인스타그램 채널 생성 완료. 게시물 수집 중 (30~60초 후 자동 반영).');
-          } else {
-            _showSnackBar('RSS가 성공적으로 생성되었습니다. 이제 구독할 수 있습니다.');
-          }
+          // [MODIFIED] Instagram을 포함한 모든 플랫폼에 대해 동일한 성공 메시지를 표시하도록 변경
+          _showSnackBar('RSS가 성공적으로 생성되었습니다. 이제 구독할 수 있습니다.');
         }
       } else {
         setState(() => _errorMessage = 'RSS 생성에 실패했습니다. 유효한 URL인지 확인해주세요.');
