@@ -424,7 +424,6 @@ class RssService {
   }
 
   // RSS 생성 API
-
   static Future<RssChannel?> generateRss(String url, String kind) async {
     try {
       final response = await _authService.apiRequest(
@@ -508,6 +507,39 @@ class RssService {
     } catch (e) {
       debugPrint('RSS CSS 방식 생성 오류: $e');
       lastGenerateIsExist = null;
+      return null;
+    }
+  }
+
+  // RSS 요약 호출
+  // 서버 예시: POST /premium/rss/summary  body: { "rss_link": "<링크>" }
+  // 응답 예시: { "text": "..." } 또는 { "summary": "..." } 또는 "..."
+  static Future<String?> fetchRssSummary(String rssLink) async {
+    try {
+      final response = await _authService.apiRequest(
+        'POST',
+        '/premium/rss/summary',
+        body: {'rss_link': rssLink},
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = utf8.decode(response.bodyBytes);
+        final parsed = json.decode(decoded);
+        if (parsed is Map<String, dynamic>) {
+          if (parsed['text'] is String) return parsed['text'] as String;
+          if (parsed['summary'] is String) return parsed['summary'] as String;
+        } else if (parsed is String) {
+          return parsed;
+        }
+        return null;
+      } else {
+        debugPrint(
+          'Failed to fetch RSS summary: ${response.statusCode}, ${response.body}',
+        );
+        return null;
+      }
+    } catch (e) {
+      debugPrint('Error fetching RSS summary: $e');
       return null;
     }
   }

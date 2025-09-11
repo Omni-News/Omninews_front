@@ -6,12 +6,168 @@ import 'package:share/share.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
 import 'package:omninews_flutter/utils/url_launcher_helper.dart';
+import 'package:omninews_flutter/services/rss_service.dart';
 
-class RssDetailScreen extends StatelessWidget {
+// Premium gating 관련 import (RssAddScreen과 동일한 서비스/모델 사용)
+import 'package:omninews_flutter/models/omninews_subscription.dart';
+import 'package:omninews_flutter/services/omninews_subscription/omninews_subscription_service.dart';
+import 'package:omninews_flutter/screens/omninews_subscription/omninews_subscription_home.dart';
+
+class RssDetailScreen extends StatefulWidget {
   final RssItem rssItem;
   final RssChannel? channel; // 채널 정보는 옵션
 
   const RssDetailScreen({super.key, required this.rssItem, this.channel});
+
+  @override
+  State<RssDetailScreen> createState() => _RssDetailScreenState();
+}
+
+class _RssDetailScreenState extends State<RssDetailScreen> {
+  // 요약 상태
+  String? _summary;
+  String? _error;
+  bool _loading = false;
+
+  // 프리미엄 구독 상태
+  SubscriptionStatus? _subscriptionStatus;
+  bool _isCheckingSubscription = true;
+
+  // 채널 해석 상태 (widget.channel이 없을 때 서버에서 구독 채널 목록을 가져와 매칭)
+  RssChannel? _resolvedChannel;
+  bool _resolvingChannel = false;
+
+  bool get _isPremiumActive => _subscriptionStatus?.isActive == true;
+
+  // Instagram / Naver Blog 생성 채널은 요약 버튼/기능 숨김
+  // 1) channel.rssGenerator 기준
+  // 2) 채널 미해결 시 아이템 링크 도메인 기준 보조판정
+  bool get _hideSummaryFeature {
+    final gen =
+        (_resolvedChannel?.rssGenerator ?? widget.channel?.rssGenerator ?? '')
+            .toLowerCase();
+    final host = _hostOf(widget.rssItem.rssLink);
+
+    final hideByGen =
+        gen == 'omninews_instagram' ||
+        gen == 'omninews_naver' ||
+        gen.contains('instagram') ||
+        gen.contains('naver') ||
+        gen.contains('naver blog');
+
+    final hideByDomain =
+        host.contains('instagram.com') ||
+        host.contains('naver.com') ||
+        host.contains('blog.naver.com');
+
+    final hide = hideByGen || hideByDomain;
+    // 디버깅 로그
+    debugPrint(
+      '🔵 generator: "$gen", host: "$host", hide: $hide (byGen: $hideByGen, byDomain: $hideByDomain)',
+    );
+    return hide;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSubscriptionStatus();
+
+    // 전달받은 channel이 없으면 구독 채널에서 매칭 시도
+    if (widget.channel != null) {
+      _resolvedChannel = widget.channel;
+    } else {
+      _resolveChannelByItem();
+    }
+  }
+
+  Future<void> _checkSubscriptionStatus() async {
+    setState(() => _isCheckingSubscription = true);
+    final service = SubscriptionService();
+    final status = await service.checkSubscriptionStatus();
+    if (!mounted) return;
+    setState(() {
+      _subscriptionStatus = status;
+      _isCheckingSubscription = false;
+    });
+  }
+
+  // 아이템 링크의 호스트와 구독 채널의 링크 호스트를 비교해 채널을 추정
+  Future<void> _resolveChannelByItem() async {
+    setState(() => _resolvingChannel = true);
+    try {
+      final channels = await RssService.fetchSubscribedChannels();
+      final itemHost = _hostOf(widget.rssItem.rssLink);
+      RssChannel? found;
+
+      for (final c in channels) {
+        final chHost = _hostOf(c.channelLink);
+        if (chHost.isEmpty || itemHost.isEmpty) continue;
+        // 완전 일치 우선, 포함 관계 보조
+        if (chHost == itemHost ||
+            itemHost.contains(chHost) ||
+            chHost.contains(itemHost)) {
+          found = c;
+          break;
+        }
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _resolvedChannel = found;
+      });
+    } catch (e) {
+      debugPrint('채널 매칭 중 오류: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _resolvingChannel = false);
+      }
+    }
+  }
+
+  Future<void> _requestSummary() async {
+    if (_loading) return;
+
+    // 미구독자는 구독 페이지로 유도
+    if (!_isPremiumActive) {
+      _goToSubscription();
+      return;
+    }
+
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    final result = await RssService.fetchRssSummary(widget.rssItem.rssLink);
+
+    if (!mounted) return;
+    setState(() {
+      _loading = false;
+      if (result == null || result.trim().isEmpty) {
+        _error = '요약을 가져오지 못했습니다. 잠시 후 다시 시도해 주세요.';
+        _summary = null;
+      } else {
+        _summary = result.trim();
+        _error = null;
+      }
+    });
+  }
+
+  void _goToSubscription() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const SubscriptionHomePage()),
+    );
+  }
+
+  String _hostOf(String url) {
+    try {
+      return Uri.parse(url).host.toLowerCase();
+    } catch (_) {
+      return '';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +178,13 @@ class RssDetailScreen extends StatelessWidget {
 
     // 이미지가 있는지 확인
     final hasImage =
-        rssItem.rssImageLink != null && rssItem.rssImageLink!.isNotEmpty;
+        widget.rssItem.rssImageLink != null &&
+        widget.rssItem.rssImageLink!.isNotEmpty;
+
+    // 본문 영역에 표시할 텍스트: 요약이 있으면 요약, 아니면 원래 description
+    final bodyText = _summary ?? _cleanHtml(widget.rssItem.rssDescription);
+
+    final channelForUi = _resolvedChannel ?? widget.channel;
 
     return Scaffold(
       backgroundColor: detailTheme.scaffoldBackgroundColor,
@@ -64,7 +226,7 @@ class RssDetailScreen extends StatelessWidget {
                       hasImage
                           ? FlexibleSpaceBar(
                             background: Image.network(
-                              rssItem.rssImageLink!,
+                              widget.rssItem.rssImageLink!,
                               fit: BoxFit.cover,
                               errorBuilder: (context, error, stackTrace) {
                                 return Container(
@@ -94,8 +256,12 @@ class RssDetailScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // RSS 채널 정보 표시
-                        if (channel != null)
-                          _buildChannelInfo(channel!, colorScheme, textTheme),
+                        if (channelForUi != null)
+                          _buildChannelInfo(
+                            channelForUi,
+                            colorScheme,
+                            textTheme,
+                          ),
 
                         const SizedBox(height: 16),
 
@@ -109,15 +275,15 @@ class RssDetailScreen extends StatelessWidget {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              _formatDate(rssItem.rssPubDate),
+                              _formatDate(widget.rssItem.rssPubDate),
                               style: textTheme.bodySmall?.copyWith(
                                 color: colorScheme.secondary,
                               ),
                             ),
 
                             // 저자 정보가 있으면 표시
-                            if (rssItem.rssAuthor != null &&
-                                rssItem.rssAuthor!.isNotEmpty) ...[
+                            if (widget.rssItem.rssAuthor != null &&
+                                widget.rssItem.rssAuthor!.isNotEmpty) ...[
                               const SizedBox(width: 12),
                               Icon(
                                 Icons.person_outline,
@@ -127,7 +293,7 @@ class RssDetailScreen extends StatelessWidget {
                               const SizedBox(width: 6),
                               Expanded(
                                 child: Text(
-                                  rssItem.rssAuthor!,
+                                  widget.rssItem.rssAuthor!,
                                   style: textTheme.bodySmall?.copyWith(
                                     color: colorScheme.secondary,
                                   ),
@@ -142,19 +308,115 @@ class RssDetailScreen extends StatelessWidget {
 
                         // 제목
                         Text(
-                          rssItem.rssTitle,
+                          widget.rssItem.rssTitle,
                           style: textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                         ),
 
-                        const SizedBox(height: 24),
+                        // 요약하기 CTA (본문 상단)
+                        if (!_hideSummaryFeature) ...[
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed:
+                                  _isCheckingSubscription || _resolvingChannel
+                                      ? null
+                                      : (_isPremiumActive
+                                          ? _requestSummary
+                                          : _goToSubscription),
+                              icon:
+                                  (_loading ||
+                                          _isCheckingSubscription ||
+                                          _resolvingChannel)
+                                      ? const SizedBox(
+                                        width: 18,
+                                        height: 18,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                      : Icon(
+                                        _isPremiumActive
+                                            ? Icons.auto_awesome_rounded
+                                            : Icons.lock_outline,
+                                        size: 18,
+                                      ),
+                              label: Text(
+                                _isCheckingSubscription
+                                    ? '확인 중...'
+                                    : _resolvingChannel
+                                    ? '채널 확인 중...'
+                                    : _isPremiumActive
+                                    ? (_summary == null ? 'AI로 요약하기' : '다시 요약')
+                                    : '구독하고 요약 사용',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: detailTheme.primaryColor,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                              ),
+                            ),
+                          ),
 
-                        // RSS 본문 콘텐츠
-                        Text(
-                          _cleanHtml(rssItem.rssDescription),
-                          style: textTheme.bodyLarge,
-                        ),
+                          // 미구독자용 프리미엄 안내 배너 (버튼 아래)
+                          if (!_isCheckingSubscription &&
+                              !_isPremiumActive) ...[
+                            const SizedBox(height: 10),
+                            _buildPremiumSummaryBanner(context, detailTheme),
+                          ],
+
+                          // 로딩/에러 인라인 표시 (본문 위)
+                          if (_loading || _error != null) ...[
+                            const SizedBox(height: 10),
+                            if (_loading)
+                              Row(
+                                children: [
+                                  SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        colorScheme.primary,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Text(
+                                    '요약 생성 중...',
+                                    style: textTheme.bodyMedium?.copyWith(
+                                      color: colorScheme.primary,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            else if (_error != null)
+                              Text(
+                                _error!,
+                                style: textTheme.bodyMedium?.copyWith(
+                                  color: detailTheme.colorScheme.error,
+                                ),
+                              ),
+                          ],
+                        ],
+
+                        const SizedBox(height: 16),
+
+                        // 본문(또는 요약) 콘텐츠 - 요약이 있으면 요약으로 대체
+                        Text(bodyText, style: textTheme.bodyLarge),
                       ],
                     ),
                   ),
@@ -162,7 +424,7 @@ class RssDetailScreen extends StatelessWidget {
               ],
             ),
 
-            // 하단 버튼 영역
+            // 하단 버튼 영역 (공유/원문 보기)
             Positioned(
               left: 0,
               right: 0,
@@ -191,7 +453,7 @@ class RssDetailScreen extends StatelessWidget {
                         child: ElevatedButton.icon(
                           onPressed: () {
                             Share.share(
-                              '${rssItem.rssTitle}\n\n${rssItem.rssLink}',
+                              '${widget.rssItem.rssTitle}\n\n${widget.rssItem.rssLink}',
                             );
                           },
                           icon: const Icon(Icons.share, size: 18),
@@ -227,10 +489,9 @@ class RssDetailScreen extends StatelessWidget {
                         padding: const EdgeInsets.only(left: 8),
                         child: ElevatedButton.icon(
                           onPressed: () {
-                            // 최근 읽은 기사 추가 등의 코드를 여기 추가할 수 있음
                             UrlLauncherHelper.openUrl(
                               context,
-                              rssItem.rssLink,
+                              widget.rssItem.rssLink,
                               settings.webOpenMode,
                             );
                           },
@@ -260,6 +521,35 @@ class RssDetailScreen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // 미구독자용 프리미엄 안내 배너 (간단 버전)
+  Widget _buildPremiumSummaryBanner(BuildContext context, ThemeData theme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.lock_outline, color: theme.colorScheme.primary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '이 글 요약은 프리미엄 전용 기능입니다. 구독하고 바로 이용해 보세요!',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.primary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          TextButton(onPressed: _goToSubscription, child: const Text('구독하기')),
+        ],
       ),
     );
   }
@@ -349,8 +639,7 @@ class RssDetailScreen extends StatelessWidget {
 
   // HTML 태그 제거 함수
   String _cleanHtml(String html) {
-    // 기본적인 HTML 태그 제거 (더 정교한 구현이 필요하다면 html 패키지 사용 권장)
-    RegExp exp = RegExp(r"<[^>]*>", multiLine: true, caseSensitive: true);
+    final exp = RegExp(r"<[^>]*>", multiLine: true, caseSensitive: true);
     return html
         .replaceAll(exp, '')
         .replaceAll('&nbsp;', ' ')
