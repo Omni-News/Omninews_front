@@ -1,10 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/app_setting.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
+import 'package:omninews_flutter/screens/login_screen.dart';
 import 'package:omninews_flutter/screens/omninews_subscription/omninews_subscription_home.dart';
 import 'package:provider/provider.dart';
-import 'package:omninews_flutter/services/auth_service.dart'; // 알림 권한용 추가
-import 'package:permission_handler/permission_handler.dart'; // 권한 핸들러 추가
+import 'package:omninews_flutter/services/auth_service.dart'; // 알림 권한용 + 회원탈퇴
+import 'package:permission_handler/permission_handler.dart'; // 권한 핸들러
+import 'package:url_launcher/url_launcher.dart'; // 스토어 구독 관리 이동
+import 'package:omninews_flutter/services/settings_service.dart'; // 로컬 설정 저장/초기화
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -21,25 +26,31 @@ class SettingsScreen extends StatelessWidget {
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(title: Text('설정', style: theme.textTheme.headlineMedium)),
-      body: ListView(
-        children: [
-          _buildSectionHeader(context, '콘텐츠 표시 설정'),
-          _buildViewModeSelector(context, settingsProvider),
-          const Divider(),
-          _buildSectionHeader(context, '웹 링크 설정'),
-          _buildWebOpenModeSelector(context, settingsProvider),
-          const Divider(),
-          // 알림 섹션 추가
-          _buildSectionHeader(context, '알림 설정'),
-          _buildNotificationSettings(context, settingsProvider),
-          const Divider(),
-          // 구독 섹션 추가
-          _buildSectionHeader(context, '구독 관리'),
-          _buildSubscriptionSettings(context),
-          const Divider(),
-        ],
+    return WillPopScope(
+      onWillPop: () async => true,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('설정', style: theme.textTheme.headlineMedium),
+        ),
+        body: ListView(
+          children: [
+            _buildSectionHeader(context, '콘텐츠 표시 설정'),
+            _buildViewModeSelector(context, settingsProvider),
+            const Divider(),
+            _buildSectionHeader(context, '웹 링크 설정'),
+            _buildWebOpenModeSelector(context, settingsProvider),
+            const Divider(),
+            _buildSectionHeader(context, '알림 설정'),
+            _buildNotificationSettings(context, settingsProvider),
+            const Divider(),
+            _buildSectionHeader(context, '구독 관리'),
+            _buildSubscriptionSettings(context),
+            const Divider(),
+            _buildSectionHeader(context, '계정'),
+            _buildAccountDeletionTile(context),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
     );
   }
@@ -61,7 +72,7 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  // 구독 설정 위젯 추가
+  // 구독 설정 위젯
   Widget _buildSubscriptionSettings(BuildContext context) {
     return Column(
       children: [
@@ -70,15 +81,161 @@ class SettingsScreen extends StatelessWidget {
           title: const Text('구독 관리'),
           subtitle: const Text('프리미엄 기능 및 구독 상태 확인'),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            Navigator.push(
+          onTap: () async {
+            await Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => SubscriptionHomePage()),
+              MaterialPageRoute(
+                builder: (context) => const SubscriptionHomePage(),
+              ),
             );
           },
         ),
       ],
     );
+  }
+
+  // 회원 탈퇴 타일
+  Widget _buildAccountDeletionTile(BuildContext context) {
+    return ListTile(
+      leading: const Icon(Icons.delete_forever, color: Colors.red),
+      title: const Text(
+        '회원 탈퇴',
+        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+      ),
+      subtitle: const Text('계정과 데이터가 삭제됩니다. 스토어 구독(애플/구글)은 별도 해지 필요'),
+      onTap: () => _confirmAndDeleteAccount(context),
+    );
+  }
+
+  Future<void> _confirmAndDeleteAccount(BuildContext context) async {
+    final confirmed =
+        await showDialog<bool>(
+          context: context,
+          builder:
+              (context) => AlertDialog(
+                title: const Text('회원 탈퇴'),
+                content: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '탈퇴 시:\n'
+                      '- 앱 내 계정 및 데이터가 삭제됩니다.\n'
+                      '- 스토어 구독은 자동 해지되지 않습니다.\n'
+                      '  (애플/구글 구독은 각 스토어에서 직접 취소해야 합니다)',
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton.icon(
+                      onPressed: _openStoreSubscriptionManagement,
+                      icon: const Icon(Icons.open_in_new),
+                      label: Text(
+                        Platform.isIOS ? '애플 구독 관리로 이동' : '구글 구독 관리로 이동',
+                      ),
+                    ),
+                  ],
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('취소'),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                    ),
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('탈퇴하기'),
+                  ),
+                ],
+              ),
+        ) ??
+        false;
+
+    if (!confirmed) return;
+
+    await _performAccountDeletion(context);
+  }
+
+  Future<void> _performAccountDeletion(BuildContext context) async {
+    final navigatorState = Navigator.of(
+      context,
+    ); // NavigatorState를 캡처해 콜백에서 재사용
+    final scaffold = ScaffoldMessenger.of(context);
+    final auth = AuthService();
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      final ok = await auth.deleteAccount();
+
+      // 로딩 닫기
+      navigatorState.pop();
+
+      if (!ok) {
+        scaffold.showSnackBar(
+          const SnackBar(
+            content: Text('회원 탈퇴 요청에 실패했습니다. 잠시 후 다시 시도해주세요.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      // 로컬 앱 설정 초기화
+      await SettingsService.saveSettings(AppSettings());
+
+      scaffold.showSnackBar(
+        const SnackBar(
+          content: Text('회원 탈퇴가 완료되었습니다.'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      // 로그인 화면으로 완전 이동 (스택 초기화)
+      await Future.delayed(const Duration(milliseconds: 200));
+      navigatorState.pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder:
+              (_) => LoginScreen(
+                onLoginSuccess: () {
+                  // 로그인 성공 시 홈으로 교체 (앱 라우팅에 맞게 조정)
+                  navigatorState.pushReplacementNamed('/');
+                },
+              ),
+        ),
+        (route) => false,
+      );
+    } catch (e) {
+      // 로딩 닫기
+      navigatorState.pop();
+      scaffold.showSnackBar(
+        SnackBar(
+          content: Text('회원 탈퇴 중 오류가 발생했습니다: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _openStoreSubscriptionManagement() async {
+    final uri =
+        Platform.isIOS
+            ? Uri.parse('itms-apps://apps.apple.com/account/subscriptions')
+            : Uri.parse('https://play.google.com/store/account/subscriptions');
+
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      final fallback =
+          Platform.isIOS
+              ? Uri.parse('https://apps.apple.com/account/subscriptions')
+              : Uri.parse(
+                'https://play.google.com/store/account/subscriptions',
+              );
+      await launchUrl(fallback, mode: LaunchMode.externalApplication);
+    }
   }
 
   Widget _buildViewModeSelector(
@@ -155,7 +312,7 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  // 알림 설정 위젯 추가 (설정 화면으로 이동 기능 추가)
+  // 알림 설정 위젯 (설정 화면으로 이동 기능 포함)
   Widget _buildNotificationSettings(
     BuildContext context,
     SettingsProvider provider,

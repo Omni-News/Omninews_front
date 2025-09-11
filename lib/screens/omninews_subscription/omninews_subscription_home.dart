@@ -15,9 +15,23 @@ class SubscriptionHomePage extends StatefulWidget {
 class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
   final AuthService _authService = AuthService();
 
+  // 구독 변경 여부를 상위 라우트에 전달하기 위한 플래그
+  bool _subscriptionChanged = false;
+
   @override
   void initState() {
     super.initState();
+  }
+
+  // 구매 성공 후 공통 처리: 로컬 상태 플래그 세팅, 스낵바, 현재 화면 종료(+결과 전달)
+  Future<void> _onPurchaseSuccess(BuildContext context) async {
+    if (!mounted) return;
+    setState(() {
+      _subscriptionChanged = true;
+    });
+
+    // 현재 페이지를 닫으면서 결과(true) 전달 -> 이전 화면에서 await 후 새로고침 가능
+    Navigator.of(context).pop(true);
   }
 
   @override
@@ -27,21 +41,33 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     final isRecentLogin = _authService.isRecentLogin();
     final availablePlans = provider.availablePlans;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('구독 관리')),
-      body:
-          provider.isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (isRecentLogin) _buildAccountSwitchNotice(),
-                    _buildStatusCard(context, status, provider, availablePlans),
-                  ],
+    // 뒤로가기(제스처/버튼) 시에도 결과를 돌려주어 이전 화면이 새로고침할 수 있게 함
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.of(context).pop(_subscriptionChanged);
+        return false;
+      },
+      child: Scaffold(
+        appBar: AppBar(title: const Text('구독 관리')),
+        body:
+            provider.isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (isRecentLogin) _buildAccountSwitchNotice(),
+                      _buildStatusCard(
+                        context,
+                        status,
+                        provider,
+                        availablePlans,
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+      ),
     );
   }
 
@@ -178,7 +204,7 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: () => _showCancellationDialog(context),
-              icon: Icon(Icons.cancel_outlined, color: Colors.red),
+              icon: const Icon(Icons.cancel_outlined, color: Colors.red),
               label: const Text('구독 관리'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: Colors.red,
@@ -190,7 +216,6 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
       );
     } else {
       // 구독 없음 - 구독 홍보 UI로 변경
-      // 사용 가능한 플랜이 있는지 확인
       final plan = availablePlans.isNotEmpty ? availablePlans.first : null;
 
       return Container(
@@ -261,12 +286,12 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                // StoreKit에서 가져온 상품명 표시
-                child: Text('${plan?.name ?? 'OmniNews 프리미엄'} 구독하기'),
+                child: Text('${'OmniNews 프리미엄(개발용) '} 구독하기'),
               ),
             ),
-            // 구독 버튼 - 플랜 정보가 있을 경우에만 표시
+
             if (plan != null) ...[
+              const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -280,7 +305,6 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  // StoreKit에서 가져온 상품명 표시
                   child: Text('${plan.name} 구독하기'),
                 ),
               ),
@@ -334,10 +358,11 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
       final success = await provider.purchaseSubscription(plan);
 
       // 로딩 닫기
-      Navigator.of(context, rootNavigator: true).pop();
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
 
       if (!success) {
-        // 실패 시 메시지 표시
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -346,11 +371,25 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
             ),
           );
         }
+      } else {
+        // 성공 시: (선택) 서버에서 최신 구독 상태 동기화가 필요한 경우 호출
+        // await provider.refreshSubscriptionStatus(); // Provider에 메서드가 있다면 사용
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('구독이 완료되었습니다. 이전 화면으로 돌아갑니다.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+        await Future.delayed(const Duration(milliseconds: 300)); // 스낵바 살짝 노출
+        await _onPurchaseSuccess(context);
       }
     } catch (e) {
       // 오류 처리
-      Navigator.of(context, rootNavigator: true).pop(); // 로딩 닫기
       if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop(); // 로딩 닫기
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('구독 처리 중 오류가 발생했습니다: $e'),
@@ -373,11 +412,39 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     );
 
     try {
-      await provider.purchaseSubscriptionTest();
-    } catch (e) {
-      // 오류 처리
-      Navigator.of(context, rootNavigator: true).pop(); // 로딩 닫기
+      final success = await provider.purchaseSubscriptionTest();
+
+      // 로딩 닫기 (성공/실패 모두 닫기)
       if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      if (!success) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('구독 처리 중 오류가 발생했습니다.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else {
+        // 성공 시 동일 처리
+        // await provider.refreshSubscriptionStatus(); // 가능하면 최신화
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('구독이 완료되었습니다. 이전 화면으로 돌아갑니다.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+        await Future.delayed(const Duration(milliseconds: 300));
+        await _onPurchaseSuccess(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop(); // 로딩 닫기
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('구독 처리 중 오류가 발생했습니다: $e'),
