@@ -162,6 +162,22 @@ class _RssAddScreenState extends State<RssAddScreen>
     });
   }
 
+  // 구독 페이지로 이동 후, 돌아올 때 결과에 따라 상태 새로고침
+  Future<void> _openSubscriptionAndRefresh() async {
+    final changed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (context) => const SubscriptionHomePage()),
+    );
+
+    if (changed == true) {
+      // 구독이 변경되었으면 즉시 상태 재확인
+      await _checkSubscriptionStatus();
+      if (mounted) {
+        _showSnackBar('구독이 활성화되었습니다.');
+      }
+    }
+  }
+
   bool _isValidImageUrl(String? url) {
     if (url == null || url.isEmpty) return false;
     try {
@@ -392,7 +408,6 @@ class _RssAddScreenState extends State<RssAddScreen>
         if (existedBefore) {
           _showSnackBar('이미 존재하는 RSS입니다. 바로 구독할 수 있습니다.');
         } else {
-          // [MODIFIED] Instagram을 포함한 모든 플랫폼에 대해 동일한 성공 메시지를 표시하도록 변경
           _showSnackBar('RSS가 성공적으로 생성되었습니다. 이제 구독할 수 있습니다.');
         }
       } else {
@@ -1148,14 +1163,7 @@ class _RssAddScreenState extends State<RssAddScreen>
           ),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const SubscriptionHomePage(),
-                ),
-              );
-            },
+            onPressed: _openSubscriptionAndRefresh, // 변경: 구독 후 돌아오면 상태 새로고침
             style: ElevatedButton.styleFrom(
               backgroundColor: theme.primaryColor,
               foregroundColor: Colors.white,

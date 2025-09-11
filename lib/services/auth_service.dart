@@ -35,7 +35,7 @@ class AuthService {
         '1008455298981-96a4gkqhnmr1hhbqab80df7rljbhocai.apps.googleusercontent.com',
   );
 
-  static String apiBaseUrl = 'http://61.253.113.42:1027/v1/api';
+  static String apiBaseUrl = 'http://localhost:1027/v1/api';
 
   // 토큰 정보
   String? _accessToken;
@@ -92,13 +92,12 @@ class AuthService {
 
     // 만료 시간 1분 전에 갱신하도록 설정 (버퍼)
     final expiryWithBuffer = _accessTokenExpiresAt!.subtract(
-      Duration(minutes: 1),
+      const Duration(minutes: 1),
     );
     return expiryWithBuffer.isBefore(DateTime.now());
   }
 
   // 로그아웃
-
   Future<bool> signOut() async {
     try {
       // 소셜 로그인 SDK 로그아웃
@@ -144,6 +143,47 @@ class AuthService {
       return true;
     } catch (e) {
       debugPrint('로그아웃 오류: $e');
+      return false;
+    }
+  }
+
+  // ============ 회원 탈퇴(계정 삭제) ============
+
+  /// 서버 회원 탈퇴 API 호출 후 로컬 데이터 정리
+  /// - DELETE /user/delete
+  /// - 백엔드 미들웨어에서 인증 검증
+  Future<bool> deleteAccount() async {
+    try {
+      await ensureInitialized();
+
+      final resp = await apiRequest('DELETE', '/user/delete');
+      debugPrint('회원 탈퇴 응답: ${resp.statusCode} ${resp.body}');
+
+      if (resp.statusCode >= 200 && resp.statusCode < 300) {
+        // 1) 알림 비활성화(서버에 push off 전달)
+        try {
+          await disableNotifications();
+          // 선택: FCM 토큰 자체 삭제
+          await FirebaseMessaging.instance.deleteToken();
+        } catch (e) {
+          debugPrint('알림 비활성화/토큰 삭제 중 오류: $e');
+        }
+
+        // 2) 로컬 인증/사용자 데이터 정리
+        await _clearAuthData();
+
+        // 3) 기타 캐시/상태 제거
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('cached_subscription');
+        await prefs.remove('last_login_time');
+        await prefs.remove('last_login_email');
+
+        return true;
+      }
+
+      return false;
+    } catch (e) {
+      debugPrint('회원 탈퇴 중 오류: $e');
       return false;
     }
   }
@@ -304,7 +344,6 @@ class AuthService {
   }
 
   // 서버로 인증 정보 전송
-
   Future<bool> _authenticateWithServer(Map<String, dynamic> paramUser) async {
     try {
       final response = await http.post(
@@ -444,7 +483,7 @@ class AuthService {
       final userData = prefs.getString('user_data');
       if (userData != null) {
         _user = json.decode(userData);
-        debugPrint('로드된 사용자 정보: $_user');
+        debugPrint('로드된 사용자 정보: $user');
 
         // 사용자 이메일 검증
         final email = _user?['email'];
@@ -682,7 +721,7 @@ class AuthService {
       debugPrint('토큰 갱신이 이미 진행 중입니다.');
       // 5초 동안 토큰 갱신이 완료될 때까지 대기
       for (int i = 0; i < 10; i++) {
-        await Future.delayed(Duration(milliseconds: 500));
+        await Future.delayed(const Duration(milliseconds: 500));
         if (!_isRefreshing && _accessToken != null) {
           return true;
         }
@@ -838,10 +877,10 @@ class AuthService {
               }
               break;
             }
-            await Future.delayed(Duration(seconds: 2));
+            await Future.delayed(const Duration(seconds: 2));
           }
         } catch (e) {
-          print('FCM 토큰 처리 오류: $e');
+          debugPrint('FCM 토큰 처리 오류: $e');
         }
       }
       return settings.authorizationStatus == AuthorizationStatus.authorized;
@@ -893,14 +932,14 @@ class AuthService {
       );
 
       if (response.statusCode == 200) {
-        print('알림 설정 저장 성공, fcm token: $fcmToken');
+        debugPrint('알림 설정 저장 성공, fcm token: $fcmToken');
         return true;
       } else {
-        print('알림 설정 저장 실패: ${response.statusCode}');
+        debugPrint('알림 설정 저장 실패: ${response.statusCode}');
         return false;
       }
     } catch (e) {
-      print('알림 설정 저장 오류: $e');
+      debugPrint('알림 설정 저장 오류: $e');
       return false;
     }
   }
@@ -935,11 +974,11 @@ class AuthService {
         debugPrint('서버 인증 성공: ${_user?['displayName']}');
         return true;
       } else {
-        print('애플 로그인 실패: ${response.statusCode}');
+        debugPrint('애플 로그인 실패: ${response.statusCode}');
         return false;
       }
     } catch (e) {
-      print('애플 로그인 오류: $e');
+      debugPrint('애플 로그인 오류: $e');
       return false;
     }
   }
