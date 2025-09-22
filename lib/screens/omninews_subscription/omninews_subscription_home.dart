@@ -272,23 +272,24 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
             _buildBenefitRow('오프라인 저장 및 읽기'),
             const SizedBox(height: 20),
 
-            //            // 임시 구독 버튼
-            //            SizedBox(
-            //              width: double.infinity,
-            //              child: ElevatedButton(
-            //                onPressed: () => _handleSubscribeTest(context, provider),
-            //                style: ElevatedButton.styleFrom(
-            //                  backgroundColor: Colors.blue.shade700,
-            //                  foregroundColor: Colors.white,
-            //                  padding: const EdgeInsets.symmetric(vertical: 12),
-            //                  textStyle: const TextStyle(
-            //                    fontSize: 16,
-            //                    fontWeight: FontWeight.bold,
-            //                  ),
-            //                ),
-            //                child: Text('${'OmniNews 프리미엄(개발용) '} 구독하기'),
-            //              ),
-            //            ),
+            // 임시 구독 버튼
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => _handleSubscribeTest(context, provider),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue.shade700,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  textStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                child: Text('${'OmniNews 프리미엄(개발용) '} 구독하기'),
+              ),
+            ),
+
             if (plan != null) ...[
               const SizedBox(height: 8),
               SizedBox(

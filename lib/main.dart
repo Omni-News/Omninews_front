@@ -97,6 +97,7 @@ class MyApp extends StatelessWidget {
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
           return MaterialApp(
+            debugShowCheckedModeBanner: false,
             title: 'Omninews',
             theme: themeProvider.currentTheme,
             home: const HomeScreen(),

@@ -5,14 +5,21 @@ import 'package:omninews_flutter/models/app_setting.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
 import 'package:omninews_flutter/screens/login_screen.dart';
 import 'package:omninews_flutter/screens/omninews_subscription/omninews_subscription_home.dart';
+import 'package:omninews_flutter/screens/webview_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:omninews_flutter/services/auth_service.dart'; // 알림 권한용 + 회원탈퇴
-import 'package:permission_handler/permission_handler.dart'; // 권한 핸들러
-import 'package:url_launcher/url_launcher.dart'; // 스토어 구독 관리 이동
-import 'package:omninews_flutter/services/settings_service.dart'; // 로컬 설정 저장/초기화
+import 'package:omninews_flutter/services/auth_service.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:omninews_flutter/services/settings_service.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
+
+  // EULA와 개인정보처리방침 URL
+  static const String eulaUrl =
+      'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+  static const String privacyPolicyUrl =
+      'https://sites.google.com/view/omninews/%ED%99%88';
 
   @override
   Widget build(BuildContext context) {
@@ -46,12 +53,55 @@ class SettingsScreen extends StatelessWidget {
             _buildSectionHeader(context, '구독 관리'),
             _buildSubscriptionSettings(context),
             const Divider(),
+            _buildSectionHeader(context, '법적 정보'), // 새로운 섹션 추가
+            _buildLegalInformation(context), // 새로운 섹션 추가
+            const Divider(),
             _buildSectionHeader(context, '계정'),
             _buildAccountDeletionTile(context),
             const SizedBox(height: 16),
           ],
         ),
       ),
+    );
+  }
+
+  // 새로 추가된 법적 정보 섹션
+  Widget _buildLegalInformation(BuildContext context) {
+    return Column(
+      children: [
+        ListTile(
+          leading: const Icon(Icons.description),
+          title: const Text('이용약관 (EULA)'),
+          subtitle: const Text('서비스 이용약관을 확인합니다'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap:
+              () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder:
+                      (context) =>
+                          const WebViewScreen(url: eulaUrl, title: '이용약관'),
+                ),
+              ),
+        ),
+        ListTile(
+          leading: const Icon(Icons.privacy_tip),
+          title: const Text('개인정보처리방침'),
+          subtitle: const Text('개인정보 수집 및 처리 방침을 확인합니다'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap:
+              () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder:
+                      (context) => const WebViewScreen(
+                        url: privacyPolicyUrl,
+                        title: '개인정보처리방침',
+                      ),
+                ),
+              ),
+        ),
+      ],
     );
   }
 
