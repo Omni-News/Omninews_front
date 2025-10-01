@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:omninews_flutter/models/omninews_subscription.dart';
 import 'package:omninews_flutter/services/auth_service.dart';
@@ -24,10 +26,9 @@ class SubscriptionProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // 구독 상품 정보만 로드
       _availablePlans = await _subscriptionService.loadSubscriptionPlans();
 
-      // 리스너 구독 - 스토어 이벤트 수신만 준비
+      // 서비스의 상태 스트림을 구독해 UI 갱신
       _subscriptionService.statusStream.listen((status) {
         _status = status;
         notifyListeners();
@@ -49,7 +50,7 @@ class SubscriptionProvider with ChangeNotifier {
       debugPrint('로그인 후 구독 상태 확인 시작');
 
       // 트랜잭션 리스너 설정
-      _subscriptionService.setupListener();
+      await _subscriptionService.setupListener();
 
       // 구독 상태 확인
       _status = await _subscriptionService.checkSubscriptionStatus();
@@ -68,13 +69,14 @@ class SubscriptionProvider with ChangeNotifier {
     }
   }
 
+  // 구독 구매 시작: "시작됨" 여부만 반환
   Future<bool> purchaseSubscription(SubscriptionPlan plan) async {
     _isLoading = true;
     notifyListeners();
 
     try {
-      final success = await _subscriptionService.purchasePlan(plan.id);
-      return success;
+      final started = await _subscriptionService.purchasePlan(plan.id);
+      return started;
     } catch (e) {
       debugPrint('구독 구매 중 오류: $e');
       return false;
@@ -84,21 +86,14 @@ class SubscriptionProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> purchaseSubscriptionTest() async {
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      final success = await _subscriptionService
-          .registerSubscriptionWithServerTest('Test');
-      return success;
-    } catch (e) {
-      debugPrint('구독 구매 중 오류: $e');
-      return false;
-    } finally {
-      _isLoading = false;
-      notifyListeners();
-    }
+  // 특정 상품의 최종 결과를 기다림 (스토어 콜백 + 서버 검증까지)
+  Future<PurchaseResult> waitForPurchaseResult(
+    String productId, {
+    Duration timeout = const Duration(minutes: 2),
+  }) {
+    return _subscriptionService.purchaseResultStream
+        .firstWhere((r) => r.productId == productId)
+        .timeout(timeout);
   }
 
   // 초기화 - 앱 시작시 자동 복원 추가
@@ -107,21 +102,15 @@ class SubscriptionProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // 서비스 초기화 (이 과정에서 자동으로 구독 복원 시도)
       await _subscriptionService.initialize();
 
-      // 구독 상태 로드
       _status = await _subscriptionService.checkSubscriptionStatus();
-
-      // 구독 상품 로드
       _availablePlans = await _subscriptionService.loadSubscriptionPlans();
 
-      // 로그인 상태에서만 자동 복원 시도
       if (_authService.isLoggedIn) {
-        print('사용자 로그인 상태에서 구독 복원 시도...');
+        debugPrint('사용자 로그인 상태에서 구독 복원 시도...');
         await _subscriptionService.handleAccountSwitch();
 
-        // 복원 후 상태 다시 확인
         _status = await _subscriptionService.checkSubscriptionStatus();
       }
     } catch (e) {
@@ -131,7 +120,7 @@ class SubscriptionProvider with ChangeNotifier {
       notifyListeners();
     }
 
-    // 스트림 구독
+    // 상태 스트림 구독
     _subscriptionService.statusStream.listen((status) {
       _status = status;
       notifyListeners();
@@ -144,13 +133,8 @@ class SubscriptionProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // 1. 구독 서비스를 통해 계정 전환 처리
       await _subscriptionService.handleAccountSwitch();
-
-      // 2. 구독 상태 갱신
       _status = await _subscriptionService.checkSubscriptionStatus();
-
-      // 3. 최근 로그인 플래그 리셋 (다음 작업에서는 새 로그인으로 간주하지 않도록)
       _authService.resetRecentLoginFlag();
     } catch (e) {
       debugPrint('계정 변경 후 구독 새로고침 오류: $e');
@@ -166,10 +150,7 @@ class SubscriptionProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // 먼저 스토어에서 최신 상태 확인
       await _subscriptionService.restorePurchases();
-
-      // 그 다음 구독 상태 갱신
       _status = await _subscriptionService.checkSubscriptionStatus();
     } catch (e) {
       debugPrint('Error refreshing subscription status: $e');
@@ -184,9 +165,9 @@ class SubscriptionProvider with ChangeNotifier {
     return await _subscriptionService.navigateToSubscriptionManagement();
   }
 
+  // 필요 시 직접 서버 등록을 호출해야 하면 사용 (현재 플로우에서는 서비스 내부에서 호출)
   Future<void> registerSubscriptionWithServer(PurchaseDetails purchase) async {
     try {
-      // 서버에 구독 상태 등록
       await _subscriptionService.registerSubscriptionWithServer(purchase);
       debugPrint('구독 상태 서버 등록 성공: ${purchase.productID}');
     } catch (e) {
