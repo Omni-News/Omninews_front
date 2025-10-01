@@ -23,16 +23,14 @@ class SubscriptionPlan {
 class SubscriptionStatus {
   final bool isActive; // 구독 활성화 여부
   final DateTime? expiryDate; // 구독 만료일 (있는 경우)
-  final String? productId; // 구독 상품 ID (있는 경우)
 
-  SubscriptionStatus({required this.isActive, this.expiryDate, this.productId});
+  SubscriptionStatus({required this.isActive, this.expiryDate});
 
   // JSON 직렬화
   Map<String, dynamic> toJson() {
     return {
       'is_active': isActive,
       'expiry_date': expiryDate?.toIso8601String(),
-      'product_id': productId,
     };
   }
 
@@ -40,7 +38,6 @@ class SubscriptionStatus {
   factory SubscriptionStatus.fromJson(Map<String, dynamic> json) {
     return SubscriptionStatus(
       isActive: json['is_active'] ?? false,
-      productId: json['product_id'],
       expiryDate:
           json['expiry_date'] != null
               ? DateTime.parse(json['expiry_date'])
@@ -95,13 +92,11 @@ class SubscriptionReceiptRequest {
 class ReceiptValidationResult {
   final bool isValid;
   final bool isActive;
-  final String? productId;
   final String? errorMessage;
 
   ReceiptValidationResult({
     required this.isValid,
     required this.isActive,
-    this.productId,
     this.errorMessage,
   });
 }

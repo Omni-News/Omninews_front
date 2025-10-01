@@ -89,14 +89,13 @@ class SubscriptionService {
 
       final response = await _authService.apiRequest(
         'GET',
-        '/subscription/verify',
+        '/subscription/verify?is_sandbox=true',
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic>) {
           final isActive = data['is_active'] ?? false;
-          final productId = data['product_id'] ?? 'unknown';
 
           DateTime? expiryDate;
           if (data['expires_date'] != null) {
@@ -107,11 +106,7 @@ class SubscriptionService {
             }
           }
 
-          return SubscriptionStatus(
-            isActive: isActive,
-            productId: productId,
-            expiryDate: expiryDate,
-          );
+          return SubscriptionStatus(isActive: isActive, expiryDate: expiryDate);
         }
       }
 
