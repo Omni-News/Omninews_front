@@ -89,7 +89,7 @@ class SubscriptionService {
 
       final response = await _authService.apiRequest(
         'GET',
-        '/subscription/verify',
+        '/subscription/verify?is_sandbox=true',
       );
 
       if (response.statusCode == 200) {
