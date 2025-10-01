@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:omninews_flutter/models/omninews_subscription.dart';
 import 'package:omninews_flutter/services/auth_service.dart';
 import 'package:omninews_flutter/services/omninews_subscription/omninews_subscription_service.dart';
@@ -163,15 +162,5 @@ class SubscriptionProvider with ChangeNotifier {
   // 구독 취소 안내 메서드
   Future<bool> navigateToSubscriptionManagement() async {
     return await _subscriptionService.navigateToSubscriptionManagement();
-  }
-
-  // 필요 시 직접 서버 등록을 호출해야 하면 사용 (현재 플로우에서는 서비스 내부에서 호출)
-  Future<void> registerSubscriptionWithServer(PurchaseDetails purchase) async {
-    try {
-      await _subscriptionService.registerSubscriptionWithServer(purchase);
-      debugPrint('구독 상태 서버 등록 성공: ${purchase.productID}');
-    } catch (e) {
-      debugPrint('구독 상태 서버 등록 오류: $e');
-    }
   }
 }

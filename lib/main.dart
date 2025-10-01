@@ -60,10 +60,10 @@ void main() async {
   }
 
   // 구독 서비스 - 초기화는 하되 검증은 하지 않음
-  final subscriptionService = SubscriptionService(skipInitialCheck: true);
+  final subscriptionService = SubscriptionService(skipInitialCheck: false);
   try {
-    await subscriptionService.setupListener(); // 리스너만 설정
-    debugPrint('구독 서비스 리스너 설정 완료');
+    await subscriptionService.initialize(); // 리스너 설정 + verify 수행
+    debugPrint('구독 서비스 초기화 및 상태 확인 완료');
   } catch (e) {
     debugPrint('구독 서비스 초기화 오류: $e');
   }
