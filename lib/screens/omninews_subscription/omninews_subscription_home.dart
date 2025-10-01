@@ -1,8 +1,10 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/omninews_subscription.dart';
 import 'package:omninews_flutter/services/auth_service.dart';
 import 'package:provider/provider.dart';
+
 import '../../provider/subscription_provider.dart';
 
 class SubscriptionHomePage extends StatefulWidget {
@@ -29,8 +31,6 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     setState(() {
       _subscriptionChanged = true;
     });
-
-    // 현재 페이지를 닫으면서 결과(true) 전달 -> 이전 화면에서 await 후 새로고침 가능
     Navigator.of(context).pop(true);
   }
 
@@ -41,7 +41,6 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     final isRecentLogin = _authService.isRecentLogin();
     final availablePlans = provider.availablePlans;
 
-    // 뒤로가기(제스처/버튼) 시에도 결과를 돌려주어 이전 화면이 새로고침할 수 있게 함
     return WillPopScope(
       onWillPop: () async {
         Navigator.of(context).pop(_subscriptionChanged);
@@ -199,8 +198,6 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
             ),
             const SizedBox(height: 8),
             const Text('모든 프리미엄 기능을 이용할 수 있습니다.'),
-
-            // 취소 버튼 추가
             const SizedBox(height: 16),
             OutlinedButton.icon(
               onPressed: () => _showCancellationDialog(context),
@@ -215,7 +212,7 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
         ),
       );
     } else {
-      // 구독 없음 - 구독 홍보 UI로 변경
+      // 구독 없음 - 구독 홍보 UI
       final plan = availablePlans.isNotEmpty ? availablePlans.first : null;
 
       return Container(
@@ -271,25 +268,6 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
             _buildBenefitRow('AI 맞춤 뉴스 추천'),
             _buildBenefitRow('오프라인 저장 및 읽기'),
             const SizedBox(height: 20),
-
-            // 임시 구독 버튼
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => _handleSubscribeTest(context, provider),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue.shade700,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  textStyle: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                child: Text('${'OmniNews 프리미엄(개발용) '} 구독하기'),
-              ),
-            ),
-
             if (plan != null) ...[
               const SizedBox(height: 8),
               SizedBox(
@@ -322,7 +300,6 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     }
   }
 
-  // 혜택 항목 행 위젯
   Widget _buildBenefitRow(String benefit) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -340,7 +317,7 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     );
   }
 
-  // 구독 처리 메서드 - StoreKit 플랜 사용
+  // 구독 처리 메서드 - 최종 결과(purchaseResultStream)를 기다려 성공/실패 결정
   Future<void> _handleSubscribe(
     BuildContext context,
     SubscriptionProvider provider,
@@ -354,94 +331,52 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     );
 
     try {
-      // StoreKit에서 가져온 플랜으로 구독 구매 시도
-      final success = await provider.purchaseSubscription(plan);
+      // 1) 구매 플로우 시작
+      final started = await provider.purchaseSubscription(plan);
+      if (!started) {
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop(); // 로딩 닫기
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('구독 결제를 시작할 수 없습니다.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // 2) 최종 결과(스토어 콜백 + 서버 검증)를 기다림
+      final result = await provider.waitForPurchaseResult(plan.id);
 
       // 로딩 닫기
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
       }
 
-      if (!success) {
+      if (!result.success) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('구독 처리 중 오류가 발생했습니다.'),
+            SnackBar(
+              content: Text(result.message ?? '구독 등록에 실패했습니다.'),
               backgroundColor: Colors.red,
             ),
           );
         }
-      } else {
-        // 성공 시: (선택) 서버에서 최신 구독 상태 동기화가 필요한 경우 호출
-        // await provider.refreshSubscriptionStatus(); // Provider에 메서드가 있다면 사용
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('구독이 완료되었습니다. 이전 화면으로 돌아갑니다.'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-        await Future.delayed(const Duration(milliseconds: 300)); // 스낵바 살짝 노출
-        await _onPurchaseSuccess(context);
+        return;
       }
-    } catch (e) {
-      // 오류 처리
+
+      // 성공 UX
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop(); // 로딩 닫기
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('구독 처리 중 오류가 발생했습니다: $e'),
-            backgroundColor: Colors.red,
+          const SnackBar(
+            content: Text('구독이 완료되었습니다. 이전 화면으로 돌아갑니다.'),
+            backgroundColor: Colors.green,
           ),
         );
       }
-    }
-  }
-
-  Future<void> _handleSubscribeTest(
-    BuildContext context,
-    SubscriptionProvider provider,
-  ) async {
-    // 로딩 표시
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-
-    try {
-      final success = await provider.purchaseSubscriptionTest();
-
-      // 로딩 닫기 (성공/실패 모두 닫기)
-      if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-      }
-
-      if (!success) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('구독 처리 중 오류가 발생했습니다.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      } else {
-        // 성공 시 동일 처리
-        // await provider.refreshSubscriptionStatus(); // 가능하면 최신화
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('구독이 완료되었습니다. 이전 화면으로 돌아갑니다.'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-        await Future.delayed(const Duration(milliseconds: 300));
-        await _onPurchaseSuccess(context);
-      }
+      await Future.delayed(const Duration(milliseconds: 300));
+      await _onPurchaseSuccess(context);
     } catch (e) {
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop(); // 로딩 닫기
@@ -463,15 +398,11 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
 
   // 가격 포맷팅
   String _formatPrice(double price) {
-    // 소수점 없는 정수로 표시
-    int priceAsInt = price.round();
-
-    // 천 단위 구분자 추가
-    String formattedPrice = priceAsInt.toString().replaceAllMapped(
+    final priceAsInt = price.round();
+    final formattedPrice = priceAsInt.toString().replaceAllMapped(
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
       (Match m) => '${m[1]},',
     );
-
     return '$formattedPrice원';
   }
 

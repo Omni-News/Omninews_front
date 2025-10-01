@@ -1,16 +1,35 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:omninews_flutter/models/omninews_subscription.dart';
-import 'package:flutter/foundation.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:omninews_flutter/services/auth_service.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+class PurchaseResult {
+  final bool success;
+  final String productId;
+  final String? message;
+
+  PurchaseResult({
+    required this.success,
+    required this.productId,
+    this.message,
+  });
+}
 
 class SubscriptionService {
   final _statusController = StreamController<SubscriptionStatus>.broadcast();
   Stream<SubscriptionStatus> get statusStream => _statusController.stream;
+
+  // 최종 구매 결과 스트림: 서버 검증까지 끝난 뒤 성공/실패 이벤트 발행
+  final _purchaseResultController =
+      StreamController<PurchaseResult>.broadcast();
+  Stream<PurchaseResult> get purchaseResultStream =>
+      _purchaseResultController.stream;
+
   StreamSubscription<List<PurchaseDetails>>? _purchaseUpdateSubscription;
   final _inAppPurchase = InAppPurchase.instance;
   final AuthService _authService = AuthService();
@@ -18,7 +37,7 @@ class SubscriptionService {
 
   SubscriptionService({this.skipInitialCheck = false});
 
-  // 트랜잭션 리스너만 설정하는 메서드 추가
+  // 트랜잭션 리스너만 설정
   Future<void> setupListener() async {
     try {
       if (_purchaseUpdateSubscription == null) {
@@ -32,12 +51,9 @@ class SubscriptionService {
 
   Future<void> initialize() async {
     try {
-      // 트랜잭션 리스너 설정
       await setupListener();
 
-      // skipInitialCheck가 true면 초기 구독 상태 확인 생략
       if (!skipInitialCheck) {
-        // 구독 상태 확인
         final status = await checkSubscriptionStatus();
         _statusController.add(status);
         debugPrint('초기화 시 구독 상태 확인 완료');
@@ -67,12 +83,10 @@ class SubscriptionService {
   // 구독 상태 확인 - 서버 API 사용
   Future<SubscriptionStatus> checkSubscriptionStatus() async {
     try {
-      // 로그인 확인
       if (!_authService.isLoggedIn) {
         return SubscriptionStatus(isActive: false);
       }
 
-      // 서버에서 구독 상태 확인
       final response = await _authService.apiRequest(
         'GET',
         '/subscription/verify',
@@ -80,7 +94,6 @@ class SubscriptionService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-
         if (data is Map<String, dynamic>) {
           final isActive = data['is_active'] ?? false;
           final productId = data['product_id'] ?? 'unknown';
@@ -91,7 +104,6 @@ class SubscriptionService {
               expiryDate = DateTime.parse(data['expires_date']);
             } catch (e) {
               debugPrint('만료일 파싱 오류: $e');
-              // 만료일 파싱 실패 시 null로 설정 (임의 날짜 설정 없음)
             }
           }
 
@@ -115,14 +127,12 @@ class SubscriptionService {
     try {
       final receiptData = purchase.verificationData.serverVerificationData;
 
-      // 백엔드 스펙에 맞는 요청 구조 생성
       final subscriptionRequest = SubscriptionRequest(
         receiptData: receiptData,
         platform: Platform.isIOS ? 'ios' : 'android',
-        isTest: !kReleaseMode,
+        isTest: true,
       );
 
-      // AuthService 사용하여 API 호출
       final response = await _authService.apiRequest(
         'POST',
         '/subscription/register',
@@ -133,36 +143,7 @@ class SubscriptionService {
         debugPrint('서버에 구독 등록 성공');
         return true;
       } else {
-        debugPrint('서버에 구독 등록 실패: ${response.statusCode}');
-        return false;
-      }
-    } catch (e) {
-      debugPrint('서버에 구독 등록 실패: $e');
-      return false;
-    }
-  }
-
-  Future<bool> registerSubscriptionWithServerTest(String receiptData) async {
-    try {
-      // 백엔드 스펙에 맞는 요청 구조 생성
-      final subscriptionRequest = SubscriptionRequest(
-        receiptData: receiptData,
-        platform: Platform.isIOS ? 'ios' : 'android',
-        isTest: !kReleaseMode,
-      );
-
-      // AuthService 사용하여 API 호출
-      final response = await _authService.apiRequest(
-        'POST',
-        '/subscription/register',
-        body: subscriptionRequest.toJson(),
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        debugPrint('서버에 구독 등록 성공');
-        return true;
-      } else {
-        debugPrint('서버에 구독 등록 실패: ${response.statusCode}');
+        debugPrint('서버에 구독 등록 실패: ${response.statusCode} - ${response.body}');
         return false;
       }
     } catch (e) {
@@ -174,7 +155,7 @@ class SubscriptionService {
   // 구독 플랜 로드
   Future<List<SubscriptionPlan>> loadSubscriptionPlans() async {
     try {
-      final productIds = {'kdh.omninews.premium'}; // 앱에서 제공하는 구독 ID
+      final productIds = {'kdh.omninews.premium'};
       final response = await _inAppPurchase.queryProductDetails(productIds);
 
       return response.productDetails.map((product) {
@@ -197,12 +178,11 @@ class SubscriptionService {
     }
   }
 
-  // 구독 구매
+  // 구독 구매 시작
   Future<bool> purchasePlan(String productId) async {
     try {
       debugPrint("구독 구매 시작: $productId");
 
-      // 제품 정보 확인
       final products = await _inAppPurchase.queryProductDetails({productId});
       if (products.productDetails.isEmpty) {
         debugPrint('상품을 찾을 수 없습니다: $productId');
@@ -212,7 +192,6 @@ class SubscriptionService {
       final product = products.productDetails.first;
       final purchaseParam = PurchaseParam(productDetails: product);
 
-      // 결제 프로세스 시작
       bool purchaseStarted;
       if (Platform.isIOS) {
         debugPrint("iOS에서 구독 구매 요청");
@@ -221,6 +200,8 @@ class SubscriptionService {
         );
       } else {
         debugPrint("Android에서 구독 구매 요청");
+        // 주의: 구독은 일반적으로 non-consumable로 처리합니다.
+        // 기존 코드 유지가 필요하면 buyConsumable을 사용하세요.
         purchaseStarted = await _inAppPurchase.buyConsumable(
           purchaseParam: purchaseParam,
         );
@@ -247,6 +228,23 @@ class SubscriptionService {
     }
   }
 
+  void _emitFailure(PurchaseDetails purchase, String msg) {
+    debugPrint(msg);
+    _purchaseResultController.add(
+      PurchaseResult(
+        success: false,
+        productId: purchase.productID,
+        message: msg,
+      ),
+    );
+  }
+
+  void _emitSuccess(PurchaseDetails purchase) {
+    _purchaseResultController.add(
+      PurchaseResult(success: true, productId: purchase.productID),
+    );
+  }
+
   // 구매 상태 업데이트 핸들러
   void _handlePurchaseUpdate(List<PurchaseDetails> purchases) async {
     for (final purchase in purchases) {
@@ -260,32 +258,54 @@ class SubscriptionService {
 
         case PurchaseStatus.purchased:
         case PurchaseStatus.restored:
-          // 구매 완료 또는 복원됨
           debugPrint('구매 완료 또는 복원됨: ${purchase.productID}');
 
-          // 서버에 영수증 전송하여 등록 및 검증
-          final success = await registerSubscriptionWithServer(purchase);
+          // 1) 서버 검증
+          final verified = await registerSubscriptionWithServer(purchase);
 
-          if (success) {
+          if (verified) {
             debugPrint('서버에 구독 등록 성공');
 
-            // 서버에서 최신 구독 상태 확인
+            // 2) 상태 갱신
             final status = await checkSubscriptionStatus();
             _statusController.add(status);
-          } else {
-            debugPrint('서버에 구독 등록 실패');
-          }
 
-          // 트랜잭션 완료 처리 (스토어에게 처리 완료 알림)
-          if (purchase.pendingCompletePurchase) {
-            await _inAppPurchase.completePurchase(purchase);
-            debugPrint('트랜잭션 완료됨');
+            // 3) 성공 이벤트
+            _emitSuccess(purchase);
+
+            // 4) 트랜잭션 완료 처리
+            if (purchase.pendingCompletePurchase) {
+              await _inAppPurchase.completePurchase(purchase);
+              debugPrint('트랜잭션 완료됨');
+            }
+          } else {
+            // 서버 검증 실패 → 실패 이벤트 및 플랫폼별 처리
+            _emitFailure(purchase, '서버 검증 실패로 구독이 적용되지 않습니다.');
+
+            if (Platform.isAndroid) {
+              // Android: acknowledge 생략 → 일정 시간 후 자동 환불 유도
+              debugPrint('Android: 서버 검증 실패 → acknowledge 생략하여 자동 환불 유도');
+              // 필요 시 아래 주석을 해제해 항상 트랜잭션을 완료하도록 할 수 있습니다.
+              // if (purchase.pendingCompletePurchase) {
+              //   await _inAppPurchase.completePurchase(purchase);
+              // }
+            } else {
+              // iOS: 트랜잭션은 반드시 완료 처리
+              if (purchase.pendingCompletePurchase) {
+                await _inAppPurchase.completePurchase(purchase);
+                debugPrint('iOS: 실패지만 트랜잭션은 finish 처리');
+              }
+            }
           }
           break;
 
         case PurchaseStatus.error:
           debugPrint('구매 오류: ${purchase.error?.message ?? "알 수 없는 오류"}');
-          // 오류 상태도 완료 처리
+          _emitFailure(
+            purchase,
+            '구매 오류: ${purchase.error?.message ?? "알 수 없는 오류"}',
+          );
+
           if (purchase.pendingCompletePurchase) {
             await _inAppPurchase.completePurchase(purchase);
           }
@@ -293,6 +313,7 @@ class SubscriptionService {
 
         case PurchaseStatus.canceled:
           debugPrint('구매가 취소되었습니다');
+          _emitFailure(purchase, '구매가 취소되었습니다');
           break;
       }
     }
@@ -304,7 +325,6 @@ class SubscriptionService {
       debugPrint('계정 전환 후 구독 정보 갱신 중...');
 
       if (_authService.isLoggedIn) {
-        // 서버에서 현재 계정의 구독 상태 확인
         final status = await checkSubscriptionStatus();
         _statusController.add(status);
       }
@@ -313,20 +333,12 @@ class SubscriptionService {
     }
   }
 
-  // 리소스 해제
-  void dispose() {
-    debugPrint('SubscriptionService 리소스 해제');
-    _purchaseUpdateSubscription?.cancel();
-    _statusController.close();
-  }
-
   // 구독 관리 페이지로 이동
   Future<bool> navigateToSubscriptionManagement() async {
     try {
       Uri url;
 
       if (Platform.isIOS) {
-        // iOS 설정 앱의 구독 관리로 직접 이동
         if (await canLaunchUrl(Uri.parse('App-prefs:SUBSCRIPTIONS'))) {
           return await launchUrl(Uri.parse('App-prefs:SUBSCRIPTIONS'));
         }
@@ -337,7 +349,6 @@ class SubscriptionService {
         return false;
       }
 
-      // URL 실행
       if (await canLaunchUrl(url)) {
         return await launchUrl(url, mode: LaunchMode.externalApplication);
       }
@@ -346,5 +357,12 @@ class SubscriptionService {
       debugPrint('구독 관리 페이지 이동 중 오류: $e');
       return false;
     }
+  }
+
+  void dispose() {
+    debugPrint('SubscriptionService 리소스 해제');
+    _purchaseUpdateSubscription?.cancel();
+    _statusController.close();
+    _purchaseResultController.close();
   }
 }
