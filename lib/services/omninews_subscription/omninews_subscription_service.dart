@@ -129,20 +129,27 @@ class SubscriptionService {
   }
 
   // 서버에 구독 정보 등록 (register)
+  // 서버에 구독 정보 등록 (register) - transactionId만 전송
   Future<bool> registerSubscriptionWithServer(PurchaseDetails purchase) async {
     try {
-      final receiptData = purchase.verificationData.serverVerificationData;
+      final transactionId =
+          purchase
+              .purchaseID; // iOS: transactionIdentifier, Android: orderId(없을 수 있음)
+      if (transactionId == null || transactionId.isEmpty) {
+        debugPrint('서버 등록 실패: transactionId가 없습니다.');
+        return false;
+      }
 
-      final subscriptionRequest = SubscriptionRequest(
-        receiptData: receiptData,
-        platform: Platform.isIOS ? 'ios' : 'android',
-        isTest: true,
-      );
+      final body = {
+        'transaction_id': transactionId,
+        'platform': Platform.isIOS ? 'ios' : 'android',
+        'is_test': true,
+      };
 
       final response = await _authService.apiRequest(
         'POST',
         '/subscription/register',
-        body: subscriptionRequest.toJson(),
+        body: body,
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
