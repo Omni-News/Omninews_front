@@ -166,6 +166,8 @@ class SubscriptionService {
   }
 
   // 구독 플랜 로드
+  // loadSubscriptionPlans만 발췌 수정
+
   Future<List<SubscriptionPlan>> loadSubscriptionPlans() async {
     try {
       final productIds = {'kdh.omninews.premium'};
@@ -176,11 +178,11 @@ class SubscriptionService {
           id: product.id,
           name: '프리미엄 구독',
           description: product.description,
-          price:
-              double.tryParse(
-                product.price.replaceAll(RegExp(r'[^0-9.]'), ''),
-              ) ??
-              0.0,
+          // 숫자 값은 rawPrice를 사용 (파싱 금지)
+          price: product.rawPrice,
+          // 통화/표시 문자열도 함께 저장
+          currencyCode: product.currencyCode,
+          priceString: product.price, // 예: '₩2,200', '$1.99'
           features: ['광고 없이 기사 읽기', '프리미엄 콘텐츠 이용', '개인화된 추천'],
           durationDays: 30,
         );

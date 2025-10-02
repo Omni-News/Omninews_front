@@ -289,7 +289,8 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
               const SizedBox(height: 8),
               Center(
                 child: Text(
-                  '월 ${_formatPrice(plan.price)} · 첫 결제 후 자동 갱신',
+                  // KRW면 “2,200원”, 그 외 통화는 스토어 표시 문자열 그대로 사용
+                  '월 ${_formatPriceDisplay(plan)} · 첫 결제 후 자동 갱신',
                   style: const TextStyle(fontSize: 14, color: Colors.black54),
                 ),
               ),
@@ -397,13 +398,18 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
   }
 
   // 가격 포맷팅
-  String _formatPrice(double price) {
-    final priceAsInt = price.round();
-    final formattedPrice = priceAsInt.toString().replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]},',
-    );
-    return '$formattedPrice원';
+  String _formatPriceDisplay(SubscriptionPlan plan) {
+    if ((plan.currencyCode ?? '').toUpperCase() == 'KRW') {
+      // KRW: 소수점 없이 천 단위 구분 + "원"
+      final priceAsInt = plan.price.round(); // rawPrice가 2200.0 → 2200
+      final formatted = priceAsInt.toString().replaceAllMapped(
+        RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+        (m) => '${m[1]},',
+      );
+      return '$formatted원';
+    }
+    // 기타 통화: 스토어가 준 문자열을 그대로(예: '$1.99', '€2,29', '¥240')
+    return plan.priceString ?? plan.price.toString();
   }
 
   void _showCancellationDialog(BuildContext context) {
