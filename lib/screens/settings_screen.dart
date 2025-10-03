@@ -152,7 +152,12 @@ class SettingsScreen extends StatelessWidget {
         '회원 탈퇴',
         style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
       ),
-      subtitle: const Text('계정과 데이터가 삭제됩니다. 스토어 구독(애플/구글)은 별도 해지 필요'),
+      // iOS에서는 Google 언급 제거
+      subtitle: Text(
+        Platform.isIOS
+            ? '계정과 데이터가 삭제됩니다. 앱스토어 구독은 별도 해지 필요'
+            : '계정과 데이터가 삭제됩니다. 구글 플레이 구독은 별도 해지 필요',
+      ),
       onTap: () => _confirmAndDeleteAccount(context),
     );
   }
@@ -168,11 +173,12 @@ class SettingsScreen extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    // 플랫폼별로 문구 분리: iOS 빌드에서 Google Play 언급 제거
+                    Text(
                       '탈퇴 시:\n'
                       '- 앱 내 계정 및 데이터가 삭제됩니다.\n'
                       '- 스토어 구독은 자동 해지되지 않습니다.\n'
-                      '  (애플/구글 구독은 각 스토어에서 직접 취소해야 합니다)',
+                      '  (${Platform.isIOS ? '앱스토어 구독은' : '구글 플레이 구독은'} 스토어에서 직접 취소해야 합니다)',
                     ),
                     const SizedBox(height: 12),
                     TextButton.icon(

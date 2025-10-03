@@ -424,9 +424,12 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  '구독을 취소하려면 앱스토어/구글플레이의 구독 관리 페이지로 이동해야 합니다.',
-                  style: TextStyle(fontSize: 14),
+                // 플랫폼별로 문구 분리: iOS 빌드에서 Google Play 언급 제거
+                Text(
+                  Platform.isIOS
+                      ? '구독을 취소하려면 앱스토어의 구독 관리 페이지로 이동해야 합니다.'
+                      : '구독을 취소하려면 구글 플레이 스토어의 구독 관리 페이지로 이동해야 합니다.',
+                  style: const TextStyle(fontSize: 14),
                 ),
                 const SizedBox(height: 8),
                 if (Platform.isIOS)
