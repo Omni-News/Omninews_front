@@ -153,11 +153,7 @@ class SettingsScreen extends StatelessWidget {
         style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
       ),
       // iOS에서는 Google 언급 제거
-      subtitle: Text(
-        Platform.isIOS
-            ? '계정과 데이터가 삭제됩니다. 앱스토어 구독은 별도 해지 필요'
-            : '계정과 데이터가 삭제됩니다. 구글 플레이 구독은 별도 해지 필요',
-      ),
+      subtitle: Text(Platform.isIOS ? '계정과 데이터가 삭제됩니다' : '계정과 데이터가 삭제됩니다'),
       onTap: () => _confirmAndDeleteAccount(context),
     );
   }
