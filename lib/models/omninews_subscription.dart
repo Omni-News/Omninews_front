@@ -61,20 +61,11 @@ class SubscriptionStatus {
 class SubscriptionRequest {
   final String receiptData;
   final String platform;
-  final bool isTest;
 
-  SubscriptionRequest({
-    required this.receiptData,
-    required this.platform,
-    required this.isTest,
-  });
+  SubscriptionRequest({required this.receiptData, required this.platform});
 
   Map<String, dynamic> toJson() {
-    return {
-      'receipt_data': receiptData,
-      'platform': platform,
-      'is_test': isTest,
-    };
+    return {'receipt_data': receiptData, 'platform': platform};
   }
 }
 
@@ -82,20 +73,14 @@ class SubscriptionRequest {
 class SubscriptionReceiptRequest {
   final String receiptData;
   final String platform;
-  final bool isTest;
 
   SubscriptionReceiptRequest({
     required this.receiptData,
     required this.platform,
-    required this.isTest,
   });
 
   Map<String, dynamic> toJson() {
-    return {
-      'receipt_data': receiptData,
-      'platform': platform,
-      'is_test': isTest,
-    };
+    return {'receipt_data': receiptData, 'platform': platform};
   }
 }
 
