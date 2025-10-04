@@ -49,6 +49,7 @@ class _WebViewScreenState extends State<WebViewScreen> {
         title: Text(widget.title),
         actions: [
           IconButton(
+            tooltip: '새로고침',
             icon: const Icon(Icons.refresh),
             onPressed: () {
               controller.reload();
@@ -59,7 +60,13 @@ class _WebViewScreenState extends State<WebViewScreen> {
       body: Stack(
         children: [
           WebViewWidget(controller: controller),
-          if (isLoading) const Center(child: CircularProgressIndicator()),
+          if (isLoading)
+            Center(
+              child: Semantics(
+                label: '로딩 중',
+                child: CircularProgressIndicator(),
+              ),
+            ),
         ],
       ),
     );

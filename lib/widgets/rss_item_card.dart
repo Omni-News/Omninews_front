@@ -1,15 +1,15 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:omninews_flutter/models/app_setting.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
+import 'package:omninews_flutter/screens/rss_detail_screen.dart';
 import 'package:omninews_flutter/services/recently_read_service.dart';
 import 'package:omninews_flutter/services/rss_service.dart';
 import 'package:omninews_flutter/services/subscribe_service.dart';
-import 'package:intl/intl.dart';
-import 'package:omninews_flutter/screens/rss_detail_screen.dart'; // 추가: RssDetailScreen 임포트
-import 'package:provider/provider.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
+import 'package:provider/provider.dart';
 
 class RssItemCard extends StatefulWidget {
   final RssItem item;
@@ -31,23 +31,31 @@ class _RssItemCardState extends State<RssItemCard> {
     _checkBookmarkStatus();
   }
 
+  @override
+  void didUpdateWidget(covariant RssItemCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 다른 아이템으로 바뀌면 북마크 상태 재확인
+    if (oldWidget.item.rssLink != widget.item.rssLink) {
+      _checkBookmarkStatus();
+    }
+  }
+
   Future<void> _checkBookmarkStatus() async {
-    final isBookmarked = await SubscribeService.isBookmarked(
-      widget.item.rssLink,
-    );
-    if (mounted) {
-      setState(() {
-        _isBookmarked = isBookmarked;
-      });
+    try {
+      final isBookmarked = await SubscribeService.isBookmarked(
+        widget.item.rssLink,
+      );
+      if (!mounted) return;
+      setState(() => _isBookmarked = isBookmarked);
+    } catch (_) {
+      // 조용히 실패 (네트워크/저장소 오류 등)
     }
   }
 
   Future<void> _toggleBookmark() async {
     if (_isLoading) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       bool success;
@@ -59,15 +67,13 @@ class _RssItemCardState extends State<RssItemCard> {
         success = await SubscribeService.addLocalBookmark(widget.item);
       }
 
-      if (success && mounted) {
-        setState(() {
-          _isBookmarked = !_isBookmarked;
-        });
+      if (!mounted) return;
 
-        // 북마크 상태가 변경되면 콜백 호출
-        if (widget.onBookmarkChanged != null) {
-          widget.onBookmarkChanged!();
-        }
+      if (success) {
+        setState(() => _isBookmarked = !_isBookmarked);
+
+        // 부모에 알림
+        widget.onBookmarkChanged?.call();
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -79,22 +85,17 @@ class _RssItemCardState extends State<RssItemCard> {
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('오류가 발생했습니다: $e'),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('오류가 발생했습니다: $e'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -114,31 +115,53 @@ class _RssItemCardState extends State<RssItemCard> {
       } else {
         return DateFormat('MM/dd').format(date);
       }
-    } catch (e) {
+    } catch (_) {
       return dateStr;
     }
   }
 
   // URL이 유효한지 확인
   bool _isValidImageUrl(String? url) {
-    if (url == null || url.isEmpty) {
-      return false;
-    }
-
+    if (url == null || url.isEmpty) return false;
     try {
       final uri = Uri.parse(url);
       return uri.scheme.isNotEmpty && uri.host.isNotEmpty;
-    } catch (e) {
+    } catch (_) {
       return false;
     }
   }
 
-  // 설명 텍스트 자르기
-  String _truncateDescription(String description) {
-    if (description.length > 100) {
-      return '${description.substring(0, 100)}...';
+  // 설명 텍스트 전처리 및 자르기 (간단한 HTML 제거 포함)
+  String _truncateDescription(String description, {int max = 100}) {
+    final cleaned = _cleanHtml(description);
+    if (cleaned.length > max) {
+      return '${cleaned.substring(0, max)}...';
     }
-    return description;
+    return cleaned;
+  }
+
+  String _cleanHtml(String html) {
+    final exp = RegExp(r'<[^>]*>', multiLine: true);
+    return html
+        .replaceAll(exp, ' ')
+        .replaceAll('&nbsp;', ' ')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+  }
+
+  // URL에서 도메인 이름 추출
+  String _getSourceName(String url) {
+    try {
+      final uri = Uri.parse(url);
+      var domain = uri.host;
+      if (domain.startsWith('www.')) domain = domain.substring(4);
+      return domain;
+    } catch (_) {
+      return 'source';
+    }
   }
 
   @override
@@ -146,32 +169,14 @@ class _RssItemCardState extends State<RssItemCard> {
     final theme = Theme.of(context);
     final cardStyle = AppTheme.newsCardStyleOf(context);
     final rssTheme = AppTheme.rssThemeOf(context);
-    final bool hasValidImage = _isValidImageUrl(widget.item.rssImageLink);
     final settings = Provider.of<SettingsProvider>(context).settings;
+
+    final hasValidImage = _isValidImageUrl(widget.item.rssImageLink);
     final showImage =
         hasValidImage && settings.viewMode == ViewMode.textAndImage;
 
     return InkWell(
-      onTap: () {
-        // 읽은 기록 추가
-        RecentlyReadService.addRssItem(widget.item);
-
-        // 순위 업데이트
-        RssService.updateRssRank(widget.item.rssId);
-
-        // 변경: URL 직접 열기 대신 RssDetailScreen으로 이동
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder:
-                (context) => RssDetailScreen(
-                  rssItem: widget.item,
-                  // 옵션: channel 정보가 있다면 전달할 수 있음
-                  // channel: null, // 필요시 채널 정보 로드 후 전달
-                ),
-          ),
-        );
-      },
+      onTap: _handleTap,
       child: Padding(
         padding: cardStyle.cardPadding,
         child:
@@ -184,11 +189,7 @@ class _RssItemCardState extends State<RssItemCard> {
                       flex: 3,
                       child: _buildTextContent(cardStyle, rssTheme, theme),
                     ),
-
-                    // 여백
                     if (showImage) const SizedBox(width: 12),
-
-                    // 우측: 썸네일 이미지 (있을 경우)
                     if (showImage) _buildThumbnail(),
                   ],
                 ),
@@ -196,12 +197,27 @@ class _RssItemCardState extends State<RssItemCard> {
     );
   }
 
+  void _handleTap() {
+    // 읽은 기록 추가
+    RecentlyReadService.addRssItem(widget.item);
+
+    // 순위 업데이트
+    RssService.updateRssRank(widget.item.rssId);
+
+    // 상세 화면으로 이동
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => RssDetailScreen(rssItem: widget.item),
+      ),
+    );
+  }
+
   // 썸네일 이미지 위젯
   Widget _buildThumbnail() {
     final theme = Theme.of(context);
-
-    // 고유한 Hero 태그 생성
-    final String heroTag = 'rss_image_${widget.item.rssLink}';
+    final imageUrl = widget.item.rssImageLink!;
+    final String heroTag = 'rss_image_${widget.item.rssLink}'; // 고유한 Hero 태그
 
     return SizedBox(
       width: 100,
@@ -209,9 +225,9 @@ class _RssItemCardState extends State<RssItemCard> {
       child: Hero(
         tag: heroTag,
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(6),
           child: CachedNetworkImage(
-            imageUrl: widget.item.rssImageLink!,
+            imageUrl: imageUrl,
             fit: BoxFit.cover,
             placeholder:
                 (context, url) => Container(
@@ -245,26 +261,10 @@ class _RssItemCardState extends State<RssItemCard> {
                     size: 24,
                   ),
                 ),
-            errorListener: (_) => {}, // 로그 출력 억제
           ),
         ),
       ),
     );
-  }
-
-  // URL에서 도메인 이름 추출
-  String _getSourceName(String url) {
-    try {
-      final uri = Uri.parse(url);
-      String domain = uri.host;
-      // www. 제거
-      if (domain.startsWith('www.')) {
-        domain = domain.substring(4);
-      }
-      return domain;
-    } catch (e) {
-      return 'source';
-    }
   }
 
   // 텍스트 전용 레이아웃
@@ -319,6 +319,7 @@ class _RssItemCardState extends State<RssItemCard> {
                         size: 20,
                       ),
               onPressed: _toggleBookmark,
+              tooltip: _isBookmarked ? '북마크 해제' : '북마크',
             ),
           ],
         ),
@@ -338,12 +339,17 @@ class _RssItemCardState extends State<RssItemCard> {
         Row(
           children: [
             // 소스 도메인 표시
-            Text(
-              _getSourceName(widget.item.rssLink),
-              style: cardStyle.sourceStyle.copyWith(color: rssTheme.linkColor),
+            Flexible(
+              child: Text(
+                _getSourceName(widget.item.rssLink),
+                style: cardStyle.sourceStyle.copyWith(
+                  color: rssTheme.linkColor,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             const SizedBox(width: 8),
-
             // 게시일 표시
             Text(
               _formatDate(widget.item.rssPubDate),

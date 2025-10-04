@@ -63,7 +63,7 @@ class _RssDetailScreenState extends State<RssDetailScreen> {
     final hide = hideByGen || hideByDomain;
     // 디버깅 로그
     debugPrint(
-      '🔵 generator: "$gen", host: "$host", hide: $hide (byGen: $hideByGen, byDomain: $hideByDomain)',
+      '🔵 생성기: "$gen", 호스트: "$host", 숨김: $hide (생성기기준: $hideByGen, 도메인기준: $hideByDomain)',
     );
     return hide;
   }
@@ -201,6 +201,7 @@ class _RssDetailScreenState extends State<RssDetailScreen> {
                   backgroundColor: detailTheme.appBarTheme.backgroundColor,
                   elevation: 0,
                   leading: IconButton(
+                    tooltip: '뒤로가기',
                     icon: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
@@ -350,8 +351,10 @@ class _RssDetailScreenState extends State<RssDetailScreen> {
                                     : _resolvingChannel
                                     ? '채널 확인 중...'
                                     : _isPremiumActive
-                                    ? (_summary == null ? 'AI로 요약하기' : '다시 요약')
-                                    : '구독하고 요약 사용',
+                                    ? (_summary == null
+                                        ? 'AI로 요약하기'
+                                        : '요약 다시 생성')
+                                    : '구독하고 요약 사용하기',
                                 style: const TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
@@ -370,13 +373,6 @@ class _RssDetailScreenState extends State<RssDetailScreen> {
                               ),
                             ),
                           ),
-
-                          // 미구독자용 프리미엄 안내 배너 (버튼 아래)
-                          if (!_isCheckingSubscription &&
-                              !_isPremiumActive) ...[
-                            const SizedBox(height: 10),
-                            _buildPremiumSummaryBanner(context, detailTheme),
-                          ],
 
                           // 로딩/에러 인라인 표시 (본문 위)
                           if (_loading || _error != null) ...[
@@ -525,35 +521,6 @@ class _RssDetailScreenState extends State<RssDetailScreen> {
     );
   }
 
-  // 미구독자용 프리미엄 안내 배너 (간단 버전)
-  Widget _buildPremiumSummaryBanner(BuildContext context, ThemeData theme) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.primary.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: theme.colorScheme.primary.withOpacity(0.25)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.lock_outline, color: theme.colorScheme.primary, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              '이 글 요약은 프리미엄 전용 기능입니다. 구독하고 바로 이용해 보세요!',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.primary,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          TextButton(onPressed: _goToSubscription, child: const Text('구독하기')),
-        ],
-      ),
-    );
-  }
-
   // RSS 채널 정보 위젯
   Widget _buildChannelInfo(
     RssChannel channel,
@@ -658,7 +625,7 @@ class _RssDetailScreenState extends State<RssDetailScreen> {
     }
   }
 
-  // 시간 포맷팅 함수
+  // 시간 포맷팅 함수 (오전/오후가 앞에 오는 자연스러운 표기)
   String _formatTime(int hour, int minute) {
     final isPM = hour >= 12;
     final formattedHour =
@@ -668,6 +635,6 @@ class _RssDetailScreenState extends State<RssDetailScreen> {
             ? 12
             : hour;
     final formattedMinute = minute.toString().padLeft(2, '0');
-    return '$formattedHour:$formattedMinute ${isPM ? '오후' : '오전'}';
+    return '${isPM ? '오후' : '오전'} $formattedHour:$formattedMinute';
   }
 }

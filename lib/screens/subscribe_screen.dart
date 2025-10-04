@@ -186,6 +186,7 @@ class _SubscribeScreenState extends State<SubscribeScreen>
                 onPressed: () {
                   homeScaffoldKey.currentState?.openDrawer();
                 },
+                tooltip: '메뉴 열기',
               ),
               pinned: true,
               elevation: 0,
@@ -194,7 +195,7 @@ class _SubscribeScreenState extends State<SubscribeScreen>
               title:
                   _isSearching
                       ? _buildSearchField()
-                      : Text('Subscribe', style: textTheme.headlineMedium),
+                      : Text('구독', style: textTheme.headlineMedium),
               actions: [
                 IconButton(
                   icon: Icon(
@@ -202,6 +203,7 @@ class _SubscribeScreenState extends State<SubscribeScreen>
                     color: theme.appBarTheme.iconTheme?.color,
                   ),
                   onPressed: _toggleSearch,
+                  tooltip: _isSearching ? '검색 닫기' : '검색',
                 ),
                 if (_tabController.index == 1 && !_isSearching)
                   IconButton(
@@ -218,6 +220,7 @@ class _SubscribeScreenState extends State<SubscribeScreen>
                     color: theme.appBarTheme.iconTheme?.color,
                   ),
                   onPressed: _refreshData,
+                  tooltip: '새로고침',
                 ),
               ],
             ),

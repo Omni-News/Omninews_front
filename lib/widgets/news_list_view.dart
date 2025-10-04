@@ -75,10 +75,10 @@ class _NewsListViewState extends State<NewsListView> {
             ),
           );
         } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-          List<News> data = snapshot.data!;
+          final data = snapshot.data!;
 
-          // 각 뉴스의 북마크 상태 확인
-          for (var news in data) {
+          // 각 뉴스의 북마크 상태 확인 (최초 렌더에만)
+          for (final news in data) {
             if (!_bookmarkStatus.containsKey(news.newsLink)) {
               _checkBookmarkStatus(news.newsLink);
             }
@@ -95,7 +95,6 @@ class _NewsListViewState extends State<NewsListView> {
 
               return InkWell(
                 onTap: () {
-                  // NewsDetailScreen으로 이동하며 webOpenMode 설정도 함께 전달
                   Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -217,6 +216,8 @@ class _NewsListViewState extends State<NewsListView> {
                         size: 20,
                       ),
               onPressed: () => _toggleBookmark(news),
+              tooltip:
+                  _bookmarkStatus[news.newsLink] == true ? '북마크 해제' : '북마크',
             ),
           ],
         ),
@@ -234,7 +235,14 @@ class _NewsListViewState extends State<NewsListView> {
         // 출처 및 날짜
         Row(
           children: [
-            Text(news.newsSource, style: cardStyle.sourceStyle),
+            Flexible(
+              child: Text(
+                news.newsSource,
+                style: cardStyle.sourceStyle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
             const SizedBox(width: 8),
             Text(_formatDate(news.newsPubDate), style: cardStyle.dateStyle),
           ],
@@ -245,11 +253,14 @@ class _NewsListViewState extends State<NewsListView> {
 
   // 북마크 상태 확인
   Future<void> _checkBookmarkStatus(String newsLink) async {
-    final isBookmarked = await NewsBookmarkService.isNewsBookmarked(newsLink);
-    if (mounted) {
+    try {
+      final isBookmarked = await NewsBookmarkService.isNewsBookmarked(newsLink);
+      if (!mounted) return;
       setState(() {
         _bookmarkStatus[newsLink] = isBookmarked;
       });
+    } catch (_) {
+      // 조용히 실패
     }
   }
 
@@ -269,16 +280,16 @@ class _NewsListViewState extends State<NewsListView> {
         success = await NewsBookmarkService.addNewsBookmark(news);
       }
 
-      if (success && mounted) {
+      if (!mounted) return;
+
+      if (success) {
         setState(() {
           _bookmarkStatus[news.newsLink] =
               !(_bookmarkStatus[news.newsLink] ?? false);
         });
 
         // 북마크 상태 변경 시 콜백 호출
-        if (widget.onBookmarkChanged != null) {
-          widget.onBookmarkChanged!();
-        }
+        widget.onBookmarkChanged?.call();
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -315,7 +326,6 @@ class _NewsListViewState extends State<NewsListView> {
   }
 
   // 썸네일 이미지 위젯
-  // 썸네일 이미지 위젯을 수정합니다
   Widget _buildThumbnail(String imageUrl, String newsLink) {
     final theme = Theme.of(context);
 
@@ -325,11 +335,34 @@ class _NewsListViewState extends State<NewsListView> {
       child:
           imageUrl.isNotEmpty
               ? ClipRRect(
-                // Hero 태그 제거
-                borderRadius: BorderRadius.circular(4),
+                borderRadius: BorderRadius.circular(6),
                 child: Image.network(
                   imageUrl,
                   fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      color:
+                          theme.brightness == Brightness.dark
+                              ? Colors.grey[800]
+                              : Colors.grey[200],
+                      child: Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: theme.primaryColor,
+                            value:
+                                loadingProgress.expectedTotalBytes != null
+                                    ? loadingProgress.cumulativeBytesLoaded /
+                                        loadingProgress.expectedTotalBytes!
+                                    : null,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                   errorBuilder: (context, error, stackTrace) {
                     return Container(
                       color:
@@ -349,7 +382,19 @@ class _NewsListViewState extends State<NewsListView> {
                 ),
               )
               : Container(
-                // 기존 코드 유지
+                decoration: BoxDecoration(
+                  color:
+                      theme.brightness == Brightness.dark
+                          ? theme.cardColor.withOpacity(0.35)
+                          : theme.cardColor.withOpacity(0.9),
+                  border: Border.all(color: theme.dividerColor),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Icon(
+                  Icons.image_outlined,
+                  size: 20,
+                  color: theme.iconTheme.color?.withOpacity(0.5),
+                ),
               ),
     );
   }

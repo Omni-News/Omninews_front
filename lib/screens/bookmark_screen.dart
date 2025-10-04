@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
@@ -26,7 +28,9 @@ class _BookmarkScreenState extends State<BookmarkScreen>
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
   String _searchQuery = '';
-  final List<String> _tabs = ['RSS', 'News'];
+  final List<String> _tabs = ['RSS', '뉴스'];
+
+  Timer? _searchDebounce;
 
   @override
   bool get wantKeepAlive => true;
@@ -42,6 +46,7 @@ class _BookmarkScreenState extends State<BookmarkScreen>
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
@@ -64,13 +69,17 @@ class _BookmarkScreenState extends State<BookmarkScreen>
   }
 
   void _handleSearch(String query) {
-    setState(() {
-      _searchQuery = query;
-      if (query.isNotEmpty) {
-        _searchLocalBookmarks(query);
-      } else {
-        _refreshBookmarks();
-      }
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      setState(() {
+        _searchQuery = query;
+        if (query.isNotEmpty) {
+          _searchLocalBookmarks(query);
+        } else {
+          _refreshBookmarks();
+        }
+      });
     });
   }
 
@@ -83,11 +92,12 @@ class _BookmarkScreenState extends State<BookmarkScreen>
 
   Future<List<RssItem>> _filterLocalBookmarks(String query) async {
     final items = await SubscribeService.getLocalBookmarks();
-    final lowercaseQuery = query.toLowerCase();
+    final q = query.toLowerCase();
 
     return items.where((item) {
-      return item.rssTitle.toLowerCase().contains(lowercaseQuery) ||
-          item.rssDescription.toLowerCase().contains(lowercaseQuery);
+      final title = item.rssTitle.toLowerCase();
+      final desc = item.rssDescription.toLowerCase();
+      return title.contains(q) || desc.contains(q);
     }).toList();
   }
 
@@ -98,26 +108,19 @@ class _BookmarkScreenState extends State<BookmarkScreen>
       try {
         final date = DateTime.parse(item.rssPubDate);
         final dateString = DateFormat('yyyy년 MM월 dd일').format(date);
-
-        if (!grouped.containsKey(dateString)) {
-          grouped[dateString] = [];
-        }
+        grouped.putIfAbsent(dateString, () => []);
         grouped[dateString]!.add(item);
       } catch (e) {
         const dateString = '날짜 없음';
-        if (!grouped.containsKey(dateString)) {
-          grouped[dateString] = [];
-        }
+        grouped.putIfAbsent(dateString, () => []);
         grouped[dateString]!.add(item);
       }
     }
 
-    // 최신 날짜부터 정렬
     final sortedKeys =
         grouped.keys.toList()..sort((a, b) {
           if (a == '날짜 없음') return 1;
           if (b == '날짜 없음') return -1;
-
           try {
             final dateA = DateFormat('yyyy년 MM월 dd일').parse(a);
             final dateB = DateFormat('yyyy년 MM월 dd일').parse(b);
@@ -137,16 +140,11 @@ class _BookmarkScreenState extends State<BookmarkScreen>
       try {
         final date = DateTime.parse(item.newsPubDate);
         final dateString = DateFormat('yyyy년 MM월 dd일').format(date);
-
-        if (!grouped.containsKey(dateString)) {
-          grouped[dateString] = [];
-        }
+        grouped.putIfAbsent(dateString, () => []);
         grouped[dateString]!.add(item);
       } catch (e) {
         const dateString = '날짜 없음';
-        if (!grouped.containsKey(dateString)) {
-          grouped[dateString] = [];
-        }
+        grouped.putIfAbsent(dateString, () => []);
         grouped[dateString]!.add(item);
       }
     }
@@ -155,7 +153,6 @@ class _BookmarkScreenState extends State<BookmarkScreen>
         grouped.keys.toList()..sort((a, b) {
           if (a == '날짜 없음') return 1;
           if (b == '날짜 없음') return -1;
-
           try {
             final dateA = DateFormat('yyyy년 MM월 dd일').parse(a);
             final dateB = DateFormat('yyyy년 MM월 dd일').parse(b);
@@ -169,23 +166,16 @@ class _BookmarkScreenState extends State<BookmarkScreen>
   }
 
   String _formatDate(String dateString) {
-    if (dateString == '날짜 없음') {
-      return dateString;
-    }
+    if (dateString == '날짜 없음') return dateString;
 
     try {
       final now = DateTime.now();
       final date = DateFormat('yyyy년 MM월 dd일').parse(dateString);
       final difference = now.difference(date).inDays;
 
-      if (difference == 0) {
-        return '오늘';
-      } else if (difference == 1) {
-        return '어제';
-      } else if (difference == 2) {
-        return '그저께';
-      }
-
+      if (difference == 0) return '오늘';
+      if (difference == 1) return '어제';
+      if (difference == 2) return '그저께';
       return dateString;
     } catch (e) {
       return dateString;
@@ -196,19 +186,20 @@ class _BookmarkScreenState extends State<BookmarkScreen>
   Widget build(BuildContext context) {
     super.build(context);
 
-    // 기본 테마 속성
-    final textTheme = Theme.of(context).textTheme;
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: NestedScrollView(
         headerSliverBuilder: (BuildContext context, bool innerBoxIsScrolled) {
           return [
             SliverAppBar(
               leading: IconButton(
+                tooltip: '메뉴 열기',
                 icon: Icon(
                   Icons.menu,
-                  color: Theme.of(context).appBarTheme.iconTheme?.color,
+                  color: theme.appBarTheme.iconTheme?.color,
                 ),
                 onPressed: () {
                   homeScaffoldKey.currentState?.openDrawer();
@@ -216,24 +207,38 @@ class _BookmarkScreenState extends State<BookmarkScreen>
               ),
               pinned: true,
               elevation: 0,
-              backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
+              backgroundColor: theme.appBarTheme.backgroundColor,
               centerTitle: true,
               title:
                   _isSearching
                       ? _buildSearchField()
-                      : Text('Bookmarks', style: textTheme.headlineMedium),
+                      : Text('북마크', style: textTheme.headlineMedium),
               actions: [
+                if (_isSearching && _searchQuery.isNotEmpty)
+                  IconButton(
+                    tooltip: '검색어 지우기',
+                    icon: Icon(
+                      Icons.clear,
+                      color: theme.appBarTheme.iconTheme?.color,
+                    ),
+                    onPressed: () {
+                      _searchController.clear();
+                      _handleSearch('');
+                    },
+                  ),
                 IconButton(
+                  tooltip: _isSearching ? '검색 닫기' : '검색',
                   icon: Icon(
                     _isSearching ? Icons.close : Icons.search,
-                    color: Theme.of(context).appBarTheme.iconTheme?.color,
+                    color: theme.appBarTheme.iconTheme?.color,
                   ),
                   onPressed: _toggleSearch,
                 ),
                 IconButton(
+                  tooltip: '새로고침',
                   icon: Icon(
                     Icons.refresh,
-                    color: Theme.of(context).appBarTheme.iconTheme?.color,
+                    color: theme.appBarTheme.iconTheme?.color,
                   ),
                   onPressed: _refreshBookmarks,
                 ),
@@ -243,10 +248,9 @@ class _BookmarkScreenState extends State<BookmarkScreen>
               delegate: _SliverAppBarDelegate(
                 TabBar(
                   controller: _tabController,
-                  indicatorColor: Theme.of(context).primaryColor,
-                  labelColor: Theme.of(context).primaryColor,
-                  unselectedLabelColor:
-                      Theme.of(context).textTheme.bodyLarge?.color,
+                  indicatorColor: theme.primaryColor,
+                  labelColor: theme.primaryColor,
+                  unselectedLabelColor: theme.textTheme.bodyLarge?.color,
                   indicatorWeight: 3,
                   labelStyle: textTheme.labelLarge,
                   unselectedLabelStyle: textTheme.labelMedium,
@@ -260,33 +264,36 @@ class _BookmarkScreenState extends State<BookmarkScreen>
         },
         body: TabBarView(
           controller: _tabController,
-          children: [_buildDateView(), _buildNewsView()],
+          children: [_buildRssBookmarksView(), _buildNewsBookmarksView()],
         ),
       ),
     );
   }
 
-  Widget _buildDateView() {
+  Widget _buildRssBookmarksView() {
+    final theme = Theme.of(context);
     final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
 
     return RefreshIndicator(
-      color: Theme.of(context).primaryColor,
-      onRefresh: () async {
-        _refreshBookmarks();
-      },
+      color: theme.primaryColor,
+      onRefresh: () async => _refreshBookmarks(),
       child: FutureBuilder<List<RssItem>>(
         future: _bookmarkedItems,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(
-              child: CircularProgressIndicator(
-                color: Theme.of(context).primaryColor,
-              ),
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                const SizedBox(height: 200),
+                Center(
+                  child: CircularProgressIndicator(color: theme.primaryColor),
+                ),
+              ],
             );
           } else if (snapshot.hasError) {
-            return _buildErrorState('데이터를 불러오는데 실패했습니다');
+            return _buildScrollableError('데이터를 불러오는 데 실패했습니다');
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return _buildEmptyState(
+            return _buildScrollableEmpty(
               _searchQuery.isEmpty ? '북마크한 항목이 없습니다' : '검색 결과가 없습니다',
               _searchQuery.isEmpty ? Icons.bookmark_border : Icons.search,
             );
@@ -306,7 +313,29 @@ class _BookmarkScreenState extends State<BookmarkScreen>
                 header: _buildDateHeader(formattedDate, items.length),
                 content: Column(
                   children: [
-                    ...items.map((item) => _buildBookmarkItem(item)),
+                    // index 기반으로 구분선 제어 (마지막 아이템 뒤엔 구분선 표시 안 함)
+                    ...List.generate(items.length, (i) {
+                      final item = items[i];
+                      return Column(
+                        children: [
+                          RssItemCard(
+                            item: item,
+                            onBookmarkChanged: _refreshBookmarks,
+                          ),
+                          if (i < items.length - 1)
+                            Divider(
+                              height: 1,
+                              indent: 16,
+                              endIndent: 16,
+                              color:
+                                  AppTheme.newsCardStyleOf(
+                                    context,
+                                  ).dividerColor,
+                            ),
+                        ],
+                      );
+                    }),
+                    // 날짜 구역 구분선
                     if (index < itemsByDate.length - 1)
                       Container(
                         height: 8,
@@ -323,27 +352,30 @@ class _BookmarkScreenState extends State<BookmarkScreen>
     );
   }
 
-  Widget _buildNewsView() {
+  Widget _buildNewsBookmarksView() {
+    final theme = Theme.of(context);
     final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
 
     return RefreshIndicator(
-      color: Theme.of(context).primaryColor,
-      onRefresh: () async {
-        _refreshBookmarks();
-      },
+      color: theme.primaryColor,
+      onRefresh: () async => _refreshBookmarks(),
       child: FutureBuilder<List<News>>(
         future: _bookmarkedNews,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(
-              child: CircularProgressIndicator(
-                color: Theme.of(context).primaryColor,
-              ),
+            return ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                const SizedBox(height: 200),
+                Center(
+                  child: CircularProgressIndicator(color: theme.primaryColor),
+                ),
+              ],
             );
           } else if (snapshot.hasError) {
-            return _buildErrorState('뉴스 데이터를 불러오는데 실패했습니다');
+            return _buildScrollableError('뉴스 데이터를 불러오는 데 실패했습니다');
           } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return _buildEmptyState(
+            return _buildScrollableEmpty(
               _searchQuery.isEmpty ? '북마크한 뉴스가 없습니다' : '검색 결과가 없습니다',
               _searchQuery.isEmpty ? Icons.bookmark_border : Icons.search,
             );
@@ -363,9 +395,28 @@ class _BookmarkScreenState extends State<BookmarkScreen>
                 header: _buildDateHeader(formattedDate, newsItems.length),
                 content: Column(
                   children: [
-                    ...newsItems.map(
-                      (newsItem) => _buildNewsBookmarkItem(newsItem),
-                    ),
+                    // index 기반으로 구분선 제어
+                    ...List.generate(newsItems.length, (i) {
+                      final n = newsItems[i];
+                      return Column(
+                        children: [
+                          NewsItemCard(
+                            news: n,
+                            onBookmarkChanged: _refreshBookmarks,
+                          ),
+                          if (i < newsItems.length - 1)
+                            Divider(
+                              height: 1,
+                              indent: 16,
+                              endIndent: 16,
+                              color:
+                                  AppTheme.newsCardStyleOf(
+                                    context,
+                                  ).dividerColor,
+                            ),
+                        ],
+                      );
+                    }),
                     if (index < newsByDate.length - 1)
                       Container(
                         height: 8,
@@ -408,163 +459,144 @@ class _BookmarkScreenState extends State<BookmarkScreen>
     );
   }
 
-  Widget _buildBookmarkItem(RssItem item) {
-    final cardStyle = AppTheme.newsCardStyleOf(context);
+  // RefreshIndicator가 동작하도록 스크롤 가능한 에러 상태
+  Widget _buildScrollableError(String message) {
+    final theme = Theme.of(context);
+    final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
 
-    return Column(
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       children: [
-        RssItemCard(item: item, onBookmarkChanged: _refreshBookmarks),
-        Divider(
-          height: 1,
-          indent: 16,
-          endIndent: 16,
-          color: cardStyle.dividerColor,
+        const SizedBox(height: 120),
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.error_outline_rounded,
+                  size: 56,
+                  color: subscribeStyle.errorIconColor,
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: theme.textTheme.bodyLarge?.color,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: _refreshBookmarks,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('다시 시도'),
+                  style: ElevatedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: theme.primaryColor,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildNewsBookmarkItem(News news) {
-    final cardStyle = AppTheme.newsCardStyleOf(context);
+  // RefreshIndicator가 동작하도록 스크롤 가능한 빈 상태
+  Widget _buildScrollableEmpty(String message, IconData icon) {
+    final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
 
-    return Column(
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       children: [
-        NewsItemCard(news: news, onBookmarkChanged: _refreshBookmarks),
-        Divider(
-          height: 1,
-          indent: 16,
-          endIndent: 16,
-          color: cardStyle.dividerColor,
+        const SizedBox(height: 120),
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              children: [
+                Icon(icon, size: 64, color: subscribeStyle.emptyIconColor),
+                const SizedBox(height: 20),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 17,
+                    color: subscribeStyle.emptyTextColor,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                if (_searchQuery.isEmpty && icon == Icons.bookmark_border) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    '관심 있는 컨텐츠를 북마크해보세요.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 15,
+                      color: subscribeStyle.emptyTextColor.withOpacity(0.8),
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 32),
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 12,
+                      horizontal: 16,
+                    ),
+                    decoration: BoxDecoration(
+                      color: subscribeStyle.hintBoxBackground,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: subscribeStyle.hintBoxBorder),
+                    ),
+                    child: Text(
+                      '각 콘텐츠에서 북마크 아이콘을 탭하면 이곳에 저장됩니다.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: subscribeStyle.hintTextColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ),
       ],
     );
   }
 
   Widget _buildSearchField() {
+    final theme = Theme.of(context);
     return TextField(
       controller: _searchController,
       autofocus: true,
       decoration: InputDecoration(
         hintText: '검색어를 입력하세요',
-        hintStyle: TextStyle(color: Theme.of(context).hintColor),
+        hintStyle: TextStyle(color: theme.hintColor),
         border: InputBorder.none,
         contentPadding: const EdgeInsets.symmetric(vertical: 15),
       ),
-      style: TextStyle(
-        color: Theme.of(context).textTheme.bodyLarge?.color,
-        fontSize: 16,
-      ),
+      style: TextStyle(color: theme.textTheme.bodyLarge?.color, fontSize: 16),
       onChanged: _handleSearch,
-    );
-  }
-
-  Widget _buildErrorState(String message) {
-    final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline_rounded,
-              size: 56,
-              color: subscribeStyle.errorIconColor,
-            ),
-            const SizedBox(height: 20),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).textTheme.bodyLarge?.color,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                letterSpacing: -0.3,
-              ),
-            ),
-            const SizedBox(height: 28),
-            ElevatedButton.icon(
-              onPressed: _refreshBookmarks,
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('다시 시도'),
-              style: ElevatedButton.styleFrom(
-                foregroundColor: Colors.white,
-                backgroundColor: Theme.of(context).primaryColor,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 12,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(String message, IconData icon) {
-    final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 64, color: subscribeStyle.emptyIconColor),
-            const SizedBox(height: 20),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 17,
-                color: subscribeStyle.emptyTextColor,
-                fontWeight: FontWeight.w500,
-                letterSpacing: -0.3,
-              ),
-            ),
-            if (_searchQuery.isEmpty && icon == Icons.bookmark_border) ...[
-              const SizedBox(height: 16),
-              Text(
-                '관심 있는 컨텐츠를 북마크해보세요.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 15,
-                  color: subscribeStyle.emptyTextColor.withOpacity(0.8),
-                  letterSpacing: -0.2,
-                ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 32),
-                padding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 16,
-                ),
-                decoration: BoxDecoration(
-                  color: subscribeStyle.hintBoxBackground,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: subscribeStyle.hintBoxBorder),
-                ),
-                child: Text(
-                  '각 콘텐츠에서 북마크 아이콘을 탭하면 이곳에 저장됩니다.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: subscribeStyle.hintTextColor,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+      textInputAction: TextInputAction.search,
+      onSubmitted: _handleSearch,
     );
   }
 }
@@ -580,14 +612,15 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
+    final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: theme.cardColor,
         boxShadow:
             overlapsContent
                 ? [
                   BoxShadow(
-                    color: Theme.of(context).shadowColor,
+                    color: theme.shadowColor,
                     blurRadius: 4,
                     offset: const Offset(0, 2),
                   ),

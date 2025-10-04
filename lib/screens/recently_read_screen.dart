@@ -39,7 +39,7 @@ class _RecentlyReadScreenState extends State<RecentlyReadScreen> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('기록 삭제'),
-          content: const Text('모든 최근 읽은 글 기록을 삭제하시겠습니까?'),
+          content: const Text('최근 읽은 글 기록을 모두 삭제하시겠습니까?'),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -59,7 +59,7 @@ class _RecentlyReadScreenState extends State<RecentlyReadScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('최근 읽은 글 기록이 삭제되었습니다'),
+            content: Text('최근 읽은 글 기록을 삭제했습니다.'),
             duration: Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
           ),
@@ -136,6 +136,8 @@ class _RecentlyReadScreenState extends State<RecentlyReadScreen> {
       body: RefreshIndicator(
         onRefresh: () async {
           _loadItems();
+          // 새로고침 제스처 후 약간의 대기 시간을 주어 UI가 자연스럽게 보이도록 함
+          await Future.delayed(const Duration(milliseconds: 300));
         },
         child: FutureBuilder<List<RecentlyReadItem>>(
           future: _items,
@@ -143,7 +145,7 @@ class _RecentlyReadScreenState extends State<RecentlyReadScreen> {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             } else if (snapshot.hasError) {
-              return _buildErrorState('데이터를 불러오는데 실패했습니다');
+              return _buildErrorState('데이터를 불러오는 데 실패했습니다.');
             } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
               return _buildEmptyState();
             }
@@ -164,10 +166,8 @@ class _RecentlyReadScreenState extends State<RecentlyReadScreen> {
                     title: cleanTitle,
                     description: cleanDescription,
                     summary:
-                        item.summary.isEmpty
-                            ? cleanDescription // 요약이 비어있으면 설명 사용
-                            : item.summary,
-                    link: item.link, // 원본 링크는
+                        item.summary.isEmpty ? cleanDescription : item.summary,
+                    link: item.link, // 원본 링크는 그대로 유지
                     source: domain, // 도메인만 표시하도록 변경
                     pubDate: item.pubDate,
                     type: item.type,
@@ -290,7 +290,7 @@ class _RecentlyReadScreenState extends State<RecentlyReadScreen> {
           ),
           const SizedBox(width: 8),
           Text(
-            '$itemCount개의 항목',
+            '총 $itemCount개',
             style: TextStyle(
               color: theme.textTheme.bodyMedium?.color?.withOpacity(0.7),
               fontSize: 14,
@@ -382,7 +382,7 @@ class _RecentlyReadScreenState extends State<RecentlyReadScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              '최근 읽은 글이 없습니다',
+              '최근 읽은 글이 없습니다.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 17,

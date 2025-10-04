@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:omninews_flutter/models/app_setting.dart';
 import 'package:omninews_flutter/models/news.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
-import 'package:omninews_flutter/screens/news_detail_screen.dart'; // 추가: NewsDetailScreen 임포트
+import 'package:omninews_flutter/screens/news_detail_screen.dart';
 import 'package:omninews_flutter/services/news_bookmark_service.dart';
 import 'package:omninews_flutter/services/recently_read_service.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
-import 'package:omninews_flutter/models/app_setting.dart';
 import 'package:provider/provider.dart';
 
 class NewsItemCard extends StatefulWidget {
@@ -27,6 +27,14 @@ class _NewsItemCardState extends State<NewsItemCard> {
   void initState() {
     super.initState();
     _checkBookmarkStatus();
+  }
+
+  @override
+  void didUpdateWidget(covariant NewsItemCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.news.newsLink != widget.news.newsLink) {
+      _checkBookmarkStatus();
+    }
   }
 
   Future<void> _checkBookmarkStatus() async {
@@ -63,9 +71,7 @@ class _NewsItemCardState extends State<NewsItemCard> {
         });
 
         // 북마크 변경 콜백 실행
-        if (widget.onBookmarkChanged != null) {
-          widget.onBookmarkChanged!();
-        }
+        widget.onBookmarkChanged?.call();
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -194,6 +200,7 @@ class _NewsItemCardState extends State<NewsItemCard> {
                                 : cardStyle.bookmarkInactiveColor,
                         size: 20,
                       ),
+              tooltip: _isBookmarked ? '북마크 해제' : '북마크',
               onPressed: _toggleBookmark,
             ),
           ],
@@ -240,6 +247,30 @@ class _NewsItemCardState extends State<NewsItemCard> {
           child: Image.network(
             widget.news.newsImageLink,
             fit: BoxFit.cover,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Container(
+                color:
+                    theme.brightness == Brightness.dark
+                        ? Colors.grey[800]
+                        : Colors.grey[200],
+                child: Center(
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: theme.primaryColor,
+                      value:
+                          loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
+                    ),
+                  ),
+                ),
+              );
+            },
             errorBuilder: (context, error, stackTrace) {
               return Container(
                 color:
