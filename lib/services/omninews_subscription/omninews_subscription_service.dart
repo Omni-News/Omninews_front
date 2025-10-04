@@ -37,8 +37,9 @@ class SubscriptionService {
   // 최초 진입 시 검증 스킵 여부
   final bool skipInitialCheck;
 
-  // 사용자가 "구독하기" 버튼을 눌러 구매를 시작했는지 여부 (서버 등록을 이 플래그로 제어)
+  // 사용자 유도 여부 플래그
   bool _userInitiatedPurchase = false;
+  bool _userInitiatedRestore = false; // ← 복원 버튼으로 시작했는지
 
   SubscriptionService({this.skipInitialCheck = false});
 
@@ -95,7 +96,7 @@ class SubscriptionService {
 
       final response = await _authService.apiRequest(
         'GET',
-        '/subscription/verify?is_sandbox=true',
+        '/subscription/verify',
       );
 
       if (response.statusCode == 200) {
@@ -129,22 +130,35 @@ class SubscriptionService {
   }
 
   // 서버에 구독 정보 등록 (register)
-  // 서버에 구독 정보 등록 (register) - transactionId만 전송
+  // - iOS: transaction_id(필수)
+  // - Android: transaction_id(가능하면) + purchase_token(권장)
   Future<bool> registerSubscriptionWithServer(PurchaseDetails purchase) async {
     try {
       final transactionId =
           purchase
               .purchaseID; // iOS: transactionIdentifier, Android: orderId(없을 수 있음)
-      if (transactionId == null || transactionId.isEmpty) {
-        debugPrint('서버 등록 실패: transactionId가 없습니다.');
+
+      // Android의 경우 purchaseID가 null일 수 있으므로 purchaseToken을 함께 전달
+      final serverVerificationData =
+          purchase.verificationData.serverVerificationData;
+      final bool isAndroid = Platform.isAndroid;
+      final bool isIOS = Platform.isIOS;
+
+      if ((transactionId == null || transactionId.isEmpty) &&
+          (!isAndroid || serverVerificationData.isEmpty)) {
+        debugPrint('서버 등록 실패: 전송할 식별자가 없습니다. (transactionId/purchaseToken 없음)');
         return false;
       }
 
-      final body = {
-        'transaction_id': transactionId,
-        'platform': Platform.isIOS ? 'ios' : 'android',
-        'is_test': true,
-      };
+      final body = <String, dynamic>{'platform': isIOS ? 'ios' : 'android'};
+
+      if (transactionId != null && transactionId.isNotEmpty) {
+        body['transaction_id'] = transactionId;
+      }
+      if (isAndroid && serverVerificationData.isNotEmpty) {
+        // 서버가 지원한다면 purchase_token으로 검증/연결
+        body['purchase_token'] = serverVerificationData;
+      }
 
       final response = await _authService.apiRequest(
         'POST',
@@ -166,23 +180,27 @@ class SubscriptionService {
   }
 
   // 구독 플랜 로드
-  // loadSubscriptionPlans만 발췌 수정
-
   Future<List<SubscriptionPlan>> loadSubscriptionPlans() async {
     try {
       final productIds = {'kdh.omninews.premium'};
       final response = await _inAppPurchase.queryProductDetails(productIds);
+
+      if (response.notFoundIDs.isNotEmpty) {
+        debugPrint('스토어에서 찾지 못한 상품 IDs: ${response.notFoundIDs}');
+      }
+      if (response.productDetails.isEmpty) {
+        debugPrint('상품 상세가 비어 있음');
+        return [];
+      }
 
       return response.productDetails.map((product) {
         return SubscriptionPlan(
           id: product.id,
           name: '프리미엄 구독',
           description: product.description,
-          // 숫자 값은 rawPrice를 사용 (파싱 금지)
           price: product.rawPrice,
-          // 통화/표시 문자열도 함께 저장
           currencyCode: product.currencyCode,
-          priceString: product.price, // 예: '₩2,200', '$1.99'
+          priceString: product.price,
           features: ['광고 없이 기사 읽기', '프리미엄 콘텐츠 이용', '개인화된 추천'],
           durationDays: 30,
         );
@@ -217,7 +235,6 @@ class SubscriptionService {
         );
       } else {
         debugPrint("Android에서 구독 구매 요청");
-        // 구독은 non-consumable로 처리하는 것이 일반적입니다.
         purchaseStarted = await _inAppPurchase.buyNonConsumable(
           purchaseParam: purchaseParam,
         );
@@ -235,15 +252,17 @@ class SubscriptionService {
     }
   }
 
-  // 구매 복원
+  // 구매 복원 (사용자 버튼으로 시작했을 때만 서버 등록 허용)
   Future<bool> restorePurchases() async {
     try {
       debugPrint("구매 내역 복원 시도 중...");
+      _userInitiatedRestore = true; // ← 복원 트리거 표시
       await _inAppPurchase.restorePurchases();
       debugPrint("구매 내역 복원 요청 완료");
       return true;
     } catch (e) {
       debugPrint('구매 복원 중 오류: $e');
+      _userInitiatedRestore = false;
       return false;
     }
   }
@@ -280,21 +299,26 @@ class SubscriptionService {
         case PurchaseStatus.restored:
           debugPrint('구매 완료 또는 복원됨: ${purchase.productID}');
 
-          if (_userInitiatedPurchase) {
-            // 사용자가 버튼을 눌러 시작한 구매만 register 수행
-            final verified = await registerSubscriptionWithServer(purchase);
+          final bool shouldRegister =
+              _userInitiatedPurchase || _userInitiatedRestore;
 
-            if (verified) {
-              debugPrint('서버에 구독 등록 성공');
+          if (shouldRegister) {
+            // 사용자가 버튼을 눌러 시작한 경우에만 register 수행 (복원 포함)
+            final registered = await registerSubscriptionWithServer(purchase);
+
+            if (registered) {
+              debugPrint('서버에 구독 등록/연결 성공');
               final status = await checkSubscriptionStatus(); // 등록 후 상태 동기화
               _statusController.add(status);
-              _emitSuccess(purchase);
+              if (_userInitiatedPurchase) {
+                _emitSuccess(purchase);
+              }
               if (purchase.pendingCompletePurchase) {
                 await _inAppPurchase.completePurchase(purchase);
                 debugPrint('트랜잭션 완료됨');
               }
             } else {
-              _emitFailure(purchase, '서버 검증 실패로 구독이 적용되지 않습니다.');
+              _emitFailure(purchase, '서버 등록/검증 실패로 구독이 적용되지 않습니다.');
 
               if (Platform.isAndroid) {
                 // Android: acknowledge 생략 → 자동 환불 유도
@@ -310,15 +334,16 @@ class SubscriptionService {
 
             // 처리 후 플래그 해제
             _userInitiatedPurchase = false;
+            _userInitiatedRestore = false;
           } else {
             // 앱 초기 진입 등 사용자 유도 구매가 아닌 이벤트:
             // register는 절대 하지 않고 verify만 수행
-            debugPrint('사용자 유도 구매가 아님 → register 생략, verify만 수행하여 상태 동기화');
+            debugPrint('사용자 유도 구매/복원이 아님 → register 생략, verify만 수행하여 상태 동기화');
             final status = await checkSubscriptionStatus();
             _statusController.add(status);
 
             // 상태에 따라 트랜잭션 완료 처리 결정
-            final isActive = status.isActive ?? false;
+            final isActive = status.isActive;
             if (Platform.isIOS) {
               // iOS는 트랜잭션을 완료 처리
               if (purchase.pendingCompletePurchase) {
@@ -347,12 +372,14 @@ class SubscriptionService {
             await _inAppPurchase.completePurchase(purchase);
           }
           _userInitiatedPurchase = false;
+          _userInitiatedRestore = false;
           break;
 
         case PurchaseStatus.canceled:
           debugPrint('구매가 취소되었습니다');
           _emitFailure(purchase, '구매가 취소되었습니다');
           _userInitiatedPurchase = false;
+          _userInitiatedRestore = false;
           break;
       }
     }

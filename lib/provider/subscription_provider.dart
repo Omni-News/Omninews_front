@@ -17,6 +17,8 @@ class SubscriptionProvider with ChangeNotifier {
   final SubscriptionService _subscriptionService;
   final AuthService _authService = AuthService();
 
+  StreamSubscription<SubscriptionStatus>? _statusSub;
+
   SubscriptionProvider(this._subscriptionService);
 
   // 앱 시작시 구독 검증 없이 상품 정보만 로드
@@ -27,8 +29,9 @@ class SubscriptionProvider with ChangeNotifier {
     try {
       _availablePlans = await _subscriptionService.loadSubscriptionPlans();
 
-      // 서비스의 상태 스트림을 구독해 UI 갱신
-      _subscriptionService.statusStream.listen((status) {
+      // 서비스의 상태 스트림을 구독해 UI 갱신 (중복 구독 방지)
+      _statusSub?.cancel();
+      _statusSub = _subscriptionService.statusStream.listen((status) {
         _status = status;
         notifyListeners();
       });
@@ -58,6 +61,13 @@ class SubscriptionProvider with ChangeNotifier {
       if (_availablePlans.isEmpty) {
         _availablePlans = await _subscriptionService.loadSubscriptionPlans();
       }
+
+      // 상태 스트림 구독 (중복 방지)
+      _statusSub?.cancel();
+      _statusSub = _subscriptionService.statusStream.listen((status) {
+        _status = status;
+        notifyListeners();
+      });
 
       debugPrint('로그인 후 구독 상태 확인 완료: ${_status.isActive ? "구독 중" : "구독 안함"}');
     } catch (e) {
@@ -112,18 +122,19 @@ class SubscriptionProvider with ChangeNotifier {
 
         _status = await _subscriptionService.checkSubscriptionStatus();
       }
+
+      // 상태 스트림 구독 (중복 방지)
+      _statusSub?.cancel();
+      _statusSub = _subscriptionService.statusStream.listen((status) {
+        _status = status;
+        notifyListeners();
+      });
     } catch (e) {
       debugPrint('Error initializing subscription: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
-
-    // 상태 스트림 구독
-    _subscriptionService.statusStream.listen((status) {
-      _status = status;
-      notifyListeners();
-    });
   }
 
   // 계정 전환 후 구독 상태 새로고침
@@ -143,13 +154,15 @@ class SubscriptionProvider with ChangeNotifier {
     }
   }
 
-  // 구독 상태 새로고침
+  // 구독 상태 새로고침 (복원 + 검증)
   Future<void> refreshSubscriptionStatus() async {
     _isLoading = true;
     notifyListeners();
 
     try {
       await _subscriptionService.restorePurchases();
+      // 복원 이벤트가 들어올 시간을 약간 줌 (스토어 콜백 → 서버 등록/검증 → 상태 반영)
+      await Future.delayed(const Duration(seconds: 1));
       _status = await _subscriptionService.checkSubscriptionStatus();
     } catch (e) {
       debugPrint('Error refreshing subscription status: $e');
@@ -159,8 +172,34 @@ class SubscriptionProvider with ChangeNotifier {
     }
   }
 
+  // UI에서 직접 호출할 구매 복원
+  Future<bool> restorePurchases() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final ok = await _subscriptionService.restorePurchases();
+      // 복원 → 콜백 처리 대기 후 서버 상태 확인
+      await Future.delayed(const Duration(seconds: 1));
+      _status = await _subscriptionService.checkSubscriptionStatus();
+      return ok;
+    } catch (e) {
+      debugPrint('구매 복원 중 오류: $e');
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   // 구독 취소 안내 메서드
   Future<bool> navigateToSubscriptionManagement() async {
     return await _subscriptionService.navigateToSubscriptionManagement();
+  }
+
+  @override
+  void dispose() {
+    _statusSub?.cancel();
+    super.dispose();
   }
 }

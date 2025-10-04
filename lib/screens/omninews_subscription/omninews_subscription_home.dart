@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/omninews_subscription.dart';
 import 'package:omninews_flutter/services/auth_service.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../provider/subscription_provider.dart';
 
@@ -19,6 +20,12 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
 
   // 구독 변경 여부를 상위 라우트에 전달하기 위한 플래그
   bool _subscriptionChanged = false;
+
+  // 법적 링크 (SettingsScreen과 동일하게 유지)
+  static const String eulaUrl =
+      'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+  static const String privacyPolicyUrl =
+      'https://sites.google.com/view/omninews/%ED%99%88';
 
   @override
   void initState() {
@@ -290,14 +297,95 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
               Center(
                 child: Text(
                   // KRW면 “2,200원”, 그 외 통화는 스토어 표시 문자열 그대로 사용
-                  '월 ${_formatPriceDisplay(plan)} · 첫 결제 후 자동 갱신',
+                  '월 ${_formatPriceDisplay(plan)} · 자동 갱신',
                   style: const TextStyle(fontSize: 14, color: Colors.black54),
                 ),
+              ),
+              const SizedBox(height: 16),
+              _buildSubscriptionTermsAndLinks(plan),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final ok = await provider.restorePurchases();
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(ok ? '구매 내역을 복원했습니다.' : '복원에 실패했습니다.'),
+                      backgroundColor: ok ? Colors.green : Colors.red,
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.restore),
+                label: const Text('구매 복원'),
+              ),
+            ] else ...[
+              // 상품이 비어 있을 때 사용자 안내
+              const SizedBox(height: 8),
+              Text(
+                '상품 정보를 불러올 수 없습니다. 네트워크 상태 또는 스토어 설정을 확인한 뒤 다시 시도해 주세요.',
+                style: TextStyle(color: Colors.red.shade700),
               ),
             ],
           ],
         ),
       );
+    }
+  }
+
+  Widget _buildSubscriptionTermsAndLinks(SubscriptionPlan plan) {
+    final price = _formatPriceDisplay(plan);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 필수 고지(구독 기간/가격/자동갱신/청구/관리)
+        Text(
+          '구독 정보',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.blue.shade800,
+          ),
+        ),
+        const SizedBox(height: 6),
+        _bullet('구독 기간: 1개월(자동 갱신)'),
+        _bullet('가격: $price/월'),
+        _bullet('결제는 Apple ID로 청구됩니다.'),
+        _bullet('현재 기간 종료 최소 24시간 전에 취소하지 않으면 자동으로 갱신됩니다.'),
+        _bullet('갱신 시점 24시간 이내에 다음 기간 요금이 청구됩니다.'),
+        _bullet('구매 후 언제든지 App Store 계정 설정에서 관리 및 취소할 수 있습니다.'),
+        const SizedBox(height: 8),
+        // 법적 링크
+        Wrap(
+          spacing: 16,
+          runSpacing: 8,
+          children: [
+            TextButton(
+              onPressed: () => _openExternal(eulaUrl),
+              child: const Text('이용약관(EULA)'),
+            ),
+            TextButton(
+              onPressed: () => _openExternal(privacyPolicyUrl),
+              child: const Text('개인정보처리방침'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _bullet(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [const Text('•  '), Expanded(child: Text(text))],
+      ),
+    );
+  }
+
+  Future<void> _openExternal(String url) async {
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      // 실패해도 조용히 무시
     }
   }
 
