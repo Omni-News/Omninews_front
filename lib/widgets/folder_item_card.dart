@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_flutter/models/rss_item.dart';
+import 'package:intl/intl.dart';
 import 'package:omninews_flutter/models/rss_channel.dart';
 import 'package:omninews_flutter/models/rss_folder.dart';
-// import 'package:omninews_flutter/screens/webview_screen.dart'; // 1. 이 파일이 없으므로 주석 처리 또는 대체
+import 'package:omninews_flutter/models/rss_item.dart';
+import 'package:omninews_flutter/screens/rss_detail_screen.dart';
+import 'package:omninews_flutter/services/recently_read_service.dart';
+import 'package:omninews_flutter/services/rss_service.dart';
 import 'package:omninews_flutter/services/subscribe_service.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
-import 'package:intl/intl.dart';
 
 class FolderItemCard extends StatefulWidget {
   final RssItem item;
@@ -18,7 +20,7 @@ class FolderItemCard extends StatefulWidget {
 }
 
 class _FolderItemCardState extends State<FolderItemCard> {
-  bool _isBookmarked = false; // 초기값 설정
+  bool _isBookmarked = false;
   bool _isLoading = false;
   RssChannel? _sourceChannel;
 
@@ -30,55 +32,71 @@ class _FolderItemCardState extends State<FolderItemCard> {
   }
 
   Future<void> _checkBookmarkStatus() async {
-    final isBookmarked = await SubscribeService.isBookmarked(
-      widget.item.rssLink,
-    );
-    if (mounted) {
+    try {
+      final isBookmarked = await SubscribeService.isBookmarked(
+        widget.item.rssLink,
+      );
+      if (!mounted) return;
       setState(() {
         _isBookmarked = isBookmarked;
       });
+    } catch (_) {
+      // 조용히 실패
     }
   }
 
   void _findSourceChannel() {
-    // 2. orElse에서 null 대신 RssChannel의 기본값 반환하도록 수정
     try {
       _sourceChannel = widget.folder.folderChannels.firstWhere(
         (channel) => channel.channelId == widget.item.channelId,
       );
-    } catch (e) {
-      _sourceChannel = null; // 명시적으로 null 할당
+    } catch (_) {
+      _sourceChannel = null;
     }
   }
 
   Future<void> _toggleBookmark() async {
     if (_isLoading) return;
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
     try {
       bool success;
       if (_isBookmarked) {
-        success = await SubscribeService.removeBookmark(widget.item.rssLink);
+        // 폴더/로컬 컨텍스트에 맞춰 Local API 사용
+        success = await SubscribeService.removeLocalBookmark(
+          widget.item.rssLink,
+        );
       } else {
-        success = await SubscribeService.addBookmark(widget.item);
+        success = await SubscribeService.addLocalBookmark(widget.item);
       }
 
-      if (success && mounted) {
-        setState(() {
-          _isBookmarked = !_isBookmarked;
-        });
+      if (!mounted) return;
+
+      if (success) {
+        setState(() => _isBookmarked = !_isBookmarked);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isBookmarked ? '북마크에 추가되었습니다' : '북마크에서 제거되었습니다'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).primaryColor,
+          ),
+        );
       }
     } catch (e) {
-      debugPrint('Error toggling bookmark: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('북마크 처리 중 오류가 발생했습니다: $e'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Theme.of(context).colorScheme.error,
+        ),
+      );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -98,12 +116,12 @@ class _FolderItemCardState extends State<FolderItemCard> {
       } else {
         return DateFormat('yyyy년 MM월 dd일').format(date);
       }
-    } catch (e) {
+    } catch (_) {
       return '날짜 없음';
     }
   }
 
-  // 채널 이름을 가져오는 함수
+  // 채널 이름
   String _getChannelName() {
     if (_sourceChannel != null) {
       return _sourceChannel!.channelTitle;
@@ -112,28 +130,32 @@ class _FolderItemCardState extends State<FolderItemCard> {
   }
 
   void _openArticle() {
-    // 3. WebViewScreen으로 이동 부분 수정
-    // WebViewScreen이 없다면 URL을 열 수 있는 다른 방법을 사용해야 함
-    // 임시 해결책: 스낵바로 대체
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('링크 열기: ${widget.item.rssLink}'),
-        action: SnackBarAction(label: '확인', onPressed: () {}),
-      ),
-    );
+    // 읽은 기록 및 랭크 업데이트
+    RecentlyReadService.addRssItem(widget.item);
+    RssService.updateRssRank(widget.item.rssId);
 
-    // 실제 WebViewScreen이 있다면 아래 코드를 사용
-    /*
+    // 상세 화면으로 이동
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => WebViewScreen(
-          url: widget.item.rssLink,
-          title: widget.item.rssTitle,
-        ),
+        builder: (context) => RssDetailScreen(rssItem: widget.item),
       ),
     );
-    */
+  }
+
+  // 간단한 HTML 제거 후 축약
+  String _cleanAndTruncate(String text, {int max = 160}) {
+    final cleaned =
+        text
+            .replaceAll(RegExp(r'<[^>]*>'), ' ')
+            .replaceAll('&nbsp;', ' ')
+            .replaceAll('&amp;', '&')
+            .replaceAll('&lt;', '<')
+            .replaceAll('&gt;', '>')
+            .replaceAll(RegExp(r'\s+'), ' ')
+            .trim();
+    if (cleaned.length <= max) return cleaned;
+    return '${cleaned.substring(0, max)}...';
   }
 
   @override
@@ -148,12 +170,11 @@ class _FolderItemCardState extends State<FolderItemCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 소스 채널 표시 (새로 추가)
+            // 상단: 소스 채널 + 날짜
             Row(
               children: [
                 // 채널 이미지 (소형)
-                if (_sourceChannel?.channelImageUrl != null &&
-                    _sourceChannel!.channelImageUrl!.isNotEmpty)
+                if ((_sourceChannel?.channelImageUrl ?? '').isNotEmpty)
                   SizedBox(
                     width: 20,
                     height: 20,
@@ -191,16 +212,18 @@ class _FolderItemCardState extends State<FolderItemCard> {
                 const SizedBox(width: 8),
 
                 // 채널 이름
-                Text(
-                  _getChannelName(),
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: theme.primaryColor,
+                Expanded(
+                  child: Text(
+                    _getChannelName(),
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: theme.primaryColor,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-
-                const Spacer(),
 
                 // 날짜
                 Text(
@@ -230,7 +253,7 @@ class _FolderItemCardState extends State<FolderItemCard> {
 
             // 내용 (요약)
             Text(
-              widget.item.rssDescription,
+              _cleanAndTruncate(widget.item.rssDescription, max: 160),
               style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -267,8 +290,7 @@ class _FolderItemCardState extends State<FolderItemCard> {
                               size: 20,
                               color:
                                   _isBookmarked
-                                      ? theme
-                                          .primaryColor // 4. bookmarkActiveColor 대신 primaryColor 사용
+                                      ? theme.primaryColor
                                       : theme.iconTheme.color,
                             ),
                   ),
@@ -276,10 +298,10 @@ class _FolderItemCardState extends State<FolderItemCard> {
 
                 const SizedBox(width: 16),
 
-                // 공유 버튼
+                // 공유 버튼 (향후 구현)
                 InkWell(
                   onTap: () {
-                    // 공유 기능 구현
+                    // TODO: 공유 기능 구현 (Share.share 등)
                   },
                   borderRadius: BorderRadius.circular(20),
                   child: Padding(

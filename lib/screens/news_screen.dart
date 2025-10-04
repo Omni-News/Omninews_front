@@ -18,14 +18,7 @@ class NewsScreen extends StatefulWidget {
 
 class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
   late TabController _tabController;
-  List<String> categories = [
-    "정치",
-    "경제",
-    "사회",
-    "생활/문화",
-    "세계",
-    "IT/과학",
-  ];
+  List<String> categories = ["정치", "경제", "사회", "생활/문화", "세계", "IT/과학"];
 
   // 기본 카테고리 목록을 따로 저장
   final List<String> defaultCategories = [
@@ -141,8 +134,10 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
 
             // TabController 재생성
             _tabController.dispose();
-            _tabController =
-                TabController(length: categories.length, vsync: this);
+            _tabController = TabController(
+              length: categories.length,
+              vsync: this,
+            );
             _tabController.addListener(_handleTabIndexChange);
             fetchAllNewsLists();
             _isLoading = false;
@@ -167,9 +162,10 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
 
   Future<void> _saveCategories() async {
     final prefs = await SharedPreferences.getInstance();
-    final userCategories = categories
-        .where((category) => !defaultCategories.contains(category))
-        .toList();
+    final userCategories =
+        categories
+            .where((category) => !defaultCategories.contains(category))
+            .toList();
     await prefs.setStringList('user_categories', userCategories);
 
     // 정렬 옵션도 저장
@@ -185,8 +181,11 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
     setState(() {
       categorySortOptions[category] = sortOption;
       // 새로운 정렬 옵션으로 뉴스 다시 불러오기
-      customNewsList[category] =
-          NewsService.fetchCustomNews(category, 20, sortOption);
+      customNewsList[category] = NewsService.fetchCustomNews(
+        category,
+        20,
+        sortOption,
+      );
     });
 
     // 변경된 정렬 옵션 저장
@@ -201,8 +200,11 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
       } else {
         // 사용자 추가 카테고리는 저장된 정렬 옵션으로 API 호출
         String sortOption = categorySortOptions[category] ?? "sim";
-        customNewsList[category] =
-            NewsService.fetchCustomNews(category, 20, sortOption);
+        customNewsList[category] = NewsService.fetchCustomNews(
+          category,
+          20,
+          sortOption,
+        );
       }
     }
   }
@@ -219,70 +221,68 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          '새 카테고리 추가',
-          style: TextStyle(
-            color: theme.textTheme.headlineMedium?.color,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: theme.cardColor,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        content: TextField(
-          controller: _categoryController,
-          decoration: InputDecoration(
-            labelText: '카테고리 이름',
-            hintText: '새 카테고리 이름을 입력하세요',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-              borderSide: BorderSide(
-                color: theme.primaryColor,
-                width: 2,
-              ),
-            ),
-          ),
-          autofocus: true,
-          style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-          onSubmitted: (value) {
-            if (value.trim().isNotEmpty) {
-              _addCategory(value);
-              Navigator.pop(context);
-            }
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              '취소',
+      builder:
+          (context) => AlertDialog(
+            title: Text(
+              '새 카테고리 추가',
               style: TextStyle(
-                color: theme.textTheme.bodyLarge?.color?.withOpacity(0.7),
+                color: theme.textTheme.headlineMedium?.color,
+                fontWeight: FontWeight.bold,
               ),
             ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              _addCategory(_categoryController.text);
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: theme.primaryColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              elevation: 0,
+            backgroundColor: theme.cardColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: const Text('추가'),
+            content: TextField(
+              controller: _categoryController,
+              decoration: InputDecoration(
+                labelText: '카테고리 이름',
+                hintText: '새 카테고리 이름을 입력하세요',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide(color: theme.primaryColor, width: 2),
+                ),
+              ),
+              autofocus: true,
+              style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+              onSubmitted: (value) {
+                if (value.trim().isNotEmpty) {
+                  _addCategory(value);
+                  Navigator.pop(context);
+                }
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  '취소',
+                  style: TextStyle(
+                    color: theme.textTheme.bodyLarge?.color?.withOpacity(0.7),
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  _addCategory(_categoryController.text);
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.primaryColor,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Text('추가'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -304,49 +304,50 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(
-          '카테고리 삭제',
-          style: TextStyle(
-            color: theme.textTheme.headlineMedium?.color,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        backgroundColor: theme.cardColor,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        content: Text(
-          '\'$category\' 카테고리를 삭제하시겠습니까?',
-          style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              '취소',
+      builder:
+          (context) => AlertDialog(
+            title: Text(
+              '카테고리 삭제',
               style: TextStyle(
-                color: theme.textTheme.bodyLarge?.color?.withOpacity(0.7),
+                color: theme.textTheme.headlineMedium?.color,
+                fontWeight: FontWeight.bold,
               ),
             ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              _deleteCategory(index);
-              Navigator.pop(context);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: theme.colorScheme.error,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-              elevation: 0,
+            backgroundColor: theme.cardColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: const Text('삭제'),
+            content: Text(
+              '\'$category\' 카테고리를 삭제하시겠습니까?',
+              style: TextStyle(color: theme.textTheme.bodyLarge?.color),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  '취소',
+                  style: TextStyle(
+                    color: theme.textTheme.bodyLarge?.color?.withOpacity(0.7),
+                  ),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  _deleteCategory(index);
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: theme.colorScheme.error,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  elevation: 0,
+                ),
+                child: const Text('삭제'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
@@ -410,8 +411,11 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
       categorySortOptions[category] = "sim"; // 기본값은 정확순
 
       // 사용자 추가 카테고리는 커스텀 API 호출
-      customNewsList[category] =
-          NewsService.fetchCustomNews(category, 20, "sim");
+      customNewsList[category] = NewsService.fetchCustomNews(
+        category,
+        20,
+        "sim",
+      );
 
       // TabController 재생성
       _tabController.dispose();
@@ -465,139 +469,153 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: _isLoading
-          ? Center(
-              child: CircularProgressIndicator(
-                color: theme.primaryColor,
-              ),
-            )
-          : NestedScrollView(
-              headerSliverBuilder:
-                  (BuildContext context, bool innerBoxIsScrolled) {
-                return [
-                  SliverAppBar(
-                    leading: IconButton(
-                      icon: Icon(
-                        Icons.menu,
-                        color: theme.appBarTheme.iconTheme?.color,
-                      ),
-                      onPressed: () {
-                        homeScaffoldKey.currentState?.openDrawer();
-                      },
-                    ),
-                    pinned: true,
-                    elevation: 0,
-                    backgroundColor: theme.appBarTheme.backgroundColor,
-                    title: Text(
-                      'News',
-                      style: textTheme.headlineMedium,
-                    ),
-                    actions: [
-                      IconButton(
+      body:
+          _isLoading
+              ? Center(
+                child: CircularProgressIndicator(color: theme.primaryColor),
+              )
+              : NestedScrollView(
+                headerSliverBuilder: (
+                  BuildContext context,
+                  bool innerBoxIsScrolled,
+                ) {
+                  return [
+                    SliverAppBar(
+                      leading: IconButton(
+                        tooltip: '메뉴 열기',
                         icon: Icon(
-                          Icons.refresh,
+                          Icons.menu,
                           color: theme.appBarTheme.iconTheme?.color,
                         ),
-                        onPressed: _refresh,
+                        onPressed: () {
+                          homeScaffoldKey.currentState?.openDrawer();
+                        },
                       ),
-                    ],
-                  ),
-                  SliverPersistentHeader(
-                    delegate: _SliverAppBarDelegate(
-                      SingleChildScrollView(
-                        controller: _tabScrollController,
-                        scrollDirection: Axis.horizontal,
-                        physics: const ClampingScrollPhysics(),
-                        child: TabBar(
-                          controller: _tabController,
-                          isScrollable: true,
-                          indicatorColor: theme.primaryColor,
-                          labelColor: theme.primaryColor,
-                          unselectedLabelColor: textTheme.bodyLarge?.color,
-                          indicatorWeight: 3,
-                          labelStyle: textTheme.labelLarge,
-                          unselectedLabelStyle: textTheme.labelMedium,
-                          labelPadding:
-                              const EdgeInsets.symmetric(horizontal: 17.0),
-                          padding: const EdgeInsets.symmetric(horizontal: 9.0),
-                          tabAlignment: TabAlignment.start,
-                          tabs: List.generate(categories.length, (index) {
-                            final category = categories[index];
-                            final isCustomCategory =
-                                !defaultCategories.contains(category);
+                      pinned: true,
+                      elevation: 0,
+                      backgroundColor: theme.appBarTheme.backgroundColor,
+                      title: Text('뉴스', style: textTheme.headlineMedium),
+                      actions: [
+                        IconButton(
+                          tooltip: '새로고침',
+                          icon: Icon(
+                            Icons.refresh,
+                            color: theme.appBarTheme.iconTheme?.color,
+                          ),
+                          onPressed: _refresh,
+                        ),
+                      ],
+                    ),
+                    SliverPersistentHeader(
+                      delegate: _SliverAppBarDelegate(
+                        SingleChildScrollView(
+                          controller: _tabScrollController,
+                          scrollDirection: Axis.horizontal,
+                          physics: const ClampingScrollPhysics(),
+                          child: TabBar(
+                            controller: _tabController,
+                            isScrollable: true,
+                            indicatorColor: theme.primaryColor,
+                            labelColor: theme.primaryColor,
+                            unselectedLabelColor: textTheme.bodyLarge?.color,
+                            indicatorWeight: 3,
+                            labelStyle: textTheme.labelLarge,
+                            unselectedLabelStyle: textTheme.labelMedium,
+                            labelPadding: const EdgeInsets.symmetric(
+                              horizontal: 17.0,
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 9.0,
+                            ),
+                            tabAlignment: TabAlignment.start,
+                            tabs: List.generate(categories.length, (index) {
+                              final category = categories[index];
+                              final isCustomCategory =
+                                  !defaultCategories.contains(category);
 
-                            return GestureDetector(
-                              onLongPress: () =>
-                                  _showDeleteCategoryDialog(category, index),
-                              child: Tab(
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(category),
-                                    if (isCustomCategory) ...[
-                                      const SizedBox(width: 5),
-                                      Icon(
-                                        Icons.search,
-                                        size: 16,
-                                        color: _tabController.index == index
-                                            ? theme.primaryColor
-                                            : textTheme.bodyLarge?.color
-                                                ?.withOpacity(0.6),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      InkWell(
-                                        onTap: () {
-                                          _showDeleteCategoryDialog(
-                                              category, index);
-                                        },
-                                        child: Icon(
-                                          Icons.close,
-                                          size: 14,
-                                          color: _tabController.index == index
-                                              ? theme.primaryColor
-                                              : textTheme.bodyLarge?.color
-                                                  ?.withOpacity(0.6),
+                              return GestureDetector(
+                                onLongPress:
+                                    () => _showDeleteCategoryDialog(
+                                      category,
+                                      index,
+                                    ),
+                                child: Tab(
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(category),
+                                      if (isCustomCategory) ...[
+                                        const SizedBox(width: 5),
+                                        Icon(
+                                          Icons.search,
+                                          size: 16,
+                                          color:
+                                              _tabController.index == index
+                                                  ? theme.primaryColor
+                                                  : textTheme.bodyLarge?.color
+                                                      ?.withOpacity(0.6),
                                         ),
-                                      ),
+                                        const SizedBox(width: 4),
+                                        InkWell(
+                                          onTap: () {
+                                            _showDeleteCategoryDialog(
+                                              category,
+                                              index,
+                                            );
+                                          },
+                                          child: Icon(
+                                            Icons.close,
+                                            size: 14,
+                                            color:
+                                                _tabController.index == index
+                                                    ? theme.primaryColor
+                                                    : textTheme.bodyLarge?.color
+                                                        ?.withOpacity(0.6),
+                                          ),
+                                        ),
+                                      ],
                                     ],
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            );
-                          }),
+                              );
+                            }),
+                          ),
                         ),
                       ),
+                      floating: true,
+                      pinned: false,
                     ),
-                    floating: true,
-                    pinned: false,
-                  ),
-                ];
-              },
-              body: TabBarView(
-                controller: _tabController,
-                children: categories.map((category) {
-                  final isDefaultCategory =
-                      defaultCategories.contains(category);
+                  ];
+                },
+                body: TabBarView(
+                  controller: _tabController,
+                  children:
+                      categories.map((category) {
+                        final isDefaultCategory = defaultCategories.contains(
+                          category,
+                        );
 
-                  if (isDefaultCategory) {
-                    // 기본 카테고리용 뉴스 리스트 뷰에 설정 전달
-                    return NewsListView(newsList: newsList[category]!);
-                  } else {
-                    // 사용자 추가 카테고리용 커스텀 뉴스 리스트 뷰에 설정 전달
-                    return CustomNewsListView(
-                        newsList: customNewsList[category]!,
-                        categoryName: category,
-                        currentSortOption:
-                            categorySortOptions[category] ?? "sim",
-                        onSortChanged: (newSortOption) {
-                          updateCategorySortOption(category, newSortOption);
-                        });
-                  }
-                }).toList(),
+                        if (isDefaultCategory) {
+                          // 기본 카테고리용 뉴스 리스트 뷰에 설정 전달
+                          return NewsListView(newsList: newsList[category]!);
+                        } else {
+                          // 사용자 추가 카테고리용 커스텀 뉴스 리스트 뷰에 설정 전달
+                          return CustomNewsListView(
+                            newsList: customNewsList[category]!,
+                            categoryName: category,
+                            currentSortOption:
+                                categorySortOptions[category] ?? "sim",
+                            onSortChanged: (newSortOption) {
+                              updateCategorySortOption(category, newSortOption);
+                            },
+                          );
+                        }
+                      }).toList(),
+                ),
               ),
-            ),
       // 카테고리 추가 버튼
       floatingActionButton: FloatingActionButton(
+        tooltip: '카테고리 추가',
         onPressed: _showAddCategoryDialog,
         backgroundColor: theme.primaryColor,
         foregroundColor: Colors.white,
@@ -616,21 +634,25 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
 
   @override
   Widget build(
-      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     final theme = Theme.of(context);
 
     return Container(
       decoration: BoxDecoration(
         color: theme.cardColor,
-        boxShadow: overlapsContent
-            ? [
-                BoxShadow(
-                  color: theme.shadowColor,
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ]
-            : [],
+        boxShadow:
+            overlapsContent
+                ? [
+                  BoxShadow(
+                    color: theme.shadowColor,
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+                : [],
       ),
       height: 48.0,
       child: child,

@@ -8,16 +8,32 @@ class RssScreenWidget {
   // 채널 이미지 위젯
   static Widget buildChannelImage(RssChannel channel, BuildContext context) {
     final rssTheme = AppTheme.rssThemeOf(context);
+    final imageUrl = channel.channelImageUrl ?? '';
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(rssTheme.channelImageBorderRadius),
       child:
-          channel.channelImageUrl != null && channel.channelImageUrl!.isNotEmpty
+          imageUrl.isNotEmpty
               ? Image.network(
-                channel.channelImageUrl!,
+                imageUrl,
                 width: 60,
                 height: 60,
                 fit: BoxFit.cover,
+                frameBuilder: (context, child, frame, _) {
+                  if (frame != null) return child;
+                  return Container(
+                    width: 60,
+                    height: 60,
+                    color: Theme.of(context).cardColor.withOpacity(0.6),
+                    child: const Center(
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  );
+                },
                 errorBuilder: (context, error, stackTrace) {
                   return buildDefaultChannelImage(context);
                 },
@@ -55,53 +71,66 @@ class RssScreenWidget {
     final rssTheme = AppTheme.rssThemeOf(context);
     final isProcessing = subscribingStatus[channelRssLink] == true;
 
-    if (isProcessing) {
-      return SizedBox(
-        width: 24,
-        height: 24,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color:
-              isSubscribed
-                  ? rssTheme.subscribeButtonActiveText
-                  : rssTheme.subscribeButtonInactiveText,
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color:
-            isSubscribed
-                ? rssTheme.subscribeButtonActivedBackground
-                : rssTheme.subscribeButtonInactiveBackground,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isSubscribed ? Icons.check : Icons.add,
-            size: 16,
-            color:
-                isSubscribed
-                    ? rssTheme.subscribeButtonActiveText
-                    : rssTheme.subscribeButtonInactiveText,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            isSubscribed ? '구독 중' : '구독하기',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color:
-                  isSubscribed
-                      ? rssTheme.subscribeButtonActiveText
-                      : rssTheme.subscribeButtonInactiveText,
-            ),
-          ),
-        ],
+    return Semantics(
+      button: true,
+      label: isSubscribed ? '구독 중' : '구독하기',
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
+        child:
+            isProcessing
+                ? SizedBox(
+                  key: const ValueKey('processing'),
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color:
+                        isSubscribed
+                            ? rssTheme.subscribeButtonActiveText
+                            : rssTheme.subscribeButtonInactiveText,
+                  ),
+                )
+                : Container(
+                  key: ValueKey(isSubscribed ? 'subscribed' : 'unsubscribed'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  decoration: BoxDecoration(
+                    color:
+                        isSubscribed
+                            ? rssTheme.subscribeButtonActivedBackground
+                            : rssTheme.subscribeButtonInactiveBackground,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isSubscribed ? Icons.check : Icons.add,
+                        size: 16,
+                        color:
+                            isSubscribed
+                                ? rssTheme.subscribeButtonActiveText
+                                : rssTheme.subscribeButtonInactiveText,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isSubscribed ? '구독 중' : '구독하기',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color:
+                              isSubscribed
+                                  ? rssTheme.subscribeButtonActiveText
+                                  : rssTheme.subscribeButtonInactiveText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
       ),
     );
   }
@@ -122,6 +151,7 @@ class RssScreenWidget {
           const SizedBox(height: 16),
           Text(
             message,
+            textAlign: TextAlign.center,
             style: TextStyle(
               color: subscribeStyle.emptyTextColor,
               fontSize: 16,
@@ -132,11 +162,11 @@ class RssScreenWidget {
           if (icon == Icons.rss_feed) ...[
             Text(
               'RSS 피드를 추가하려면 아래 + 버튼을 눌러주세요',
+              textAlign: TextAlign.center,
               style: TextStyle(
                 color: subscribeStyle.hintTextColor,
                 fontSize: 14,
               ),
-              textAlign: TextAlign.center,
             ),
           ],
         ],
@@ -174,6 +204,7 @@ class RssScreenWidget {
           Text(
             '+ 버튼을 눌러 새 폴더를 만들어보세요',
             style: TextStyle(fontSize: 14, color: subscribeStyle.hintTextColor),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
           TextButton.icon(
@@ -320,7 +351,6 @@ class RssScreenWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10),
       children: [
         // 1. 폴더 섹션
-        // 섹션 헤더와 "폴더가 없습니다" 메시지 표시
         Padding(
           padding: const EdgeInsets.only(top: 10, left: 4, bottom: 10),
           child: Text(
@@ -333,7 +363,6 @@ class RssScreenWidget {
           ),
         ),
 
-        // 폴더가 없는 경우 메시지 표시, 있는 경우 폴더 목록 표시
         if (folders.isEmpty)
           Card(
             margin: const EdgeInsets.only(bottom: 16, top: 2),
@@ -371,13 +400,14 @@ class RssScreenWidget {
                       fontSize: 13,
                       color: theme.hintColor.withOpacity(0.7),
                     ),
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
             ),
           )
         else
-          // 폴더 목록 - 바로 시작
+          // 폴더 목록
           ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -403,7 +433,6 @@ class RssScreenWidget {
 
         // 2. 폴더에 속하지 않은 채널 섹션
         if (unfolderedChannels.isNotEmpty) ...[
-          // 여백 줄이기 - 세로 여백 축소
           Padding(
             padding: const EdgeInsets.only(top: 60, left: 4, bottom: 10),
             child: Text(
@@ -415,8 +444,6 @@ class RssScreenWidget {
               ),
             ),
           ),
-
-          // 채널 목록 - 바로 시작
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
@@ -467,7 +494,6 @@ class RssScreenWidget {
     final theme = Theme.of(context);
 
     return Card(
-      // 여백 줄임
       margin: const EdgeInsets.only(bottom: 4, top: 2),
       elevation: 0,
       shape: RoundedRectangleBorder(
@@ -483,7 +509,6 @@ class RssScreenWidget {
           final isAlreadyInFolder = folder.folderChannels.any(
             (c) => c.channelId == channel.channelId,
           );
-
           if (!isAlreadyInFolder) {
             onAddChannelToFolder(channel, folder);
           }
@@ -500,42 +525,42 @@ class RssScreenWidget {
                       : Colors.transparent,
             ),
             child: Theme(
-              // 폴더 내 검은 구분선 제거
               data: Theme.of(
                 context,
               ).copyWith(dividerColor: Colors.transparent),
               child: ExpansionTile(
-                // 여백 줄임
                 tilePadding: const EdgeInsets.symmetric(
                   horizontal: 14,
                   vertical: 0,
                 ),
                 childrenPadding: EdgeInsets.zero,
                 leading: Icon(Icons.folder_outlined, color: theme.primaryColor),
-                title: Text(
-                  folder.folderName,
+                title: const Text(
+                  '폴더',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                 ),
                 subtitle: Text(
-                  '${folder.folderChannels.length}개의 채널',
-                  style: TextStyle(fontSize: 13),
+                  folder.folderName.isNotEmpty
+                      ? '${folder.folderName} • ${folder.folderChannels.length}개의 채널'
+                      : '${folder.folderChannels.length}개의 채널',
+                  style: const TextStyle(fontSize: 13),
                 ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // 항상 삭제 버튼 표시 (비어있는 폴더 조건 제거)
+                    // 항상 삭제 버튼 표시
                     IconButton(
-                      icon: Icon(Icons.delete_outline, size: 20),
+                      icon: const Icon(Icons.delete_outline, size: 20),
                       onPressed: () => onDeleteFolder(folder),
                       tooltip: '폴더 삭제',
                       padding: EdgeInsets.zero,
-                      constraints: BoxConstraints.tightFor(
+                      constraints: const BoxConstraints.tightFor(
                         width: 24,
                         height: 24,
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Icon(Icons.keyboard_arrow_down, size: 22),
+                    const Icon(Icons.keyboard_arrow_down, size: 22),
                   ],
                 ),
                 children:
@@ -598,20 +623,12 @@ class RssScreenWidget {
         child: _buildChannelListItemSimple(channel: channel, context: context),
       ),
       onDragStarted: () {
-        if (onDragStatusChanged != null) {
-          onDragStatusChanged(true);
-        }
-        if (onDraggingChannelChanged != null) {
-          onDraggingChannelChanged(channel);
-        }
+        onDragStatusChanged?.call(true);
+        onDraggingChannelChanged?.call(channel);
       },
       onDragEnd: (details) {
-        if (onDragStatusChanged != null) {
-          onDragStatusChanged(false);
-        }
-        if (onDraggingChannelChanged != null) {
-          onDraggingChannelChanged(null);
-        }
+        onDragStatusChanged?.call(false);
+        onDraggingChannelChanged?.call(null);
       },
       child: _buildChannelListItemSimple(
         channel: channel,
@@ -632,11 +649,11 @@ class RssScreenWidget {
     VoidCallback? onRemoveFromFolder,
   }) {
     final theme = Theme.of(context);
+    final imageUrl = channel.channelImageUrl ?? '';
 
     return InkWell(
       onTap: onTap,
       child: Padding(
-        // 여백 줄임
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         child: Row(
           children: [
@@ -647,10 +664,9 @@ class RssScreenWidget {
                 width: 40,
                 height: 40,
                 child:
-                    channel.channelImageUrl != null &&
-                            channel.channelImageUrl!.isNotEmpty
+                    imageUrl.isNotEmpty
                         ? Image.network(
-                          channel.channelImageUrl!,
+                          imageUrl,
                           fit: BoxFit.cover,
                           errorBuilder:
                               (context, error, stackTrace) => Container(
@@ -680,11 +696,14 @@ class RssScreenWidget {
                 children: [
                   Text(
                     channel.channelTitle,
-                    style: TextStyle(fontWeight: FontWeight.w500, fontSize: 15),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 15,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 3), // 간격 줄임
+                  const SizedBox(height: 3),
                   Text(
                     channel.channelDescription,
                     style: TextStyle(
@@ -703,12 +722,15 @@ class RssScreenWidget {
             // 폴더에서 제거 버튼
             if (isInFolder && onRemoveFromFolder != null)
               IconButton(
-                icon: Icon(Icons.remove_circle_outline, size: 18),
+                icon: const Icon(Icons.remove_circle_outline, size: 18),
                 onPressed: onRemoveFromFolder,
                 color: theme.colorScheme.error.withOpacity(0.7),
                 tooltip: '폴더에서 제거',
                 padding: EdgeInsets.zero,
-                constraints: BoxConstraints.tight(Size(24, 24)),
+                constraints: const BoxConstraints.tightFor(
+                  width: 24,
+                  height: 24,
+                ),
               ),
 
             // 드래그 핸들
@@ -726,6 +748,7 @@ class RssScreenWidget {
   // 드래그 중인 채널 미리보기
   static Widget _buildDragFeedback(RssChannel channel, BuildContext context) {
     final theme = Theme.of(context);
+    final imageUrl = channel.channelImageUrl ?? '';
 
     return Material(
       color: Colors.transparent,
@@ -736,8 +759,15 @@ class RssScreenWidget {
         decoration: BoxDecoration(
           color: theme.cardColor,
           borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: theme.shadowColor.withOpacity(0.12),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
-        width: 200,
+        width: 220,
         child: Row(
           children: [
             // 작은 이미지
@@ -747,10 +777,9 @@ class RssScreenWidget {
                 width: 30,
                 height: 30,
                 child:
-                    channel.channelImageUrl != null &&
-                            channel.channelImageUrl!.isNotEmpty
+                    imageUrl.isNotEmpty
                         ? Image.network(
-                          channel.channelImageUrl!,
+                          imageUrl,
                           fit: BoxFit.cover,
                           errorBuilder:
                               (context, error, stackTrace) => Container(
@@ -779,7 +808,7 @@ class RssScreenWidget {
             Expanded(
               child: Text(
                 channel.channelTitle,
-                style: TextStyle(fontWeight: FontWeight.w500),
+                style: const TextStyle(fontWeight: FontWeight.w500),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -798,26 +827,26 @@ class RssScreenWidget {
   }) {
     final theme = Theme.of(context);
 
-    // 하나의 FAB만 사용하도록 수정
     return FloatingActionButton(
       heroTag: 'mainFab',
       backgroundColor: theme.primaryColor,
       elevation: 4,
       onPressed: () {
-        // FAB 메뉴를 모달 바텀 시트로 표시
         showModalBottomSheet(
           context: context,
+          useSafeArea: true,
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           ),
           builder:
               (context) => SafeArea(
+                top: false,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     // 제목
-                    Padding(
-                      padding: const EdgeInsets.all(16),
+                    const Padding(
+                      padding: EdgeInsets.all(16),
                       child: Text(
                         '옵션 선택',
                         style: TextStyle(
@@ -827,7 +856,7 @@ class RssScreenWidget {
                       ),
                     ),
 
-                    Divider(height: 1),
+                    const Divider(height: 1),
 
                     // 폴더 생성 옵션
                     ListTile(
@@ -845,8 +874,8 @@ class RssScreenWidget {
                       title: const Text('폴더 생성하기'),
                       subtitle: const Text('RSS 채널을 구성할 새 폴더를 만듭니다'),
                       onTap: () {
-                        Navigator.pop(context); // 바텀시트 닫기
-                        onCreateFolder(); // 폴더 생성 다이얼로그
+                        Navigator.pop(context);
+                        onCreateFolder();
                       },
                     ),
 
@@ -866,8 +895,8 @@ class RssScreenWidget {
                       title: const Text('RSS 추가하기'),
                       subtitle: const Text('새로운 RSS 피드를 구독합니다'),
                       onTap: () {
-                        Navigator.pop(context); // 바텀시트 닫기
-                        onAddRss(); // RSS 추가 화면
+                        Navigator.pop(context);
+                        onAddRss();
                       },
                     ),
 
@@ -882,7 +911,7 @@ class RssScreenWidget {
   }
 }
 
-// TabBar를 위한 SliverPersistentHeader delegate 클래스 (변경 없음)
+// TabBar를 위한 SliverPersistentHeader delegate 클래스
 class SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
   final Widget child;
   final ThemeData theme;

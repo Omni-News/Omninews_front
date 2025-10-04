@@ -37,6 +37,7 @@ class NewsDetailScreen extends StatelessWidget {
                   backgroundColor: detailTheme.appBarTheme.backgroundColor,
                   elevation: 0,
                   leading: IconButton(
+                    tooltip: '뒤로가기',
                     icon: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
@@ -118,11 +119,12 @@ class NewsDetailScreen extends StatelessWidget {
                           ],
                         ),
                         const SizedBox(height: 16),
+
                         // 제목
                         Text(news.newsTitle, style: textTheme.titleLarge),
                         const SizedBox(height: 24),
 
-                        // 더 모던하고 센스있는 AI 요약 라벨
+                        // AI 요약 라벨
                         Row(
                           children: [
                             Icon(
@@ -132,7 +134,7 @@ class NewsDetailScreen extends StatelessWidget {
                             ),
                             const SizedBox(width: 7),
                             Text(
-                              'AI 뉴스 본문 요약',
+                              'AI 요약',
                               style: textTheme.labelLarge?.copyWith(
                                 color: colorScheme.primary,
                                 fontWeight: FontWeight.w700,
@@ -160,7 +162,8 @@ class NewsDetailScreen extends StatelessWidget {
                 ),
               ],
             ),
-            // 하단 고정 버튼 영역 (이전 코드 그대로)
+
+            // 하단 고정 버튼 영역
             Positioned(
               left: 0,
               right: 0,
@@ -218,6 +221,7 @@ class NewsDetailScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+
                     // 원문 보기 버튼
                     Expanded(
                       child: Padding(
@@ -270,6 +274,7 @@ class NewsDetailScreen extends StatelessWidget {
     }
   }
 
+  // 오전/오후가 앞에 오는 자연스러운 표기
   String _formatTime(int hour, int minute) {
     final isPM = hour >= 12;
     final formattedHour =
@@ -279,6 +284,6 @@ class NewsDetailScreen extends StatelessWidget {
             ? 12
             : hour;
     final formattedMinute = minute.toString().padLeft(2, '0');
-    return '$formattedHour:$formattedMinute ${isPM ? '오후' : '오전'}';
+    return '${isPM ? '오후' : '오전'} $formattedHour:$formattedMinute';
   }
 }

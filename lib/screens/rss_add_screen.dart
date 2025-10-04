@@ -192,7 +192,7 @@ class _RssAddScreenState extends State<RssAddScreen>
     final url = _urlController.text.trim();
     if (url.isEmpty) {
       setState(() {
-        _errorMessage = 'URL을 입력해주세요';
+        _errorMessage = 'URL을 입력해 주세요.';
         _previewChannel = null;
       });
       return;
@@ -222,10 +222,10 @@ class _RssAddScreenState extends State<RssAddScreen>
           _isExistingRss = exists;
           _isAlreadySubscribed = already;
         });
-        if (already) _showSnackBar('이미 구독 중인 RSS 채널입니다');
+        if (already) _showSnackBar('이미 구독 중인 RSS 채널입니다.');
       } else {
         if (!mounted) return;
-        setState(() => _errorMessage = 'RSS 피드를 불러올 수 없습니다');
+        setState(() => _errorMessage = 'RSS 피드를 불러오지 못했습니다.');
       }
     } catch (e) {
       if (!mounted) return;
@@ -254,7 +254,7 @@ class _RssAddScreenState extends State<RssAddScreen>
         _cssItemTitleController.text.trim().isEmpty ||
         _cssItemLinkController.text.trim().isEmpty) {
       setState(() {
-        _errorMessage = '필수 항목을 모두 입력해주세요.';
+        _errorMessage = '필수 항목을 모두 입력해 주세요.';
         _isCssGenerating = false;
       });
       return;
@@ -289,11 +289,11 @@ class _RssAddScreenState extends State<RssAddScreen>
         if (existedBefore) {
           _showSnackBar('이미 존재하는 RSS입니다. 바로 구독할 수 있습니다.');
         } else {
-          _showSnackBar('RSS가 성공적으로 생성되었습니다. 이제 구독할 수 있습니다.');
+          _showSnackBar('RSS를 성공적으로 생성했습니다. 이제 구독할 수 있습니다.');
         }
       } else {
         setState(
-          () => _errorMessage = 'RSS 생성에 실패했습니다. CSS 셀렉터와 채널 정보를 확인하세요.',
+          () => _errorMessage = 'RSS 생성에 실패했습니다. CSS 셀렉터와 채널 정보를 확인해 주세요.',
         );
       }
     } catch (e) {
@@ -319,11 +319,11 @@ class _RssAddScreenState extends State<RssAddScreen>
           _isExistingRss = true;
           _isLoading = false;
         });
-        _showSnackBar('RSS가 성공적으로 추가되었습니다. 이제 구독할 수 있습니다.');
+        _showSnackBar('RSS를 추가했습니다. 이제 구독할 수 있습니다.');
       } else {
         if (!mounted) return;
         setState(() {
-          _errorMessage = 'RSS 추가 중 오류가 발생했습니다';
+          _errorMessage = 'RSS 추가 중 오류가 발생했습니다.';
           _isLoading = false;
         });
       }
@@ -355,7 +355,7 @@ class _RssAddScreenState extends State<RssAddScreen>
       } else {
         if (!mounted) return;
         setState(() {
-          _errorMessage = '이미 구독 중인 채널입니다';
+          _errorMessage = '이미 구독 중인 채널입니다.';
           _isAlreadySubscribed = true;
           _isLoading = false;
         });
@@ -375,7 +375,7 @@ class _RssAddScreenState extends State<RssAddScreen>
 
     final url = _generateUrlController.text.trim();
     if (url.isEmpty) {
-      setState(() => _errorMessage = 'URL을 입력해주세요');
+      setState(() => _errorMessage = 'URL을 입력해 주세요.');
       return;
     }
 
@@ -408,10 +408,10 @@ class _RssAddScreenState extends State<RssAddScreen>
         if (existedBefore) {
           _showSnackBar('이미 존재하는 RSS입니다. 바로 구독할 수 있습니다.');
         } else {
-          _showSnackBar('RSS가 성공적으로 생성되었습니다. 이제 구독할 수 있습니다.');
+          _showSnackBar('RSS를 성공적으로 생성했습니다. 이제 구독할 수 있습니다.');
         }
       } else {
-        setState(() => _errorMessage = 'RSS 생성에 실패했습니다. 유효한 URL인지 확인해주세요.');
+        setState(() => _errorMessage = 'RSS 생성에 실패했습니다. 주소가 올바른지 확인해 주세요.');
       }
     } catch (e) {
       setState(() => _errorMessage = '오류가 발생했습니다: $e');
@@ -428,7 +428,7 @@ class _RssAddScreenState extends State<RssAddScreen>
         builder: (context) => const HomeScreen(initialTabIndex: 1),
       ),
     );
-    _showSnackBar('RSS 채널이 구독되었습니다');
+    _showSnackBar('RSS 채널을 구독했습니다.');
   }
 
   void _showSnackBar(String message) {
@@ -486,11 +486,14 @@ class _RssAddScreenState extends State<RssAddScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'RSS 피드 URL 입력',
+              'RSS 피드 주소 입력',
               style: textTheme.titleLarge?.copyWith(fontSize: 18),
             ),
             const SizedBox(height: 8),
-            Text('RSS 주소를 입력하고 미리보기 버튼을 눌러주세요.', style: textTheme.bodyMedium),
+            Text(
+              'RSS 주소를 입력한 뒤, 미리보기를 눌러 확인해 주세요.',
+              style: textTheme.bodyMedium,
+            ),
             const SizedBox(height: 24),
             _buildUrlInputField(theme),
             if (_errorMessage != null && _tabController.index == 0)
@@ -540,17 +543,17 @@ class _RssAddScreenState extends State<RssAddScreen>
                                 _errorMessage = null;
                               });
                             },
-                            child: const Text("자동 추출 방식으로 돌아가기"),
+                            child: const Text('자동 추출로 돌아가기'),
                           ),
                         ),
                       ] else ...[
                         Text(
-                          '사이트 URL 입력',
+                          '사이트 주소 입력',
                           style: textTheme.titleLarge?.copyWith(fontSize: 18),
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          '선택한 플랫폼의 채널 또는 페이지 URL을 입력해주세요.',
+                          '선택한 플랫폼의 채널 또는 페이지 주소를 입력해 주세요.',
                           style: textTheme.bodyMedium,
                         ),
                         const SizedBox(height: 12),
@@ -939,7 +942,7 @@ class _RssAddScreenState extends State<RssAddScreen>
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.green, width: 1.5),
+                borderSide: const BorderSide(color: Colors.green, width: 1.5),
               ),
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
@@ -1157,7 +1160,7 @@ class _RssAddScreenState extends State<RssAddScreen>
           ),
           const SizedBox(height: 16),
           Text(
-            'RSS가 제공되지 않는 사이트도 손쉽게 RSS로 만들어 구독할 수 있습니다. 구독을 통해 이 기능을 사용해보세요!',
+            'RSS가 제공되지 않는 사이트도 손쉽게 RSS로 만들어 구독할 수 있습니다. 구독을 통해 이 기능을 이용해 보세요.',
             style: textTheme.bodyMedium,
             textAlign: TextAlign.center,
           ),
@@ -1276,7 +1279,7 @@ class _RssAddScreenState extends State<RssAddScreen>
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              '인스타그램 채널이 생성되었습니다.\n게시물 아이템을 수집 중입니다 (약 30~60초). 잠시 후 새로고침하거나 홈에서 확인하세요.',
+              '인스타그램 채널이 생성되었습니다.\n게시물을 수집 중입니다(약 30~60초 소요). 잠시 후 새로고침하거나 홈에서 확인하세요.',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.primary,
                 height: 1.3,
@@ -1387,7 +1390,7 @@ class _RssAddScreenState extends State<RssAddScreen>
                   ),
                 if (_tabController.index == 1)
                   _buildInfoChip(
-                    label: '프리미엄 생성',
+                    label: '프리미엄으로 생성',
                     icon: Icons.stars,
                     iconColor: Colors.amber,
                     theme: theme,

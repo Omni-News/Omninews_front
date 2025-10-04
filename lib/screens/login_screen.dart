@@ -53,9 +53,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 24.0),
 
-                  // App Name
+                  // App Name (브랜드명은 그대로 사용)
                   Text(
-                    'Omni News',
+                    'OmniNews',
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -63,9 +63,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 12.0),
 
-                  // Subtitle
+                  // Subtitle (자연스러운 한글 문구)
                   Text(
-                    'Your News, Your Way',
+                    '나만의 뉴스, 나만의 방식',
                     style: theme.textTheme.bodyLarge?.copyWith(
                       color: theme.textTheme.bodyLarge?.color?.withOpacity(0.7),
                     ),
@@ -83,12 +83,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
                         const SizedBox(height: 16.0),
 
-                        // Apple Login Button with larger icon
+                        // Apple 로그인 버튼
                         _buildLoginButtonWithIcon(),
 
                         const SizedBox(height: 16.0),
 
-                        // Kakao Login Button with SVG
+                        // Kakao 로그인 버튼
                         _buildKakaoLoginButton(),
 
                         const SizedBox(height: 24.0),
@@ -103,7 +103,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // Google Login Button with inline SVG
+  // Google 로그인 버튼 (SVG 아이콘 포함)
   Widget _buildGoogleLoginButton() {
     return SizedBox(
       width: double.infinity,
@@ -136,7 +136,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(width: 12.0),
             const Text(
-              "Sign in with Google",
+              "Google로 로그인",
               style: TextStyle(fontSize: 16.0, fontWeight: FontWeight.w500),
             ),
           ],
@@ -145,7 +145,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  // Kakao Login Button with SVG
+  // Kakao 로그인 버튼 (SVG 아이콘 포함)
   Widget _buildKakaoLoginButton() {
     return SizedBox(
       width: double.infinity,
@@ -173,7 +173,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(width: 12.0),
             const Text(
-              "Sign in with Kakao",
+              "카카오로 로그인",
               style: TextStyle(
                 fontSize: 16.0,
                 fontWeight: FontWeight.w500,
@@ -187,7 +187,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   // Google 로그인 처리
-
   Future<void> _handleGoogleLogin() async {
     try {
       setState(() => _isLoading = true);
@@ -276,24 +275,15 @@ class _LoginScreenState extends State<LoginScreen> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  // 로그인 버튼 위젯
+  // 애플 로그인 버튼 위젯
   Widget _buildLoginButtonWithIcon() {
     return SignInWithAppleButton(
       onPressed: _handleAppleLogin,
       style: SignInWithAppleButtonStyle.black,
-
-      /// 색상 지정 가능
       height: 44,
-
-      /// 버튼 높이 지정 가능
       borderRadius: BorderRadius.circular(8),
-
-      /// 모서리 지정 가능
-
-      /// 아이콘 위치 지정 가능
-      text: 'Sign in with Apple',
-
-      /// 텍스트 지정 가능
+      // Apple 가이드에 맞춘 한글 문구
+      text: 'Apple로 로그인',
     );
   }
 }

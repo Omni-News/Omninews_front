@@ -6,8 +6,8 @@ import 'package:omninews_flutter/services/rss_service.dart';
 import 'package:omninews_flutter/widgets/rss_item_card.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
 import 'package:omninews_flutter/models/app_setting.dart'; // 앱 설정 모델
-import 'package:omninews_flutter/utils/url_launcher_helper.dart';
-import 'package:provider/provider.dart'; // URL 실행 도우미
+import 'package:omninews_flutter/utils/url_launcher_helper.dart'; // URL 실행 도우미
+import 'package:provider/provider.dart'; // 프로바이더
 
 class RssChannelDetailScreen extends StatefulWidget {
   final RssChannel channel;
@@ -28,7 +28,7 @@ class RssChannelDetailScreen extends StatefulWidget {
 class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
   late Future<List<RssItem>> _rssItems;
   bool _isSubscribing = false;
-  late bool _localIsSubscribed; // 추가된 지역 상태
+  late bool _localIsSubscribed; // 지역 상태
 
   @override
   void initState() {
@@ -64,13 +64,12 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_localIsSubscribed ? '구독되었습니다' : '구독이 취소되었습니다'),
+            content: Text(_localIsSubscribed ? '구독되었습니다.' : '구독이 취소되었습니다.'),
             duration: const Duration(seconds: 2),
             backgroundColor: Theme.of(context).primaryColor,
             behavior: SnackBarBehavior.floating,
           ),
         );
-        // Navigator.of(context).pop(); // 제거: 화면을 닫지 않고 상태 업데이트만 수행
       }
     } catch (e) {
       if (mounted) {
@@ -114,6 +113,7 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
               elevation: 0,
               backgroundColor: theme.appBarTheme.backgroundColor,
               leading: IconButton(
+                tooltip: '뒤로가기',
                 icon: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -138,6 +138,7 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
               title: Text('RSS 채널', style: textTheme.headlineMedium),
               actions: [
                 IconButton(
+                  tooltip: '새로고침',
                   icon: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
@@ -166,6 +167,8 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
         body: RefreshIndicator(
           onRefresh: () async {
             _loadRssItems();
+            // 약간의 대기 시간을 두어 인디케이터가 자연스럽게 보이도록 처리
+            await Future.delayed(const Duration(milliseconds: 300));
           },
           color: theme.primaryColor,
           backgroundColor: theme.cardColor,
@@ -192,7 +195,7 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
                         style: textTheme.titleLarge?.copyWith(fontSize: 18),
                       ),
                       const Spacer(),
-                      Text('새로고침하려면 아래로 당기세요', style: textTheme.bodySmall),
+                      Text('아래로 당겨 새로고침', style: textTheme.bodySmall),
                     ],
                   ),
                 ),
@@ -314,7 +317,7 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
 
           const SizedBox(height: 20),
 
-          // 구독/구독취소 버튼 - _localIsSubscribed 상태 사용으로 변경
+          // 구독/구독취소 버튼 - _localIsSubscribed 상태 사용
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
@@ -471,7 +474,7 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
               return RssItemCard(
                 item: snapshot.data![index],
                 onBookmarkChanged: () {
-                  // Refresh if needed
+                  // 필요 시 새로고침 처리
                 },
               );
             },
@@ -503,7 +506,7 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            '피드를 불러오는데 실패했습니다',
+            '피드를 불러오는 데 실패했습니다.',
             style: TextStyle(
               color: textTheme.bodyLarge?.color,
               fontSize: 16,
@@ -551,7 +554,7 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
           Icon(Icons.article, size: 48, color: subscribeStyle.emptyIconColor),
           const SizedBox(height: 16),
           Text(
-            '피드 항목이 없습니다',
+            '피드 항목이 없습니다.',
             style: TextStyle(
               color: subscribeStyle.emptyTextColor,
               fontSize: 16,
@@ -560,7 +563,7 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '나중에 다시 확인해보세요',
+            '나중에 다시 확인해 주세요.',
             style: TextStyle(
               color: subscribeStyle.emptyTextColor.withOpacity(0.8),
               fontSize: 14,

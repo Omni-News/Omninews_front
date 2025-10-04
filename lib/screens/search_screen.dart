@@ -777,7 +777,7 @@ class SearchScreenState extends State<SearchScreen>
       appBar: AppBar(
         backgroundColor: theme.appBarTheme.backgroundColor,
         elevation: 0,
-        title: Text('Search Contents', style: textTheme.headlineMedium),
+        title: Text('검색', style: textTheme.headlineMedium),
         iconTheme: theme.appBarTheme.iconTheme,
       ),
       body: Stack(

@@ -57,7 +57,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // 자동 로그인 시도
-
   Future<void> _tryAutoLogin() async {
     setState(() {
       _isLoading = true;
@@ -80,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
         );
         await subscriptionProvider.checkSubscriptionOnLogin();
 
-        debugPrint('자동 로그인 성공 (kang1027)');
+        debugPrint('자동 로그인 성공');
       } else {
         setState(() {
           _isLoggedIn = false;
@@ -135,7 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     // 로딩 중일 때는 로딩 인디케이터를 표시
     if (_isLoading) {
-      return Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     // 로그인이 되어 있지 않으면 로그인 화면을 표시
@@ -177,7 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Omni News',
+                    'OmniNews',
                     style: textTheme.headlineMedium?.copyWith(
                       color: Colors.white,
                       fontSize: 22,
@@ -185,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Your News, Your Way',
+                    '나만의 뉴스, 나만의 방식',
                     style: TextStyle(color: Colors.white70, fontSize: 14),
                   ),
                 ],
@@ -197,11 +196,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: EdgeInsets.zero,
                 children: [
                   // 피드 섹션
-                  _buildSectionHeader('MY FEEDS', theme.colorScheme.secondary),
+                  _buildSectionHeader('내 피드', theme.colorScheme.secondary),
 
                   _buildDrawerItem(
                     icon: Icons.access_time,
-                    title: 'Recently Read',
+                    title: '최근 읽은 글',
                     onTap: () {
                       Navigator.pop(context);
                       // 최근 읽은 글 화면으로 이동
@@ -216,7 +215,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   _buildDrawerItem(
                     icon: Icons.subscriptions_outlined,
-                    title: 'Subscriptions',
+                    title: '구독',
                     onTap: () {
                       Navigator.pop(context);
                       _onItemTapped(0);
@@ -226,7 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   _buildDrawerItem(
                     icon: Icons.rss_feed_outlined,
-                    title: 'RSS Feeds',
+                    title: 'RSS 피드',
                     onTap: () {
                       Navigator.pop(context);
                       _onItemTapped(1);
@@ -236,7 +235,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   _buildDrawerItem(
                     icon: Icons.newspaper_outlined,
-                    title: 'News',
+                    title: '뉴스',
                     onTap: () {
                       Navigator.pop(context);
                       _onItemTapped(2);
@@ -246,7 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   _buildDrawerItem(
                     icon: Icons.bookmark_outline_sharp,
-                    title: 'Bookmarks',
+                    title: '북마크',
                     onTap: () {
                       Navigator.pop(context);
                       _onItemTapped(3);
@@ -257,14 +256,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   const Divider(),
 
                   // 설정 섹션
-                  _buildSectionHeader(
-                    'PREFERENCES',
-                    theme.colorScheme.secondary,
-                  ),
+                  _buildSectionHeader('환경 설정', theme.colorScheme.secondary),
 
                   _buildDrawerItem(
                     icon: Icons.color_lens_outlined,
-                    title: 'Choose Theme',
+                    title: '테마 선택',
                     onTap: () {
                       Navigator.pop(context);
                       _showThemeSelectionDialog();
@@ -273,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   _buildDrawerItem(
                     icon: Icons.settings_outlined,
-                    title: 'Settings',
+                    title: '설정',
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(
@@ -289,7 +285,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   _buildDrawerItem(
                     icon: Icons.help_outline,
-                    title: 'Help',
+                    title: '도움말',
                     onTap: () {
                       Navigator.pop(context);
                       Navigator.push(
@@ -304,7 +300,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   // 로그아웃 옵션 추가
                   _buildDrawerItem(
                     icon: Icons.logout,
-                    title: 'Logout',
+                    title: '로그아웃',
                     onTap: () {
                       Navigator.pop(context);
                       setState(() {
@@ -348,32 +344,32 @@ class _HomeScreenState extends State<HomeScreen> {
             BottomNavigationBarItem(
               icon: Icon(Icons.subscriptions_outlined),
               activeIcon: Icon(Icons.subscriptions),
-              label: 'Sub',
-              tooltip: 'Subscriptions',
+              label: '구독',
+              tooltip: '구독',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.rss_feed_outlined),
               activeIcon: Icon(Icons.rss_feed),
               label: 'RSS',
-              tooltip: 'RSS Feeds',
+              tooltip: 'RSS 피드',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.article_outlined),
               activeIcon: Icon(Icons.article),
-              label: 'News',
-              tooltip: 'News',
+              label: '뉴스',
+              tooltip: '뉴스',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.bookmarks_outlined),
               activeIcon: Icon(Icons.bookmarks),
-              label: 'Bookmarks',
-              tooltip: 'Bookmarks',
+              label: '북마크',
+              tooltip: '북마크',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.search_outlined),
               activeIcon: Icon(Icons.search),
-              label: 'Search',
-              tooltip: 'Search',
+              label: '검색',
+              tooltip: '검색',
             ),
           ],
         ),
@@ -391,7 +387,7 @@ class _HomeScreenState extends State<HomeScreen> {
           fontSize: 13,
           fontWeight: FontWeight.bold,
           color: color,
-          letterSpacing: 1.5,
+          letterSpacing: 1.0,
         ),
       ),
     );

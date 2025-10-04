@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_flutter/models/custom_news.dart';
+import 'package:html_unescape/html_unescape.dart';
 import 'package:intl/intl.dart';
+import 'package:omninews_flutter/models/app_setting.dart';
+import 'package:omninews_flutter/models/custom_news.dart';
+import 'package:omninews_flutter/models/news.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
+import 'package:omninews_flutter/services/news_bookmark_service.dart';
 import 'package:omninews_flutter/services/recently_read_service.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
 import 'package:omninews_flutter/utils/url_launcher_helper.dart';
-import 'package:omninews_flutter/services/news_bookmark_service.dart';
-import 'package:omninews_flutter/models/news.dart';
 import 'package:provider/provider.dart';
-import 'package:html_unescape/html_unescape.dart'; // HTML 엔티티 처리 패키지 추가
 
 class CustomNewsListView extends StatefulWidget {
   final Future<List<CustomNews>> newsList;
   final String categoryName;
-  final String currentSortOption;
+  final String currentSortOption; // "sim" | "date"
   final Function(String) onSortChanged;
   final VoidCallback? onBookmarkChanged;
 
@@ -31,23 +32,21 @@ class CustomNewsListView extends StatefulWidget {
 }
 
 class _CustomNewsListViewState extends State<CustomNewsListView> {
-  // 북마크 기능을 위한 상태 저장
+  // 북마크 상태
   final Map<String, bool> _bookmarkStatus = {};
   final Map<String, bool> _loadingStatus = {};
-  final HtmlUnescape _htmlUnescape = HtmlUnescape(); // HTML 엔티티 처리 객체
 
-  // HTML 엔티티를 일반 텍스트로 변환하는 함수
+  // HTML 엔티티 처리
+  final HtmlUnescape _htmlUnescape = HtmlUnescape();
+
+  // HTML 엔티티를 일반 텍스트로 변환
   String _decodeHtmlEntities(String text) {
-    if (text.isEmpty) {
-      return '';
-    }
-
+    if (text.isEmpty) return '';
     try {
-      // HTML 엔티티 디코딩 (예: &quot; -> ", &amp; -> &)
       return _htmlUnescape.convert(text);
     } catch (e) {
       debugPrint('Error decoding HTML entities: $e');
-      return text; // 오류 발생 시 원본 반환
+      return text;
     }
   }
 
@@ -56,12 +55,11 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
     final theme = Theme.of(context);
     final cardStyle = AppTheme.newsCardStyleOf(context);
     final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
-
-    final settings = Provider.of<SettingsProvider>(context).settings;
+    final settings = context.watch<SettingsProvider>().settings;
 
     return Column(
       children: [
-        // 더 모던하고 심플한 정렬 옵션 선택 UI
+        // 정렬 옵션
         Container(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
           alignment: Alignment.centerRight,
@@ -94,7 +92,9 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
                 return Center(
                   child: CircularProgressIndicator(color: theme.primaryColor),
                 );
-              } else if (snapshot.hasError) {
+              }
+
+              if (snapshot.hasError) {
                 return Center(
                   child: Padding(
                     padding: const EdgeInsets.all(20.0),
@@ -130,7 +130,10 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
                     ),
                   ),
                 );
-              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              }
+
+              final data = snapshot.data ?? [];
+              if (data.isEmpty) {
                 return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -154,18 +157,16 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
                 );
               }
 
-              final news = snapshot.data!;
-
-              // 각 뉴스의 북마크 상태 확인
-              for (var customNews in news) {
-                if (!_bookmarkStatus.containsKey(customNews.originalLink)) {
-                  _checkBookmarkStatus(customNews.originalLink);
+              // 각 뉴스 북마크 상태 프리페치
+              for (final item in data) {
+                if (!_bookmarkStatus.containsKey(item.originalLink)) {
+                  _checkBookmarkStatus(item.originalLink);
                 }
               }
 
               return ListView.separated(
                 padding: const EdgeInsets.only(top: 4),
-                itemCount: news.length,
+                itemCount: data.length,
                 separatorBuilder:
                     (context, index) => Divider(
                       height: 1,
@@ -174,18 +175,17 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
                       color: theme.dividerTheme.color,
                     ),
                 itemBuilder: (context, index) {
-                  final item = news[index];
+                  final item = data[index];
 
                   return InkWell(
-                    onTap:
-                        () => {
-                          RecentlyReadService.addCustomNews(item),
-                          UrlLauncherHelper.openUrl(
-                            context,
-                            item.originalLink,
-                            settings.webOpenMode,
-                          ),
-                        },
+                    onTap: () {
+                      RecentlyReadService.addCustomNews(item);
+                      UrlLauncherHelper.openUrl(
+                        context,
+                        item.originalLink,
+                        settings.webOpenMode,
+                      );
+                    },
                     child: Padding(
                       padding: cardStyle.cardPadding,
                       child: _buildNewsContent(item, cardStyle, theme),
@@ -200,32 +200,31 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
     );
   }
 
-  // 뉴스 내용 구성
+  // 뉴스 내용 부분
   Widget _buildNewsContent(
     CustomNews item,
     NewsCardStyleExtension cardStyle,
     ThemeData theme,
   ) {
-    // HTML 엔티티 디코딩 적용
+    // HTML 엔티티 디코딩
     final decodedTitle = _decodeHtmlEntities(item.plainTitle);
     final decodedDescription = _decodeHtmlEntities(item.plainDescription);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 뉴스 제목과 북마크 버튼
+        // 제목 + 북마크
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: Text(
-                decodedTitle, // 디코딩된 제목 사용
+                decodedTitle,
                 style: cardStyle.titleStyle,
                 maxLines: 3,
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            // 북마크 버튼
             IconButton(
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(),
@@ -249,27 +248,33 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
                                 : cardStyle.bookmarkInactiveColor,
                         size: 20,
                       ),
+              tooltip:
+                  _bookmarkStatus[item.originalLink] == true ? '북마크 해제' : '북마크',
               onPressed: () => _toggleBookmark(item),
             ),
           ],
         ),
         const SizedBox(height: 6),
 
-        // 뉴스 내용 요약
+        // 요약
         Text(
-          _truncateDescription(decodedDescription), // 디코딩된 설명 사용
+          _truncateDescription(decodedDescription),
           style: cardStyle.descriptionStyle,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
         const SizedBox(height: 8),
 
-        // 출처 및 날짜
+        // 출처 · 날짜
         Row(
           children: [
-            Text(
-              _extractDomain(item.originalLink),
-              style: cardStyle.sourceStyle,
+            Flexible(
+              child: Text(
+                _extractDomain(item.originalLink),
+                style: cardStyle.sourceStyle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
             const SizedBox(width: 8),
             Text(_formatDate(item.pubDate), style: cardStyle.dateStyle),
@@ -281,11 +286,14 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
 
   // 북마크 상태 확인
   Future<void> _checkBookmarkStatus(String newsLink) async {
-    final isBookmarked = await NewsBookmarkService.isNewsBookmarked(newsLink);
-    if (mounted) {
+    try {
+      final isBookmarked = await NewsBookmarkService.isNewsBookmarked(newsLink);
+      if (!mounted) return;
       setState(() {
         _bookmarkStatus[newsLink] = isBookmarked;
       });
+    } catch (_) {
+      // 조용히 실패
     }
   }
 
@@ -303,20 +311,19 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
       if (_bookmarkStatus[newsLink] == true) {
         success = await NewsBookmarkService.removeNewsBookmark(newsLink);
       } else {
-        // CustomNews를 News 형식으로 변환하여 북마크에 추가
         final news = _convertCustomNewsToNews(customNews);
         success = await NewsBookmarkService.addNewsBookmark(news);
       }
 
-      if (success && mounted) {
+      if (!mounted) return;
+
+      if (success) {
         setState(() {
           _bookmarkStatus[newsLink] = !(_bookmarkStatus[newsLink] ?? false);
         });
 
-        // 북마크 상태 변경 시 콜백 호출
-        if (widget.onBookmarkChanged != null) {
-          widget.onBookmarkChanged!();
-        }
+        // 콜백
+        widget.onBookmarkChanged?.call();
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -352,26 +359,24 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
     }
   }
 
-  // CustomNews를 News로 변환 (북마크 서비스 사용을 위해)
+  // CustomNews → News 변환
   News _convertCustomNewsToNews(CustomNews customNews) {
-    // 제목과 설명에서 HTML 엔티티 제거
     final decodedTitle = _decodeHtmlEntities(customNews.plainTitle);
     final decodedDescription = _decodeHtmlEntities(customNews.plainDescription);
 
-    // News 생성자를 사용하여 객체 생성
     return News(
       newsId: 0,
-      newsTitle: decodedTitle, // 디코딩된 제목 사용
-      newsDescription: decodedDescription, // 디코딩된 설명 사용
+      newsTitle: decodedTitle,
+      newsDescription: decodedDescription,
       newsSummary: customNews.plainDescription,
       newsLink: customNews.originalLink,
       newsSource: _extractDomain(customNews.originalLink),
       newsPubDate: customNews.pubDate,
-      newsImageLink: "", // CustomNews에는 이미지가 없으므로 빈 문자열 사용
+      newsImageLink: "",
     );
   }
 
-  // 개선된 정렬 옵션 버튼 위젯
+  // 정렬 버튼
   Widget _buildSortOption({
     required BuildContext context,
     required String label,
@@ -420,19 +425,19 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
     );
   }
 
+  // 도메인 추출
   String _extractDomain(String url) {
     try {
       final uri = Uri.parse(url);
-      String domain = uri.host;
-      if (domain.startsWith('www.')) {
-        domain = domain.substring(4);
-      }
+      var domain = uri.host;
+      if (domain.startsWith('www.')) domain = domain.substring(4);
       return domain;
-    } catch (e) {
+    } catch (_) {
       return url;
     }
   }
 
+  // 날짜 포맷팅
   String _formatDate(String dateStr) {
     try {
       final date = DateTime.parse(dateStr);
@@ -448,11 +453,12 @@ class _CustomNewsListViewState extends State<CustomNewsListView> {
       } else {
         return DateFormat('MM/dd').format(date);
       }
-    } catch (e) {
+    } catch (_) {
       return dateStr;
     }
   }
 
+  // 설명 트렁케이트
   String _truncateDescription(String description) {
     if (description.length > 100) {
       return '${description.substring(0, 100)}...';

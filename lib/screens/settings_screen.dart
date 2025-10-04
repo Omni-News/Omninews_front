@@ -15,7 +15,7 @@ import 'package:omninews_flutter/services/settings_service.dart';
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
-  // EULA와 개인정보처리방침 URL
+  // EULA와 개인정보 처리방침 URL
   static const String eulaUrl =
       'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
   static const String privacyPolicyUrl =
@@ -41,20 +41,20 @@ class SettingsScreen extends StatelessWidget {
         ),
         body: ListView(
           children: [
-            _buildSectionHeader(context, '콘텐츠 표시 설정'),
+            _buildSectionHeader(context, '콘텐츠 표시 방식'),
             _buildViewModeSelector(context, settingsProvider),
             const Divider(),
-            _buildSectionHeader(context, '웹 링크 설정'),
+            _buildSectionHeader(context, '링크 열기 방식'),
             _buildWebOpenModeSelector(context, settingsProvider),
             const Divider(),
-            _buildSectionHeader(context, '알림 설정'),
+            _buildSectionHeader(context, '알림'),
             _buildNotificationSettings(context, settingsProvider),
             const Divider(),
             _buildSectionHeader(context, '구독 관리'),
             _buildSubscriptionSettings(context),
             const Divider(),
-            _buildSectionHeader(context, '법적 정보'), // 새로운 섹션 추가
-            _buildLegalInformation(context), // 새로운 섹션 추가
+            _buildSectionHeader(context, '법적 고지'),
+            _buildLegalInformation(context),
             const Divider(),
             _buildSectionHeader(context, '계정'),
             _buildAccountDeletionTile(context),
@@ -65,14 +65,14 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  // 새로 추가된 법적 정보 섹션
+  // 법적 정보 섹션
   Widget _buildLegalInformation(BuildContext context) {
     return Column(
       children: [
         ListTile(
           leading: const Icon(Icons.description),
-          title: const Text('이용약관 (EULA)'),
-          subtitle: const Text('서비스 이용약관을 확인합니다'),
+          title: const Text('이용약관(EULA)'),
+          subtitle: const Text('서비스 이용약관을 확인하세요'),
           trailing: const Icon(Icons.chevron_right),
           onTap:
               () => Navigator.push(
@@ -86,8 +86,8 @@ class SettingsScreen extends StatelessWidget {
         ),
         ListTile(
           leading: const Icon(Icons.privacy_tip),
-          title: const Text('개인정보처리방침'),
-          subtitle: const Text('개인정보 수집 및 처리 방침을 확인합니다'),
+          title: const Text('개인정보 처리방침'),
+          subtitle: const Text('개인정보 처리방침을 확인하세요'),
           trailing: const Icon(Icons.chevron_right),
           onTap:
               () => Navigator.push(
@@ -96,7 +96,7 @@ class SettingsScreen extends StatelessWidget {
                   builder:
                       (context) => const WebViewScreen(
                         url: privacyPolicyUrl,
-                        title: '개인정보처리방침',
+                        title: '개인정보 처리방침',
                       ),
                 ),
               ),
@@ -129,7 +129,7 @@ class SettingsScreen extends StatelessWidget {
         ListTile(
           leading: const Icon(Icons.card_membership),
           title: const Text('구독 관리'),
-          subtitle: const Text('프리미엄 기능 및 구독 상태 확인'),
+          subtitle: const Text('프리미엄 기능과 구독 상태를 확인합니다'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () async {
             await Navigator.push(
@@ -152,8 +152,7 @@ class SettingsScreen extends StatelessWidget {
         '회원 탈퇴',
         style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
       ),
-      // iOS에서는 Google 언급 제거
-      subtitle: Text(Platform.isIOS ? '계정과 데이터가 삭제됩니다' : '계정과 데이터가 삭제됩니다'),
+      subtitle: Text(Platform.isIOS ? '계정과 데이터가 삭제됩니다.' : '계정과 데이터가 삭제됩니다.'),
       onTap: () => _confirmAndDeleteAccount(context),
     );
   }
@@ -169,19 +168,20 @@ class SettingsScreen extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 플랫폼별로 문구 분리: iOS 빌드에서 Google Play 언급 제거
                     Text(
-                      '탈퇴 시:\n'
+                      '탈퇴 시 다음 사항에 동의하는 것으로 간주됩니다.\n'
                       '- 앱 내 계정 및 데이터가 삭제됩니다.\n'
-                      '- 스토어 구독은 자동 해지되지 않습니다.\n'
-                      '  (${Platform.isIOS ? '앱스토어 구독은' : '구글 플레이 구독은'} 스토어에서 직접 취소해야 합니다)',
+                      '- 스토어 구독은 자동으로 해지되지 않습니다.\n'
+                      '  (${Platform.isIOS ? 'App Store 구독은' : 'Google Play 구독은'} 스토어에서 직접 취소해야 합니다.)',
                     ),
                     const SizedBox(height: 12),
                     TextButton.icon(
                       onPressed: _openStoreSubscriptionManagement,
                       icon: const Icon(Icons.open_in_new),
                       label: Text(
-                        Platform.isIOS ? '애플 구독 관리로 이동' : '구글 구독 관리로 이동',
+                        Platform.isIOS
+                            ? 'App Store 구독 관리로 이동'
+                            : 'Google Play 구독 관리로 이동',
                       ),
                     ),
                   ],
@@ -209,9 +209,7 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Future<void> _performAccountDeletion(BuildContext context) async {
-    final navigatorState = Navigator.of(
-      context,
-    ); // NavigatorState를 캡처해 콜백에서 재사용
+    final navigatorState = Navigator.of(context); // NavigatorState 캡처
     final scaffold = ScaffoldMessenger.of(context);
     final auth = AuthService();
 
@@ -230,7 +228,7 @@ class SettingsScreen extends StatelessWidget {
       if (!ok) {
         scaffold.showSnackBar(
           const SnackBar(
-            content: Text('회원 탈퇴 요청에 실패했습니다. 잠시 후 다시 시도해주세요.'),
+            content: Text('회원 탈퇴 요청에 실패했습니다. 잠시 후 다시 시도해 주세요.'),
             backgroundColor: Colors.red,
           ),
         );
@@ -385,7 +383,7 @@ class SettingsScreen extends StatelessWidget {
               await authService.requestNotificationPermissions();
           if (hasPermission) {
             provider.updateNotificationsEnabled(true);
-            _showSnackBar(context, '알림이 활성화되었습니다');
+            _showSnackBar(context, '알림이 활성화되었습니다.');
           } else {
             // 권한 거부 시 설정으로 이동할 수 있는 다이얼로그 표시
             _showPermissionDeniedDialog(context);
@@ -395,7 +393,7 @@ class SettingsScreen extends StatelessWidget {
           final success = await authService.disableNotifications();
           if (success) {
             provider.updateNotificationsEnabled(false);
-            _showSnackBar(context, '알림이 비활성화되었습니다');
+            _showSnackBar(context, '알림이 비활성화되었습니다.');
           }
         }
       },

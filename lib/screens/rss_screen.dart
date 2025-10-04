@@ -24,7 +24,7 @@ class _RssScreenState extends State<RssScreen>
   List<RssChannel> subscribedChannelsList = [];
   List<RssFolder> foldersList = [];
   late TabController _tabController;
-  final List<String> _tabs = ['구독 중', '인기 RSS'];
+  final List<String> _tabs = ['구독 중', '추천 RSS'];
   bool _isLoading = true;
   // 기본값을 true로 변경하여 폴더 모드로 시작
   bool _isFolderView = true;
@@ -47,8 +47,6 @@ class _RssScreenState extends State<RssScreen>
       }
     });
   }
-
-  // 기본 폴더 생성 메서드 추가
 
   @override
   void didChangeDependencies() {
@@ -237,11 +235,9 @@ class _RssScreenState extends State<RssScreen>
 
     if (result != null && result.isNotEmpty) {
       try {
-        // createFolder가 이제 bool 반환한다고 가정
         final success = await RssFolderService.createFolder(result);
 
         if (success && mounted) {
-          // 폴더 생성 성공 시에만 폴더 목록 새로고침
           _refreshData();
 
           ScaffoldMessenger.of(context).showSnackBar(
@@ -254,10 +250,9 @@ class _RssScreenState extends State<RssScreen>
             ),
           );
         } else if (mounted) {
-          // 폴더 생성 실패 시 오류 메시지
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('폴더 생성에 실패했습니다'),
+              content: const Text('폴더 생성에 실패했습니다'),
               backgroundColor: Theme.of(context).colorScheme.error,
               behavior: SnackBarBehavior.floating,
               margin: const EdgeInsets.all(8),
@@ -282,9 +277,7 @@ class _RssScreenState extends State<RssScreen>
   // 폴더 삭제 메서드 - 채널을 구독 취소하지 않고 폴더에서만 제거하도록 수정
   Future<void> _deleteFolder(RssFolder folder) async {
     try {
-      // 폴더에 채널이 있는 경우
       if (folder.folderChannels.isNotEmpty) {
-        // 확인 다이얼로그 표시
         final confirmed = await showDialog<bool>(
           context: context,
           builder:
@@ -308,8 +301,7 @@ class _RssScreenState extends State<RssScreen>
 
         if (confirmed != true) return;
 
-        // 폴더의 모든 채널을 먼저 폴더에서 제거 (구독 취소 없이)
-        final channels = [...folder.folderChannels]; // 목록 복사
+        final channels = [...folder.folderChannels];
         for (final channel in channels) {
           await RssFolderService.removeChannelFromFolder(
             channel.channelId,
@@ -318,7 +310,6 @@ class _RssScreenState extends State<RssScreen>
         }
       }
 
-      // 폴더 삭제
       await RssFolderService.deleteFolder(folder.folderId);
       _refreshData();
 
@@ -387,17 +378,14 @@ class _RssScreenState extends State<RssScreen>
     RssFolder folder,
   ) async {
     try {
-      // 폴더의 마지막 채널인지 확인
       final isLastChannel = folder.folderChannels.length == 1;
 
-      // 채널 제거 요청
       final success = await RssFolderService.removeChannelFromFolder(
         channel.channelId,
         folder.folderId,
       );
 
       if (success) {
-        // 성공적으로 제거된 경우 알림 표시
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -412,28 +400,22 @@ class _RssScreenState extends State<RssScreen>
           );
         }
 
-        // 마지막 채널이었던 경우, 서버에서 폴더가 삭제됐을 가능성이 있으므로
-        // 빈 폴더를 다시 생성 시도
         if (isLastChannel) {
           try {
-            // 제거 후 폴더 존재 여부 확인하는 로직 추가 필요
-            // 현재 구현에서는 서버에 직접 요청하는 대신 로컬에서 처리
             final existingFolders = await RssFolderService.fetchFolders();
             final folderExists = existingFolders.any(
               (f) => f.folderId == folder.folderId,
             );
 
             if (!folderExists) {
-              // 폴더가 삭제되었다면 같은 이름으로 다시 생성
               await RssFolderService.createFolder(folder.folderName);
             }
           } catch (e) {
-            print('빈 폴더 유지 시도 중 오류: $e');
+            debugPrint('빈 폴더 유지 시도 중 오류: $e');
           }
         }
       }
 
-      // 최종적으로 데이터 새로고침
       _refreshData();
     } catch (e) {
       if (mounted) {
@@ -464,37 +446,33 @@ class _RssScreenState extends State<RssScreen>
 
   Future<void> _navigateToChannelDetail(RssChannel channel) async {
     try {
-      // 상태 변수가 설정된 경우, 로딩 중 표시
       setState(() {
         _subscribingStatus[channel.channelRssLink] = true;
       });
-
-      // 서버에서 실제 구독 상태 확인
 
       final isSubscribed = await RssService.isChannelAlreadySubscribed(
         channel.channelRssLink,
       );
 
       if (mounted) {
-        // 화면으로 이동
         Navigator.push(
           context,
           MaterialPageRoute(
             builder:
                 (context) => RssChannelDetailScreen(
                   channel: channel,
-                  isSubscribed: isSubscribed, // 실제 구독 상태 전달
+                  isSubscribed: isSubscribed,
                   onSubscriptionChanged: _refreshData,
                 ),
           ),
         ).then((_) => _refreshData());
       }
     } catch (e) {
-      debugPrint('Error navigating to channel detail: $e');
+      debugPrint('채널 상세 이동 중 오류: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('채널 정보를 불러오는 중 오류가 발생했습니다'),
+            content: const Text('채널 정보를 불러오는 중 오류가 발생했습니다'),
             backgroundColor: Theme.of(context).colorScheme.error,
             behavior: SnackBarBehavior.floating,
             margin: const EdgeInsets.all(8),
@@ -545,11 +523,12 @@ class _RssScreenState extends State<RssScreen>
                 onPressed: () {
                   homeScaffoldKey.currentState?.openDrawer();
                 },
+                tooltip: '메뉴 열기',
               ),
               pinned: true,
               elevation: 0,
               centerTitle: true,
-              title: Text('RSS Feeds', style: textTheme.headlineMedium),
+              title: Text('RSS 피드', style: textTheme.headlineMedium),
               actions: [
                 // 보기 모드 전환 버튼
                 if (_tabController.index == 0)
@@ -567,6 +546,7 @@ class _RssScreenState extends State<RssScreen>
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: _refreshData,
+                  tooltip: '새로고침',
                 ),
               ],
             ),
@@ -610,7 +590,7 @@ class _RssScreenState extends State<RssScreen>
                 ),
       ),
 
-      // FloatingActionButton 추가 (직접 구현)
+      // 추가 버튼
       floatingActionButton: FloatingActionButton(
         backgroundColor: theme.primaryColor,
         child: const Icon(Icons.add),
@@ -627,8 +607,8 @@ class _RssScreenState extends State<RssScreen>
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       // 제목
-                      Padding(
-                        padding: const EdgeInsets.all(16),
+                      const Padding(
+                        padding: EdgeInsets.all(16),
                         child: Text(
                           '옵션 선택',
                           style: TextStyle(
@@ -638,7 +618,7 @@ class _RssScreenState extends State<RssScreen>
                         ),
                       ),
 
-                      Divider(height: 1),
+                      const Divider(height: 1),
 
                       // 폴더 생성 옵션
                       ListTile(
@@ -688,6 +668,7 @@ class _RssScreenState extends State<RssScreen>
                 ),
           );
         },
+        tooltip: '추가',
       ),
     );
   }
@@ -706,15 +687,14 @@ class _RssScreenState extends State<RssScreen>
               ),
             );
           } else if (snapshot.hasError) {
-            return Center(child: Text('폴더를 불러오는데 실패했습니다: ${snapshot.error}'));
+            return Center(child: Text('폴더를 불러오는 데 실패했습니다: ${snapshot.error}'));
           } else {
-            // 폴더가 없는 경우에도 계속 진행
             final folderData = snapshot.data ?? [];
 
             // 폴더에 속하지 않은 채널 필터링
             final unfolderedChannels = _getUnfolderedChannels(folderData);
 
-            // 항상 심플한 폴더 시스템 UI 생성 (빈 폴더 목록이어도 진행)
+            // 심플한 폴더 시스템 UI 생성
             return RssScreenWidget.buildSimpleFolderSystem(
               folders: folderData,
               unfolderedChannels: unfolderedChannels,
@@ -790,7 +770,6 @@ class _RssScreenState extends State<RssScreen>
                     height: 1,
                     indent: 16,
                     endIndent: 16,
-                    // 얇고 샤프한 구분선
                     thickness: 0.2,
                     color: theme.dividerColor.withOpacity(0.3),
                   ),
@@ -847,7 +826,7 @@ class _RssScreenState extends State<RssScreen>
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    '추천 채널을 불러오는데 실패했습니다',
+                    '추천 채널을 불러오는 데 실패했습니다',
                     style: TextStyle(
                       color: subscribeStyle.emptyTextColor,
                       fontSize: 16,
@@ -866,7 +845,6 @@ class _RssScreenState extends State<RssScreen>
                     height: 1,
                     indent: 16,
                     endIndent: 16,
-                    // 얇고 샤프한 구분선
                     thickness: 0.2,
                     color: theme.dividerColor.withOpacity(0.3),
                   ),
