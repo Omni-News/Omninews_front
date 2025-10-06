@@ -29,8 +29,8 @@ class AuthService {
         '1008455298981-96a4gkqhnmr1hhbqab80df7rljbhocai.apps.googleusercontent.com',
   );
 
-  //static String apiBaseUrl = 'https://kang1027.ddnsking.com/v1/api';
-  static String apiBaseUrl = 'http://localhost:1027/v1/api';
+  static String apiBaseUrl = 'https://kang1027.ddnsking.com/v1/api';
+  //static String apiBaseUrl = 'http://localhost:1027/v1/api';
 
   // 토큰/유저
   String? _accessToken;
@@ -150,11 +150,7 @@ class AuthService {
   }
 
   // 데모 로그인: /user/demo_login
-  Future<bool> signInWithDemoCredentials(
-    String email,
-    String password, {
-    bool expired = true,
-  }) async {
+  Future<bool> signInWithDemoCredentials(String email, String password) async {
     try {
       final resp = await http.post(
         Uri.parse('$apiBaseUrl/user/demo_login'),
@@ -166,7 +162,6 @@ class AuthService {
           // 서버 계약에 맞게 필드명 고정
           'user_email': email,
           'user_password': password,
-          'expired': expired,
         }),
       );
 

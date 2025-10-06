@@ -40,7 +40,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // 로고 길게 누르면(또는 5회 탭) 데모 로그인 시트가 열립니다.
+                  // 로고 길게 누르기 또는 5회 탭 → 데모 로그인 시트
                   GestureDetector(
                     onLongPress: _showDemoLoginSheet,
                     onTap: _handleSecretTap,
@@ -114,7 +114,6 @@ class _LoginScreenState extends State<LoginScreen> {
     final theme = Theme.of(context);
     final emailCtrl = TextEditingController(text: '');
     final pwCtrl = TextEditingController(text: '');
-    bool expired = true;
 
     await showModalBottomSheet(
       context: context,
@@ -172,13 +171,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       border: OutlineInputBorder(),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text('만료된 구독 상태로 로그인'),
-                    value: expired,
-                    onChanged: (v) => setModalState(() => expired = v),
-                  ),
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
@@ -195,7 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           return;
                         }
                         Navigator.pop(context);
-                        await _handleDemoLogin(email, pw, expired: expired);
+                        await _handleDemoLogin(email, pw);
                       },
                     ),
                   ),
@@ -208,18 +200,10 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Future<void> _handleDemoLogin(
-    String email,
-    String password, {
-    required bool expired,
-  }) async {
+  Future<void> _handleDemoLogin(String email, String password) async {
     try {
       setState(() => _isLoading = true);
-      final ok = await _authService.signInWithDemoCredentials(
-        email,
-        password,
-        expired: expired,
-      );
+      final ok = await _authService.signInWithDemoCredentials(email, password);
       if (!mounted) return;
       if (ok) {
         ScaffoldMessenger.of(
@@ -328,13 +312,9 @@ class _LoginScreenState extends State<LoginScreen> {
       final success = await _authService.signInWithGoogle();
 
       if (success) {
-        // 알림 권한 요청 추가
-        bool hasPermission =
+        final hasPermission =
             await _authService.requestNotificationPermissions();
         debugPrint('알림 권한 요청 결과: $hasPermission');
-
-        // 구독 상태 초기화 설정 (새 로그인이므로 recentLogin 플래그 유지)
-
         widget.onLoginSuccess();
       } else {
         debugPrint('Google 로그인 취소 또는 실패');
@@ -358,11 +338,9 @@ class _LoginScreenState extends State<LoginScreen> {
       final success = await _authService.signInWithKakao();
 
       if (success) {
-        // 알림 권한 요청 추가
-        bool hasPermission =
+        final hasPermission =
             await _authService.requestNotificationPermissions();
         debugPrint('알림 권한 요청 결과: $hasPermission');
-
         widget.onLoginSuccess();
       } else {
         debugPrint('카카오 로그인 취소 또는 실패');
@@ -385,7 +363,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final success = await _authService.signInWithApple();
       if (success) {
-        bool hasPermission =
+        final hasPermission =
             await _authService.requestNotificationPermissions();
         debugPrint('알림 권한 요청 결과: $hasPermission');
 
@@ -415,7 +393,6 @@ class _LoginScreenState extends State<LoginScreen> {
       style: SignInWithAppleButtonStyle.black,
       height: 44,
       borderRadius: BorderRadius.circular(8),
-      // Apple 가이드에 맞춘 한글 문구
       text: 'Apple로 로그인',
     );
   }
