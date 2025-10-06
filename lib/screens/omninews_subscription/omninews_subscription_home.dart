@@ -294,30 +294,18 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
             ),
             const SizedBox(height: 12),
 
-            // 혜택 (토글)
-            Theme(
-              data: Theme.of(
-                context,
-              ).copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                title: Text(
-                  '프리미엄 혜택',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.blue.shade800,
-                  ),
-                ),
-                children: [
-                  const SizedBox(height: 4),
-                  _buildBenefitRow('광고 없는 뉴스 읽기'),
-                  _buildBenefitRow('모든 프리미엄 콘텐츠 이용'),
-                  _buildBenefitRow('AI 맞춤 뉴스 추천'),
-                  const SizedBox(height: 8),
-                ],
+            // 혜택 (항상 펼침)
+            Text(
+              '프리미엄 혜택',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: Colors.blue.shade800,
               ),
             ),
-
+            const SizedBox(height: 8),
+            _buildBenefitRow('광고 없는 뉴스 읽기'),
+            _buildBenefitRow('모든 프리미엄 콘텐츠 이용'),
+            _buildBenefitRow('AI 맞춤 뉴스 추천'),
             const SizedBox(height: 8),
 
             if (plan != null) ...[

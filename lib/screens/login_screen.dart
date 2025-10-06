@@ -22,7 +22,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  // 통합된 Auth 서비스 인스턴스
   final AuthService _authService = AuthService();
   bool _isLoading = false;
 
@@ -41,36 +40,35 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // App Logo (앱 아이콘으로 교체)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: Image.asset(
-                      'resources/omninews_icon.png', // 여기에 앱 아이콘 경로를 넣으세요.
-                      width: 80,
-                      height: 80,
-                      fit: BoxFit.cover,
+                  // 로고 길게 누르면(또는 5회 탭) 데모 로그인 시트가 열립니다.
+                  GestureDetector(
+                    onLongPress: _showDemoLoginSheet,
+                    onTap: _handleSecretTap,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: Image.asset(
+                        'resources/omninews_icon.png',
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24.0),
 
-                  // App Name (브랜드명은 그대로 사용)
                   Text(
                     'OmniNews',
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-
                   const SizedBox(height: 12.0),
-
-                  // Subtitle (자연스러운 한글 문구)
                   Text(
                     '나만의 뉴스, 나만의 방식',
                     style: theme.textTheme.bodyLarge?.copyWith(
                       color: theme.textTheme.bodyLarge?.color?.withOpacity(0.7),
                     ),
                   ),
-
                   const SizedBox(height: 48.0),
 
                   if (_isLoading)
@@ -78,19 +76,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   else
                     Column(
                       children: [
-                        // Google 로그인 버튼
                         _buildGoogleLoginButton(),
-
                         const SizedBox(height: 16.0),
-
-                        // Apple 로그인 버튼
-                        _buildLoginButtonWithIcon(),
-
+                        _buildLoginButtonWithIcon(), // Apple
                         const SizedBox(height: 16.0),
-
-                        // Kakao 로그인 버튼
                         _buildKakaoLoginButton(),
-
                         const SizedBox(height: 24.0),
                       ],
                     ),
@@ -101,6 +91,149 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
+  }
+
+  int _secretTapCount = 0;
+  DateTime? _tapWindowStart;
+  void _handleSecretTap() {
+    final now = DateTime.now();
+    if (_tapWindowStart == null ||
+        now.difference(_tapWindowStart!) > const Duration(seconds: 4)) {
+      _tapWindowStart = now;
+      _secretTapCount = 0;
+    }
+    _secretTapCount++;
+    if (_secretTapCount >= 5) {
+      _secretTapCount = 0;
+      _showDemoLoginSheet();
+    }
+  }
+
+  Future<void> _showDemoLoginSheet() async {
+    if (!mounted) return;
+    final theme = Theme.of(context);
+    final emailCtrl = TextEditingController(text: '');
+    final pwCtrl = TextEditingController(text: '');
+    bool expired = true;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 16,
+            right: 16,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 16,
+            top: 16,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setModalState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.lock_open),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Reviewer Demo Login',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: emailCtrl,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: pwCtrl,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Password',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('만료된 구독 상태로 로그인'),
+                    value: expired,
+                    onChanged: (v) => setModalState(() => expired = v),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.login),
+                      label: const Text('데모 로그인'),
+                      onPressed: () async {
+                        final email = emailCtrl.text.trim();
+                        final pw = pwCtrl.text;
+                        if (email.isEmpty || pw.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('이메일/비밀번호를 입력해 주세요.')),
+                          );
+                          return;
+                        }
+                        Navigator.pop(context);
+                        await _handleDemoLogin(email, pw, expired: expired);
+                      },
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleDemoLogin(
+    String email,
+    String password, {
+    required bool expired,
+  }) async {
+    try {
+      setState(() => _isLoading = true);
+      final ok = await _authService.signInWithDemoCredentials(
+        email,
+        password,
+        expired: expired,
+      );
+      if (!mounted) return;
+      if (ok) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('데모 계정으로 로그인되었습니다.')));
+        widget.onLoginSuccess();
+      } else {
+        _showErrorSnackbar('데모 로그인에 실패했습니다.');
+      }
+    } catch (e) {
+      _showErrorSnackbar('데모 로그인 중 오류: $e');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   // Google 로그인 버튼 (SVG 아이콘 포함)
