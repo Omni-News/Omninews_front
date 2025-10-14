@@ -20,6 +20,13 @@ class PurchaseResult {
   });
 }
 
+class ServerRegisterResult {
+  final bool ok;
+  final String? err;
+
+  ServerRegisterResult({required this.ok, this.err});
+}
+
 class SubscriptionService {
   final _statusController = StreamController<SubscriptionStatus>.broadcast();
   Stream<SubscriptionStatus> get statusStream => _statusController.stream;
@@ -132,11 +139,11 @@ class SubscriptionService {
   // 서버에 구독 정보 등록 (register)
   // - iOS: transaction_id(필수)
   // - Android: transaction_id(가능하면) + purchase_token(권장)
-  Future<bool> registerSubscriptionWithServer(PurchaseDetails purchase) async {
+  Future<ServerRegisterResult> registerSubscriptionWithServer(
+    PurchaseDetails purchase,
+  ) async {
     try {
-      final transactionId =
-          purchase
-              .purchaseID; // iOS: transactionIdentifier, Android: orderId(없을 수 있음)
+      final transactionId = purchase.purchaseID; // iOS/Android 식별자(없을 수 있음)
 
       // Android의 경우 purchaseID가 null일 수 있으므로 purchaseToken을 함께 전달
       final serverVerificationData =
@@ -146,8 +153,10 @@ class SubscriptionService {
 
       if ((transactionId == null || transactionId.isEmpty) &&
           (!isAndroid || serverVerificationData.isEmpty)) {
-        debugPrint('서버 등록 실패: 전송할 식별자가 없습니다. (transactionId/purchaseToken 없음)');
-        return false;
+        final errorMsg =
+            '서버 등록 실패: 전송할 식별자가 없습니다. (transactionId/purchaseToken 없음)';
+        debugPrint(errorMsg);
+        return ServerRegisterResult(ok: false, err: errorMsg);
       }
 
       final body = <String, dynamic>{'platform': isIOS ? 'ios' : 'android'};
@@ -168,14 +177,16 @@ class SubscriptionService {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         debugPrint('서버에 구독 등록 성공');
-        return true;
+        return ServerRegisterResult(ok: true);
       } else {
-        debugPrint('서버에 구독 등록 실패: ${response.statusCode} - ${response.body}');
-        return false;
+        final errorMsg = response.body ?? '서버 등록 실패';
+        debugPrint('서버에 구독 등록 실패: ${response.statusCode} - $errorMsg');
+        return ServerRegisterResult(ok: false, err: errorMsg);
       }
     } catch (e) {
-      debugPrint('서버에 구독 등록 실패: $e');
-      return false;
+      final errorMsg = '서버에 구독 등록 실패: $e';
+      debugPrint(errorMsg);
+      return ServerRegisterResult(ok: false, err: errorMsg);
     }
   }
 
@@ -304,9 +315,10 @@ class SubscriptionService {
 
           if (shouldRegister) {
             // 사용자가 버튼을 눌러 시작한 경우에만 register 수행 (복원 포함)
-            final registered = await registerSubscriptionWithServer(purchase);
+            final result = await registerSubscriptionWithServer(purchase);
 
-            if (registered) {
+            if (result.ok) {
+              // 1. Ok가 나오면 걍 구독 진행
               debugPrint('서버에 구독 등록/연결 성공');
               final status = await checkSubscriptionStatus(); // 등록 후 상태 동기화
               _statusController.add(status);
@@ -318,7 +330,9 @@ class SubscriptionService {
                 debugPrint('트랜잭션 완료됨');
               }
             } else {
-              _emitFailure(purchase, '서버 등록/검증 실패로 구독이 적용되지 않습니다.');
+              // 2. err가 나오면 에러 메시지와 함께 실패 처리
+              final errorMessage = result.err ?? '서버 등록/검증 실패로 구독이 적용되지 않습니다.';
+              _emitFailure(purchase, errorMessage);
 
               if (Platform.isAndroid) {
                 // Android: acknowledge 생략 → 자동 환불 유도
