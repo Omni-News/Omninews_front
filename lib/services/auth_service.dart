@@ -29,7 +29,7 @@ class AuthService {
         '1008455298981-96a4gkqhnmr1hhbqab80df7rljbhocai.apps.googleusercontent.com',
   );
 
-  static String apiBaseUrl = 'https://kang1027.ddnsking.com/v1/api';
+  static String apiBaseUrl = 'https://www.kang1027.com/v1/api';
   //static String apiBaseUrl = 'http://localhost:1027/v1/api';
 
   // 토큰/유저
