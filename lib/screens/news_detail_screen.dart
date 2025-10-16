@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/app_setting.dart';
 import 'package:omninews_flutter/models/news.dart';
 import 'package:omninews_flutter/services/recently_read_service.dart';
-import 'package:share/share.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
 import 'package:provider/provider.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
 import 'package:omninews_flutter/utils/url_launcher_helper.dart';
+import 'package:share_plus/share_plus.dart';
 
 class NewsDetailScreen extends StatelessWidget {
   final News news;

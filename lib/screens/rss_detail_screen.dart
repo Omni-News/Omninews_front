@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/rss_channel.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
 import 'package:provider/provider.dart';
-import 'package:share/share.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
 import 'package:omninews_flutter/utils/url_launcher_helper.dart';
@@ -12,6 +11,7 @@ import 'package:omninews_flutter/services/rss_service.dart';
 import 'package:omninews_flutter/models/omninews_subscription.dart';
 import 'package:omninews_flutter/services/omninews_subscription/omninews_subscription_service.dart';
 import 'package:omninews_flutter/screens/omninews_subscription/omninews_subscription_home.dart';
+import 'package:share_plus/share_plus.dart';
 
 class RssDetailScreen extends StatefulWidget {
   final RssItem rssItem;

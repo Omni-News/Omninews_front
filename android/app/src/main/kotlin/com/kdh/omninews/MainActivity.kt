@@ -1,4 +1,4 @@
-package com.example.omninews_flutter
+package com.kdh.omninews
 
 import io.flutter.embedding.android.FlutterActivity
 
