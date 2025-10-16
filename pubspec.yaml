@@ -35,31 +35,30 @@ dependencies:
   flutter_math_fork: ^0.7.3
   win32: ^5.10.1
   url_launcher: ^6.3.1
-  share: ^2.0.4
-  intl: ^0.19.0
+  intl: ^0.20.2
   shared_preferences: ^2.5.2
-  share_plus: ^10.1.4
+  share_plus: ^12.0.0
   webview_flutter: ^4.2.2
   cached_network_image: ^3.4.1
   sticky_headers: "^0.3.0+2"
   provider: ^6.0.5
   html_unescape: ^2.0.0
-  package_info_plus: ^8.3.0
+  package_info_plus: ^9.0.0
 
   # the following adds the cupertino icons font to your application.
   # use with the cupertinoicons class for ios style icons.
   cupertino_icons: ^1.0.8
 
   kakao_flutter_sdk: ^1.9.5
-  firebase_core: ^3.13.0
-  firebase_messaging: ^15.2.5
+  firebase_core: ^4.2.0
+  firebase_messaging: ^16.0.3
   flutter_local_notifications: ^19.1.0
   timezone: ^0.10.0
-  flutter_native_timezone: ^2.0.0
+  flutter_native_timezone_2025: ^1.0.1
 
-  flutter_svg: 2.0.17
-  google_sign_in: ^6.3.0
-  firebase_auth: ^5.5.2
+  flutter_svg: ^2.2.1
+  google_sign_in: ^6.2.1
+  firebase_auth: ^6.1.1
 
   sign_in_with_apple: 7.0.1
   crypto: ^3.0.6
@@ -77,7 +76,7 @@ dev_dependencies:
   # activated in the `analysis_options.yaml` file located at the root of your
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
-  flutter_lints: ^5.0.0
+  flutter_lints: ^6.0.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

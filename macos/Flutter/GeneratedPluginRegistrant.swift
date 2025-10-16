@@ -9,7 +9,7 @@ import firebase_auth
 import firebase_core
 import firebase_messaging
 import flutter_local_notifications
-import flutter_native_timezone
+import flutter_native_timezone_2025
 import google_sign_in_ios
 import in_app_purchase_storekit
 import package_info_plus
