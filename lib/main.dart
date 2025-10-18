@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:kakao_flutter_sdk/kakao_flutter_sdk.dart';
 import 'package:omninews_flutter/firebase_options.dart';
@@ -42,12 +43,14 @@ void initStoreKit() {
 }
 
 void main() async {
-  // 카카오 SDK 초기화
-  KakaoSdk.init(nativeAppKey: "89046ab727ea7019b5ec60e5aa53f5cb");
-
   // Flutter 위젯 바인딩 초기화
   WidgetsFlutterBinding.ensureInitialized();
 
+  // env 세팅
+  await dotenv.load();
+
+  // 카카오 SDK 초기화
+  KakaoSdk.init(nativeAppKey: dotenv.env['KAKAO_APP_KEY']!);
   try {
     // Firebase 등 앱 초기화
     await _initializeApp();

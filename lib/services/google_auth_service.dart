@@ -1,6 +1,7 @@
 // services/google_auth_service.dart
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 /// Firebase를 통한 Google 로그인을 처리하는 서비스 클래스
@@ -11,8 +12,7 @@ class GoogleAuthService {
   // GoogleSignIn 인스턴스
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: <String>['email'],
-    clientId:
-        '1008455298981-96a4gkqhnmr1hhbqab80df7rljbhocai.apps.googleusercontent.com', // iOS 클라이언트 ID (웹 클라이언트 ID와 다를 수 있음)
+    clientId: dotenv.env['GOOGLE_CLIENT_ID'],
   );
 
   /// Google 계정으로 로그인하고 인증된 Firebase User를 반환합니다.

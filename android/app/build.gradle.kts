@@ -1,8 +1,20 @@
+
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     id("com.google.gms.google-services")
     id("dev.flutter.flutter-gradle-plugin")
+}
+
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    FileInputStream(keystorePropertiesFile).use { fis ->
+        keystoreProperties.load(fis)
+    }
 }
 
 android {
@@ -30,20 +42,28 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(keystoreProperties["storeFile"] as String?)
+            storePassword = keystoreProperties["storePassword"] as String?
+            keyAlias = keystoreProperties["keyAlias"] as String?
+            keyPassword = keystoreProperties["keyPassword"] as String?
+        }
+    }
+
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }
 
 dependencies {
-    // Kotlin DSL에서는 따옴표 안에 문자열을 넣습니다
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     
-    // Flutter 임베딩을 명시적으로 추가해 보세요 (MainActivity.kt 에러 해결 위해)
-    implementation("io.flutter:flutter_embedding_release:1.0.0-d2913632a4578ee4d0b8b1c4a69888c8a0672c4b")
 }
+
+
 
 flutter {
     source = "../.."

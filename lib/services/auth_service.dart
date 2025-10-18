@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:kakao_flutter_sdk/kakao_flutter_sdk.dart' as kakao;
 import 'package:http/http.dart' as http;
@@ -25,8 +26,9 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     scopes: <String>['email'],
-    clientId:
-        '1008455298981-96a4gkqhnmr1hhbqab80df7rljbhocai.apps.googleusercontent.com',
+    serverClientId:
+        Platform.isAndroid ? dotenv.env['GOOGLE_SERVER_CLIENT_ID'] : null,
+    clientId: Platform.isIOS ? dotenv.env['GOOGLE_CLIENT_ID'] : null,
   );
 
   static String apiBaseUrl = 'https://www.kang1027.com/v1/api';
