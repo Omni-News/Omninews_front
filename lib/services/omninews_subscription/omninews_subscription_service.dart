@@ -193,7 +193,15 @@ class SubscriptionService {
   // 구독 플랜 로드
   Future<List<SubscriptionPlan>> loadSubscriptionPlans() async {
     try {
-      final productIds = {'kdh.omninews.premium'};
+      Set<String> productIds;
+      if (Platform.isAndroid) {
+        productIds = {'omninews-premium'};
+      } else if (Platform.isIOS) {
+        productIds = {'kdh.omninews.premium'};
+      } else {
+        productIds = {};
+      }
+
       final response = await _inAppPurchase.queryProductDetails(productIds);
 
       if (response.notFoundIDs.isNotEmpty) {
