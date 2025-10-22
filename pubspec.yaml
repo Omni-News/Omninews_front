@@ -67,6 +67,7 @@ dependencies:
   visibility_detector: 0.4.0+2
   in_app_purchase: 3.2.3
   flutter_dotenv: ^6.0.0
+  google_mobile_ads: ^6.0.0
 
 dev_dependencies:
   flutter_test:

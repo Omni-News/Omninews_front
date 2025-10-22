@@ -31,8 +31,8 @@ class AuthService {
     clientId: Platform.isIOS ? dotenv.env['GOOGLE_CLIENT_ID'] : null,
   );
 
-  static String apiBaseUrl = 'https://www.kang1027.com/v1/api';
-  //static String apiBaseUrl = 'http://localhost:1027/v1/api';
+  //static String apiBaseUrl = 'https://www.kang1027.com/v1/api';
+  static String apiBaseUrl = 'http://61.253.113.42:1028/v1/api';
 
   // 토큰/유저
   String? _accessToken;
