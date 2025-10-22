@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:kakao_flutter_sdk/kakao_flutter_sdk.dart';
 import 'package:omninews_flutter/firebase_options.dart';
@@ -9,6 +10,7 @@ import 'package:omninews_flutter/provider/settings_provider.dart';
 import 'package:omninews_flutter/provider/subscription_provider.dart';
 import 'package:omninews_flutter/services/auth_service.dart';
 import 'package:omninews_flutter/services/omninews_subscription/omninews_subscription_service.dart';
+import 'package:omninews_flutter/utils/ad_manager.dart';
 import 'package:provider/provider.dart';
 import 'provider/theme_provider.dart';
 import 'screens/home_screen.dart';
@@ -35,6 +37,9 @@ Future<void> _initializeApp() async {
   final authService = AuthService();
   await authService.initialize();
   debugPrint('AuthService 초기화 완료: 토큰 있음=${authService.accessToken != null}');
+
+  // google_mobile_ads 초기화
+  MobileAds.instance.initialize();
 }
 
 // StoreKit 초기화 함수
@@ -96,6 +101,9 @@ class MyApp extends StatelessWidget {
             return provider;
           },
         ),
+
+        // AdManager Provider 추가
+        ChangeNotifierProvider(create: (context) => AdManager()..initialize()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {

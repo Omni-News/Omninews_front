@@ -15,12 +15,54 @@ class NewsService {
     return _unescape.convert(text);
   }
 
-  static Future<List<News>> fetchNews(String category) async {
+  //  static Future<List<News>> fetchNews(String category) async {
+  //    try {
+  //      // AuthService.apiRequest 사용하여 토큰 갱신 기능 활용
+  //      final response = await _authService.apiRequest(
+  //        'GET',
+  //        '/news?category=$category',
+  //      );
+  //
+  //      if (response.statusCode == 200) {
+  //        String decodedResponse = utf8.decode(response.bodyBytes);
+  //        List<dynamic> jsonResponse = json.decode(decodedResponse);
+  //
+  //        // HTML 엔티티 디코딩 - 각 항목의 필드별로 처리
+  //        return jsonResponse.map((newsItem) {
+  //          // 문자열 필드들만 디코딩
+  //          if (newsItem['title'] is String) {
+  //            newsItem['title'] = _decodeHtmlString(newsItem['title']);
+  //          }
+  //          if (newsItem['content'] is String) {
+  //            newsItem['content'] = _decodeHtmlString(newsItem['content']);
+  //          }
+  //          if (newsItem['description'] is String) {
+  //            newsItem['description'] = _decodeHtmlString(
+  //              newsItem['description'],
+  //            );
+  //          }
+  //
+  //          return News.fromJson(newsItem);
+  //        }).toList();
+  //      } else {
+  //        debugPrint('뉴스 로드 실패: ${response.statusCode}, ${response.body}');
+  //        throw Exception('Failed to load News');
+  //      }
+  //    } catch (e) {
+  //      debugPrint('뉴스 로드 중 오류 발생: $e');
+  //      throw Exception('Failed to load News $e');
+  //    }
+  //  }
+
+  static Future<List<News>> fetchNewsPaginated(
+    String category,
+    int page,
+  ) async {
     try {
       // AuthService.apiRequest 사용하여 토큰 갱신 기능 활용
       final response = await _authService.apiRequest(
         'GET',
-        '/news?category=$category',
+        '/news?category=$category&page=$page',
       );
 
       if (response.statusCode == 200) {

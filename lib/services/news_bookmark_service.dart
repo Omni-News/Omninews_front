@@ -208,9 +208,16 @@ class NewsBookmarkService {
       int initialNewsCount = newsBookmarksJson.length;
 
       newsBookmarksJson.removeWhere((json) {
-        Map<String, dynamic> data = jsonDecode(json);
-        String link = data['link']?.toString() ?? '';
-        return link == newsLink;
+        // <--- ✅ 수정된 로직 시작
+        // data['link'] 대신 News.fromJson을 사용
+        try {
+          final existingNews = News.fromJson(jsonDecode(json));
+          return existingNews.newsLink == newsLink;
+        } catch (e) {
+          debugPrint('Error decoding news for removal: $e');
+          return false;
+        }
+        // <--- ✅ 수정된 로직 끝
       });
 
       // 북마크가 제거되었는지 확인
@@ -273,9 +280,16 @@ class NewsBookmarkService {
       final bookmarksJson = prefs.getStringList(newsBookmarksKey) ?? [];
 
       return bookmarksJson.any((json) {
-        Map<String, dynamic> data = jsonDecode(json);
-        String link = data['link']?.toString() ?? '';
-        return link == newsLink;
+        // <--- ✅ 수정된 로직 시작
+        // data['link'] 대신 News.fromJson을 사용
+        try {
+          final existingNews = News.fromJson(jsonDecode(json));
+          return existingNews.newsLink == newsLink;
+        } catch (e) {
+          debugPrint('Error decoding news for check: $e');
+          return false;
+        }
+        // <--- ✅ 수정된 로직 끝
       });
     } catch (e) {
       debugPrint('Error checking news bookmark status: $e');

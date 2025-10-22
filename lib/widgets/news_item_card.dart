@@ -41,6 +41,7 @@ class _NewsItemCardState extends State<NewsItemCard> {
     final isBookmarked = await NewsBookmarkService.isAnyBookmarked(
       widget.news.newsLink,
     );
+    debugPrint("isbookmarked: $isBookmarked");
     if (mounted) {
       setState(() {
         _isBookmarked = isBookmarked;

@@ -77,5 +77,7 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 		<string>앱에서 중요한 알림을 보내기 위해 알림 권한이 필요합니다</string>
 	</array>
+  <key>GADApplicationIdentifier</key>
+  <string>ca-app-pub-8274643755495491~2394129667</string>
 </dict>
 </plist>
