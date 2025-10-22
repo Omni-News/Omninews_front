@@ -220,7 +220,7 @@ class SubscriptionService {
           price: product.rawPrice,
           currencyCode: product.currencyCode,
           priceString: product.price,
-          features: ['광고 없이 기사 읽기', '프리미엄 콘텐츠 이용', '개인화된 추천'],
+          features: ['광고 없이 기사 읽기', '다양한 플랫폼 RSS 생성', '무제한 RSS 요약'],
           durationDays: 30,
         );
       }).toList();
