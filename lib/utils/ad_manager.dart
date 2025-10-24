@@ -2,32 +2,37 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:omninews_flutter/models/omninews_subscription.dart';
+// SubscriptionService 및 SubscriptionStatus 경로 수정
 import 'package:omninews_flutter/services/omninews_subscription/omninews_subscription_service.dart';
+import 'package:omninews_flutter/models/omninews_subscription.dart';
 
 class AdManager with ChangeNotifier {
+  // [✅ 수정] 클래스명 변경 반영 (만약 SubscriptionService 클래스명이 다르다면 맞춰주세요)
   final SubscriptionService _subscriptionService = SubscriptionService();
 
-  // --- 광고 단위 ID (테스트 ID) ---
-  // TODO: 실제 Ad Unit ID로 변경
+  // --- 광고 단위 ID (실제 ID로 변경 필요) ---
   final String _nativeAdUnitId =
-      Platform.isAndroid ? '' : 'ca-app-pub-8274643755495491/6309338228';
+      Platform.isAndroid
+          ? 'ca-app-pub-3940256099942544/2247696110' // Android 네이티브 테스트 ID
+          : 'ca-app-pub-8274643755495491/6309338228'; // iOS 네이티브 테스트 ID
   final String _bannerAdUnitId =
-      Platform.isAndroid ? '' : 'ca-app-pub-8274643755495491/8422310331';
+      Platform.isAndroid
+          ? 'ca-app-pub-3940256099942544/6300978111' // Android 배너 테스트 ID
+          : 'ca-app-pub-8274643755495491/8422310331'; // iOS 배너 테스트 ID
+
+  // --- [✅ 추가] 배너 광고 위치 식별자 ---
+  static const String newsScreenBannerPlacement = 'news_screen_banner';
+  static const String rssScreenBannerPlacement = 'rss_screen_banner';
+  // 필요하다면 다른 위치 ID 추가...
 
   // --- 구독 상태 변수 ---
   bool _isLoadingSubscriptionStatus = true;
   bool _isSubscribed = false;
   SubscriptionStatus? _status;
 
-  // --- [✅ 수정] 네이티브 광고 상태 변수 (List로 변경) ---
-  static const int _maxNativeAds = 1; // 로드할 네이티브 광고 개수
-  final List<NativeAd> _nativeAds = [];
-  bool _areNativeAdsLoading = false;
-
-  // --- 배너 광고 상태 변수 ---
-  BannerAd? _bannerAd;
-  bool _isBannerAdLoaded = false;
+  // --- [✅ 수정] 배너 광고 상태 변수 (Map으로 복원) ---
+  final Map<String, BannerAd?> _bannerAds = {}; // Placement ID -> BannerAd
+  final Map<String, bool> _bannerAdLoadedStatus = {}; // Placement ID -> 로드 상태
 
   // ===========================================================================
   // Public Getters
@@ -38,16 +43,13 @@ class AdManager with ChangeNotifier {
   SubscriptionStatus? get subscriptionStatus => _status;
   bool get showAds => !_isLoadingSubscriptionStatus && !_isSubscribed;
 
-  // --- [✅ 수정] 네이티브 광고 Getters ---
-  /// 로드에 성공한 네이티브 광고 목록
-  List<NativeAd> get nativeAds => _nativeAds;
+  // --- [✅ 수정] 배너 광고 Getters (placementId 사용) ---
+  /// 특정 위치의 배너 광고 객체 가져오기
+  BannerAd? getBannerAd(String placementId) => _bannerAds[placementId];
 
-  /// 네이티브 광고가 (적어도 1개) 로드되었는지 여부
-  bool get areNativeAdsLoaded => _nativeAds.isNotEmpty;
-
-  // --- 배너 광고 Getters ---
-  bool get isBannerAdLoaded => _isBannerAdLoaded;
-  BannerAd? get bannerAd => _bannerAd;
+  /// 특정 위치의 배너 광고 로드 완료 여부 가져오기
+  bool isBannerAdLoaded(String placementId) =>
+      _bannerAdLoadedStatus[placementId] ?? false;
 
   // ===========================================================================
   // Methods
@@ -55,137 +57,136 @@ class AdManager with ChangeNotifier {
 
   Future<void> initialize() async {
     await _checkSubscriptionStatus();
-
     if (showAds) {
-      loadNativeAds(); // [✅ 수정]
-      loadBannerAd();
+      // [✅ 수정] 각 위치별 배너 광고 로드 시작
+      loadBannerAd(placementId: newsScreenBannerPlacement);
+      loadBannerAd(placementId: rssScreenBannerPlacement);
+      // 필요하다면 다른 배너 광고도 미리 로드...
     }
   }
 
   Future<void> _checkSubscriptionStatus() async {
     _isLoadingSubscriptionStatus = true;
     notifyListeners();
-
-    final status = await _subscriptionService.checkSubscriptionStatus();
-    _status = status;
-    // TODO: 이따 복원
-    //_isSubscribed = status.isActive;
-    _isSubscribed = false;
-
-    _isLoadingSubscriptionStatus = false;
-    notifyListeners();
+    try {
+      final status = await _subscriptionService.checkSubscriptionStatus();
+      _status = status;
+      _isSubscribed = status.isActive;
+      _isSubscribed = false; // 테스트용 임시 하드코딩
+    } catch (e) {
+      debugPrint("구독 상태 확인 오류: $e");
+      _isSubscribed = false;
+    } finally {
+      _isLoadingSubscriptionStatus = false;
+      notifyListeners();
+    }
   }
 
-  // --- [✅ 수정] 네이티브 광고 로드 (여러 개) ---
-  void loadNativeAds() {
-    if (_areNativeAdsLoading || _nativeAds.isNotEmpty || !showAds) {
-      return;
+  /// [✅ 유지] 요청 시 새로운 네이티브 광고를 로드하고 Future로 반환
+  Future<NativeAd?> loadNewNativeAd() async {
+    if (!showAds) {
+      debugPrint("AdManager: Ads disabled. Skipping native ad load.");
+      return null;
     }
-    _areNativeAdsLoading = true;
-
-    for (int i = 0; i < _maxNativeAds; i++) {
-      NativeAd(
-        adUnitId: _nativeAdUnitId,
-        request: const AdRequest(),
-        listener: NativeAdListener(
-          onAdLoaded: (Ad ad) {
-            debugPrint('AdManager: NativeAd loaded (Instance ${i + 1}).');
-            _nativeAds.add(ad as NativeAd);
-            // 모든 광고 로드가 완료되었는지 확인
-            if (_nativeAds.length == _maxNativeAds) {
-              _areNativeAdsLoading = false;
-              notifyListeners();
-            }
-          },
-          onAdFailedToLoad: (Ad ad, LoadAdError error) {
-            debugPrint(
-              'AdManager: NativeAd failed to load (Instance ${i + 1}): $error',
-            );
+    final Completer<NativeAd?> completer = Completer<NativeAd?>();
+    debugPrint("AdManager: Attempting to load NativeAd ID: $_nativeAdUnitId");
+    NativeAd(
+      adUnitId: _nativeAdUnitId,
+      request: const AdRequest(),
+      listener: NativeAdListener(
+        onAdLoaded: (Ad ad) {
+          debugPrint('AdManager: New NativeAd loaded.');
+          if (!completer.isCompleted)
+            completer.complete(ad as NativeAd);
+          else
             ad.dispose();
-            // 실패하더라도 로딩 상태는 해제 (모든 시도가 끝났을 때)
-            if (i == _maxNativeAds - 1 && _nativeAds.isEmpty) {
-              _areNativeAdsLoading = false;
-              notifyListeners();
-            }
-          },
-        ),
-        nativeTemplateStyle: NativeTemplateStyle(
-          templateType: TemplateType.medium,
-        ),
-      ).load();
-    }
+        },
+        onAdFailedToLoad: (Ad ad, LoadAdError error) {
+          debugPrint('AdManager: Failed to load new NativeAd: $error');
+          ad.dispose();
+          if (!completer.isCompleted) completer.complete(null);
+        },
+        onAdClicked: (Ad ad) => debugPrint('Ad clicked.'),
+        onAdImpression: (Ad ad) => debugPrint('Ad impression.'),
+      ),
+      nativeTemplateStyle: NativeTemplateStyle(
+        templateType: TemplateType.medium,
+      ),
+    ).load();
+    return completer.future.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        debugPrint("AdManager: NativeAd loading timed out.");
+        if (!completer.isCompleted) completer.complete(null);
+        return null;
+      },
+    );
   }
 
-  // --- 배너 광고 로드 (변경 없음) ---
-  void loadBannerAd() {
-    if (_isBannerAdLoaded || _bannerAd != null || !showAds) {
+  /// [✅ 수정] 특정 위치 ID에 대한 배너 광고 로드
+  void loadBannerAd({required String placementId}) {
+    if (!showAds || _bannerAds.containsKey(placementId)) {
+      // 이미 로드 요청/완료되었거나 광고 표시 안 함 상태면 중복 로드 방지
       return;
     }
 
-    _bannerAd = BannerAd(
+    debugPrint("AdManager: Loading BannerAd for placement: $placementId");
+
+    // 로딩 시작 상태 표시
+    _bannerAds[placementId] = null;
+    _bannerAdLoadedStatus[placementId] = false;
+    // notifyListeners(); // 필요 시 로딩 시작 알림
+
+    final bannerAd = BannerAd(
       adUnitId: _bannerAdUnitId,
       size: AdSize.banner,
       request: const AdRequest(),
       listener: BannerAdListener(
         onAdLoaded: (Ad ad) {
-          debugPrint('AdManager: BannerAd loaded.');
-          _bannerAd = ad as BannerAd;
-          _isBannerAdLoaded = true;
-          notifyListeners();
+          debugPrint('AdManager: BannerAd for $placementId loaded.');
+          // AdManager가 아직 살아있을 때만 Map 업데이트
+          if (!_isLoadingSubscriptionStatus &&
+              _bannerAds.containsKey(placementId)) {
+            _bannerAds[placementId] = ad as BannerAd;
+            _bannerAdLoadedStatus[placementId] = true;
+            notifyListeners();
+          } else {
+            // 이미 dispose 되었거나, 로드 요청이 취소된 경우 광고 해제
+            ad.dispose();
+            debugPrint(
+              'AdManager: Disposing loaded BannerAd for $placementId as manager might be disposed.',
+            );
+            _bannerAds.remove(placementId); // 맵에서도 제거
+            _bannerAdLoadedStatus.remove(placementId);
+          }
         },
         onAdFailedToLoad: (Ad ad, LoadAdError error) {
-          debugPrint('AdManager: BannerAd failed to load: $error');
+          debugPrint('AdManager: BannerAd for $placementId failed: $error');
           ad.dispose();
-          _bannerAd = null;
-          _isBannerAdLoaded = false;
-          notifyListeners();
+          // AdManager가 아직 살아있을 때만 Map 업데이트 (실패 상태 반영)
+          if (!_isLoadingSubscriptionStatus &&
+              _bannerAds.containsKey(placementId)) {
+            _bannerAds.remove(placementId); // 실패 시 제거 (재로드 가능)
+            _bannerAdLoadedStatus[placementId] = false;
+            notifyListeners(); // 실패 상태 알림 (선택적)
+          } else {
+            // 이미 dispose된 경우
+            _bannerAds.remove(placementId);
+            _bannerAdLoadedStatus.remove(placementId);
+          }
         },
       ),
     )..load();
-  }
-
-  Future<NativeAd?> loadNewNativeAd() async {
-    // 광고 표시 안 함 상태면 null 반환
-    if (!showAds) {
-      return null;
-    }
-
-    final Completer<NativeAd?> completer = Completer<NativeAd?>();
-
-    NativeAd? nativeAd; // 콜백 내에서 참조하기 위해 변수 선언
-
-    nativeAd = NativeAd(
-      adUnitId: _nativeAdUnitId,
-      request: const AdRequest(),
-      listener: NativeAdListener(
-        onAdLoaded: (Ad ad) {
-          debugPrint('AdManager: New NativeAd loaded successfully.');
-          completer.complete(ad as NativeAd); // 로드 성공 시 광고 객체 반환
-        },
-        onAdFailedToLoad: (Ad ad, LoadAdError error) {
-          debugPrint('AdManager: Failed to load new NativeAd: $error');
-          ad.dispose(); // 실패 시 광고 객체 해제
-          completer.complete(null); // 로드 실패 시 null 반환
-        },
-        // --- 기타 콜백 (클릭, 노출 등) ---
-        onAdClicked: (Ad ad) => debugPrint('Ad clicked.'),
-        onAdImpression: (Ad ad) => debugPrint('Ad impression.'),
-        // ... 필요한 다른 콜백 추가 ...
-      ),
-      nativeTemplateStyle: NativeTemplateStyle(
-        templateType: TemplateType.medium, // 필요에 따라 템플릿 변경
-      ),
-    )..load();
-
-    return completer.future; // 광고 로드 결과를 기다리는 Future 반환
   }
 
   @override
   void dispose() {
-    for (var ad in _nativeAds) {
-      ad.dispose();
-    }
-    _bannerAd?.dispose();
+    // [✅ 수정] Map에 있는 모든 배너 광고 dispose
+    _bannerAds.forEach((_, ad) {
+      ad?.dispose();
+    });
+    _bannerAds.clear();
+    _bannerAdLoadedStatus.clear();
     super.dispose();
   }
 }
