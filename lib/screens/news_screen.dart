@@ -4,7 +4,7 @@ import 'package:omninews_flutter/models/news.dart';
 import 'package:omninews_flutter/models/custom_news.dart';
 import 'package:omninews_flutter/screens/home_screen.dart';
 import 'package:omninews_flutter/services/news_service.dart';
-import 'package:omninews_flutter/utils/ad_manager.dart' show AdManager;
+import 'package:omninews_flutter/utils/ad_manager.dart'; // [✅ 수정] show 제거 불필요
 import 'package:omninews_flutter/widgets/news_list_view.dart';
 import 'package:omninews_flutter/widgets/custom_news_list_view.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -31,31 +31,24 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
     "IT/과학",
   ];
 
-  // [✅ 수정] Map<String, Future<List<News>>> newsList 제거
-  // Map<String, Future<List<News>>> newsList = {};
-  Map<String, Future<List<CustomNews>>> customNewsList = {}; // CustomNews는 유지
+  Map<String, Future<List<CustomNews>>> customNewsList = {};
   Map<String, String> categorySortOptions = {};
 
   final TextEditingController _categoryController = TextEditingController();
   final ScrollController _tabScrollController = ScrollController();
-  bool _isLoading = true; // 카테고리 로딩 상태
-
-  // [✅ 추가] 각 NewsListView의 상태를 관리하기 위한 GlobalKey 맵
-  // (새로고침 등을 외부에서 트리거해야 할 경우 필요, 지금은 사용 안 함)
-  // final Map<String, GlobalKey<_NewsListViewState>> _newsListKeys = {};
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: categories.length, vsync: this);
-    _loadCategories(); // 카테고리 목록 로드 및 초기 데이터 요청 시작
+    _loadCategories();
     _tabController.addListener(_handleTabIndexChange);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkAndNavigateToNewCategory();
     });
   }
 
-  // ... (dispose, _checkAndNavigateToNewCategory, _handleTabIndexChange, _scrollToCurrentTab - 변경 없음) ...
   @override
   void dispose() {
     _tabController.removeListener(_handleTabIndexChange);
@@ -66,28 +59,28 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _checkAndNavigateToNewCategory() async {
+    // ... (변경 없음) ...
     final prefs = await SharedPreferences.getInstance();
     final selectIndex = prefs.getInt('select_category_index');
-
     if (selectIndex != null) {
       int targetIndex = selectIndex == -1 ? categories.length - 1 : selectIndex;
-
       if (targetIndex >= 0 && targetIndex < categories.length) {
         _tabController.animateTo(targetIndex);
         _scrollToCurrentTab();
       }
-
       await prefs.remove('select_category_index');
     }
   }
 
   void _handleTabIndexChange() {
+    // ... (변경 없음) ...
     if (!_tabController.indexIsChanging) {
       _scrollToCurrentTab();
     }
   }
 
   void _scrollToCurrentTab() {
+    // ... (변경 없음) ...
     if (!mounted || !_tabScrollController.hasClients) return;
     final screenWidth = MediaQuery.of(context).size.width;
     const double tabPadding = 17.0 * 2;
@@ -107,13 +100,11 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _loadCategories() async {
-    // ... (카테고리 로드 로직 - 변경 없음) ...
+    // ... (변경 없음) ...
     try {
       final prefs = await SharedPreferences.getInstance();
       final savedCategories = prefs.getStringList('user_categories');
       final savedSortOptions = prefs.getStringList('category_sort_options');
-
-      // 정렬 옵션 로드
       if (savedSortOptions != null && savedSortOptions.isNotEmpty) {
         for (int i = 0; i < savedSortOptions.length; i += 2) {
           if (i + 1 < savedSortOptions.length) {
@@ -121,38 +112,26 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
           }
         }
       }
-
-      List<String> loadedCategories = List.from(
-        defaultCategories,
-      ); // 기본 카테고리로 시작
-
+      List<String> loadedCategories = List.from(defaultCategories);
       if (savedCategories != null && savedCategories.isNotEmpty) {
-        loadedCategories.addAll(savedCategories); // 저장된 사용자 카테고리 추가
-
-        // 사용자 카테고리의 기본 정렬 옵션 설정
+        loadedCategories.addAll(savedCategories);
         for (var category in savedCategories) {
           if (!categorySortOptions.containsKey(category)) {
-            categorySortOptions[category] = "sim"; // 기본값은 정확순
+            categorySortOptions[category] = "sim";
           }
         }
       }
-
       if (mounted) {
         setState(() {
-          categories = loadedCategories; // 최종 카테고리 목록 업데이트
-
-          // TabController 재생성
-          _tabController.dispose(); // 이전 컨트롤러 해제
+          categories = loadedCategories;
+          _tabController.dispose();
           _tabController = TabController(
             length: categories.length,
             vsync: this,
           );
           _tabController.addListener(_handleTabIndexChange);
-
-          // CustomNews 데이터 로드 시작 (NewsListView는 자체적으로 로드)
-          fetchCustomNewsLists(); // [✅ 수정] 함수명 변경 및 분리
-
-          _isLoading = false; // 카테고리 로딩 완료
+          fetchCustomNewsLists();
+          _isLoading = false;
         });
       }
     } catch (e) {
@@ -165,39 +144,33 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
     }
   }
 
-  // [✅ 수정] CustomNews 데이터만 로드하도록 변경
   void fetchCustomNewsLists() {
+    // ... (변경 없음) ...
     for (var category in categories) {
       if (!defaultCategories.contains(category)) {
-        // 사용자 추가 카테고리는 저장된 정렬 옵션으로 API 호출
         String sortOption = categorySortOptions[category] ?? "sim";
         customNewsList[category] = NewsService.fetchCustomNews(
           category,
-          20, // 초기 로드 개수 또는 페이지 크기
+          20,
           sortOption,
         );
       }
     }
   }
 
-  // [✅ 삭제] fetchAllNewsLists 함수 제거 (NewsListView가 자체 처리)
-  // void fetchAllNewsLists() { ... }
-
-  // [✅ 수정] _refresh 함수는 이제 CustomNews만 새로고침 (NewsListView는 내부에서 처리)
   Future<void> _refreshCustomNews() async {
+    // ... (변경 없음) ...
     setState(() {
-      fetchCustomNewsLists(); // CustomNews만 다시 로드
+      fetchCustomNewsLists();
     });
-    // NewsListView의 새로고침은 해당 위젯 내부의 RefreshIndicator가 담당
   }
 
-  // ... (_saveCategories, updateCategorySortOption, _showAddCategoryDialog, _showDeleteCategoryDialog, _addCategory, _deleteCategory - 변경 없음) ...
   Future<void> _saveCategories() async {
+    // ... (변경 없음) ...
     final prefs = await SharedPreferences.getInstance();
     final userCategories =
         categories.where((c) => !defaultCategories.contains(c)).toList();
     await prefs.setStringList('user_categories', userCategories);
-
     List<String> sortOptionsList = [];
     categorySortOptions.forEach((category, sortOption) {
       sortOptionsList.add(category);
@@ -207,6 +180,7 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
   }
 
   void updateCategorySortOption(String category, String sortOption) {
+    // ... (변경 없음) ...
     setState(() {
       categorySortOptions[category] = sortOption;
       customNewsList[category] = NewsService.fetchCustomNews(
@@ -219,9 +193,9 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
   }
 
   void _showAddCategoryDialog() {
+    // ... (변경 없음) ...
     final theme = Theme.of(context);
     _categoryController.text = '';
-
     showDialog(
       context: context,
       builder:
@@ -290,6 +264,7 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
   }
 
   void _showDeleteCategoryDialog(String category, int index) {
+    // ... (변경 없음) ...
     final theme = Theme.of(context);
     if (defaultCategories.contains(category)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -352,6 +327,7 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
   }
 
   void _addCategory(String category) {
+    // ... (변경 없음) ...
     if (category.trim().isEmpty) return;
     if (categories.contains(category)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -398,6 +374,7 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
   }
 
   void _deleteCategory(int index) {
+    // ... (변경 없음) ...
     final categoryToDelete = categories[index];
     if (defaultCategories.contains(categoryToDelete)) return;
     setState(() {
@@ -430,17 +407,26 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
     final settingsProvider = Provider.of<SettingsProvider>(context);
     final adManager = context.watch<AdManager>();
 
+    // [✅ 수정] 배너 광고 위젯 빌더 (Placement ID 사용)
     Widget _buildBannerAdWidget() {
-      if (adManager.showAds &&
-          adManager.isBannerAdLoaded &&
-          adManager.bannerAd != null) {
+      // 해당 Placement ID로 광고 정보 가져오기
+      final bannerAd = adManager.getBannerAd(
+        AdManager.newsScreenBannerPlacement,
+      ); // ID 사용
+      final isLoaded = adManager.isBannerAdLoaded(
+        AdManager.newsScreenBannerPlacement,
+      ); // ID 사용
+
+      if (adManager.showAds && isLoaded && bannerAd != null) {
         return Container(
+          key: ValueKey(bannerAd.hashCode),
           alignment: Alignment.center,
-          width: adManager.bannerAd!.size.width.toDouble(),
-          height: adManager.bannerAd!.size.height.toDouble(),
-          child: AdWidget(ad: adManager.bannerAd!),
+          width: bannerAd.size.width.toDouble(),
+          height: bannerAd.size.height.toDouble(),
+          child: AdWidget(ad: bannerAd),
         );
       } else {
+        // 로드 안됐거나 실패 시 빈 공간
         return const SizedBox.shrink();
       }
     }
@@ -448,7 +434,7 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body:
-          _isLoading // 카테고리 로딩 중일 때
+          _isLoading
               ? Center(
                 child: CircularProgressIndicator(color: theme.primaryColor),
               )
@@ -456,6 +442,7 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
                 headerSliverBuilder: (context, innerBoxIsScrolled) {
                   return [
                     SliverAppBar(
+                      /* ... AppBar ... */
                       leading: IconButton(
                         tooltip: '메뉴 열기',
                         icon: Icon(
@@ -469,16 +456,10 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
                       elevation: 0,
                       backgroundColor: theme.appBarTheme.backgroundColor,
                       title: Text('뉴스', style: textTheme.headlineMedium),
-                      actions: [
-                        // [✅ 수정] 새로고침 버튼은 NewsListView 내부로 이동했으므로 제거 또는 다른 기능 할당
-                        // IconButton(
-                        //   tooltip: '새로고침',
-                        //   icon: Icon(Icons.refresh, color: theme.appBarTheme.iconTheme?.color),
-                        //   onPressed: _refreshCustomNews, // CustomNews만 새로고침? 또는 제거
-                        // ),
-                      ],
+                      actions: [/* ... Actions ... */],
                     ),
                     SliverPersistentHeader(
+                      /* ... TabBar ... */
                       delegate: _SliverAppBarDelegate(
                         SingleChildScrollView(
                           controller: _tabScrollController,
@@ -554,31 +535,27 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
                       ),
                       pinned: true,
                     ),
+                    // [✅ 수정 없음] 배너 광고 위치는 그대로
                     SliverToBoxAdapter(child: _buildBannerAdWidget()),
                   ];
                 },
                 body: TabBarView(
+                  /* ... TabBarView ... */
                   controller: _tabController,
                   children:
                       categories.map((category) {
                         final isDefaultCategory = defaultCategories.contains(
                           category,
                         );
-
                         if (isDefaultCategory) {
-                          // [✅ 수정] NewsListView에 category 전달
                           return NewsListView(
-                            // [✅ 수정] key 추가 (필요시 상태 유지 또는 특정 위젯 식별용)
                             key: ValueKey('newslist_$category'),
                             category: category,
-                            onBookmarkChanged: () {
-                              // 북마크 변경 시 필요한 동작 (예: 다른 화면 업데이트)
-                            },
+                            onBookmarkChanged: () {},
                           );
                         } else {
-                          // CustomNewsListView는 기존 방식 유지 (Future 사용)
                           return CustomNewsListView(
-                            key: ValueKey('customlist_$category'), // key 추가
+                            key: ValueKey('customlist_$category'),
                             newsList: customNewsList[category]!,
                             categoryName: category,
                             currentSortOption:
@@ -586,13 +563,13 @@ class NewsScreenState extends State<NewsScreen> with TickerProviderStateMixin {
                             onSortChanged: (newSortOption) {
                               updateCategorySortOption(category, newSortOption);
                             },
-                            // CustomNewsListView에도 페이지네이션 구현 필요 시 유사하게 수정
                           );
                         }
                       }).toList(),
                 ),
               ),
       floatingActionButton: FloatingActionButton(
+        /* ... FAB ... */
         tooltip: '카테고리 추가',
         onPressed: _showAddCategoryDialog,
         backgroundColor: theme.primaryColor,

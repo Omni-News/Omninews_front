@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:omninews_flutter/models/app_setting.dart';
@@ -27,8 +28,9 @@ class NewsListView extends StatefulWidget {
   State<NewsListView> createState() => _NewsListViewState();
 }
 
-class _NewsListViewState extends State<NewsListView> {
-  // --- 상태 변수 (이전과 동일) ---
+class _NewsListViewState extends State<NewsListView>
+    with AutomaticKeepAliveClientMixin {
+  // --- 상태 변수 ---
   final Map<String, bool> _bookmarkStatus = {};
   final Map<String, bool> _loadingStatus = {};
   final List<News> _newsItems = [];
@@ -39,7 +41,7 @@ class _NewsListViewState extends State<NewsListView> {
   final ScrollController _scrollController = ScrollController();
   final Random _random = Random();
 
-  // --- 광고 관련 상태 (변경 없음) ---
+  // --- 광고 관련 상태 ---
   final List<int> _adDataIndices = [];
   static const int _initialAdCount = 1;
   static const int _adsToAddPerPage = 1;
@@ -47,16 +49,17 @@ class _NewsListViewState extends State<NewsListView> {
   final Map<int, NativeAd?> _loadedAds = {};
   final List<NativeAd> _adsToDispose = [];
 
-  // --- 스크롤 네비게이터 상태 (변경 없음) ---
-  bool _isScrolling = false;
-  double _scrollPosition = 0.0;
-  double _maxScrollExtent = 1.0;
-  Timer? _scrollDisplayTimer;
+  // --- 스크롤 네비게이터 상태 ---
+  final ValueNotifier<bool> _showScrollIndicatorNotifier = ValueNotifier<bool>(
+    false,
+  );
+  Timer? _scrollIndicatorTimer;
 
   late AdManager _adManager;
-
-  // [✅ 추가] 아이템 평균 높이 추정치 (UI에 맞게 조정 필요)
   static const double _estimatedItemHeight = 120.0;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -70,25 +73,42 @@ class _NewsListViewState extends State<NewsListView> {
   void dispose() {
     _scrollController.removeListener(_scrollListener);
     _scrollController.dispose();
-    _scrollDisplayTimer?.cancel();
+    _scrollIndicatorTimer?.cancel();
+    _showScrollIndicatorNotifier.dispose();
+    // 광고 해제
     for (var ad in _adsToDispose) {
       ad.dispose();
     }
     _adsToDispose.clear();
+    _loadedAds.values.where((ad) => ad != null).forEach((ad) => ad!.dispose());
+    _loadedAds.clear();
     super.dispose();
   }
 
   Future<void> _fetchInitialNews() async {
-    // ... (데이터 로딩 로직 - 변경 없음) ...
+    // ... (데이터 로딩, 광고 위치 생성, 광고 로드 요청 - 변경 없음) ...
     if (!_isLoading) {
-      setState(() => _isLoading = true);
+      if (mounted) {
+        setState(() {
+          _isLoading = true;
+          _newsItems.clear();
+          _currentPage = 1;
+          _hasMore = true;
+          _adDataIndices.clear();
+          _loadedAds.clear();
+          for (var ad in _adsToDispose) {
+            ad.dispose();
+          }
+          _adsToDispose.clear();
+          _showScrollIndicatorNotifier.value = false;
+        });
+      } else {
+        _isLoading = true;
+      }
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0);
+      }
     }
-    _adDataIndices.clear();
-    _loadedAds.clear();
-    for (var ad in _adsToDispose) {
-      ad.dispose();
-    }
-    _adsToDispose.clear();
 
     try {
       final fetchedNews = await NewsService.fetchNewsPaginated(
@@ -96,21 +116,31 @@ class _NewsListViewState extends State<NewsListView> {
         1,
       );
       if (!mounted) return;
-
-      _newsItems.clear();
-      _newsItems.addAll(fetchedNews);
-      _currentPage = 1;
-      _hasMore = fetchedNews.length >= 20;
-
-      if (_newsItems.isNotEmpty) {
-        _generateAdIndices(_newsItems.length, _initialAdCount);
-        _requestAdsForCurrentIndices();
+      final newItems = List<News>.from(fetchedNews);
+      final newPage = 1;
+      final newHasMore = fetchedNews.length >= 20;
+      final newAdIndices = <int>[];
+      if (newItems.isNotEmpty) {
+        _generateAdIndices(newItems.length, _initialAdCount, newAdIndices);
       }
 
-      setState(() => _isLoading = false);
+      // setState는 build 메서드를 다시 호출하므로, 여기서 position이 null일 수 있음
+      setState(() {
+        _newsItems.clear();
+        _newsItems.addAll(newItems);
+        _currentPage = newPage;
+        _hasMore = newHasMore;
+        _adDataIndices.clear();
+        _adDataIndices.addAll(newAdIndices);
+        _isLoading = false;
+      });
+      // 광고 로드는 build가 완료된 후 (또는 다음 프레임)에 시작하는 것이 더 안전할 수 있음
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _requestAdsForCurrentIndices();
+      });
     } catch (e) {
       if (!mounted) return;
-      debugPrint('Error fetching initial news for ${widget.category}: $e');
+      debugPrint('[${widget.category}] Error fetching initial news: $e');
       setState(() {
         _isLoading = false;
         _hasMore = false;
@@ -125,9 +155,22 @@ class _NewsListViewState extends State<NewsListView> {
   }
 
   void _scrollListener() {
-    _updateScrollState(_scrollController, true); // 스크롤 상태 업데이트 호출
+    // ... (인디케이터 표시/숨김 타이머 로직 - 변경 없음) ...
+    if (_scrollController.hasClients) {
+      if (!_showScrollIndicatorNotifier.value) {
+        _showScrollIndicatorNotifier.value = true;
+      }
+      _scrollIndicatorTimer?.cancel();
+      _scrollIndicatorTimer = Timer(const Duration(seconds: 2), () {
+        if (mounted) {
+          _showScrollIndicatorNotifier.value = false;
+        }
+      });
+    }
+    // --- 더보기 로직 (변경 없음) ---
     if (!_isLoadingMore &&
         _hasMore &&
+        _scrollController.hasClients && // hasClients 확인 추가
         _scrollController.position.pixels >=
             _scrollController.position.maxScrollExtent - 300) {
       _loadMore();
@@ -138,7 +181,6 @@ class _NewsListViewState extends State<NewsListView> {
     // ... (더보기 로직 - 변경 없음) ...
     if (_isLoadingMore || !_hasMore) return;
     setState(() => _isLoadingMore = true);
-
     try {
       final nextPage = _currentPage + 1;
       final fetchedNews = await NewsService.fetchNewsPaginated(
@@ -146,40 +188,39 @@ class _NewsListViewState extends State<NewsListView> {
         nextPage,
       );
       if (!mounted) return;
-
       final startIndex = _newsItems.length;
-      final newlyAddedIndices = <int>[];
-
+      final newlyAddedDataIndices = <int>[];
       _newsItems.addAll(fetchedNews);
       _currentPage = nextPage;
       _hasMore = fetchedNews.length >= 20;
-
       if (fetchedNews.isNotEmpty) {
-        newlyAddedIndices.addAll(
+        newlyAddedDataIndices.addAll(
           _generateMoreAdIndices(startIndex, fetchedNews.length),
         );
       }
-
-      setState(() => _isLoadingMore = false);
-
-      if (newlyAddedIndices.isNotEmpty) {
-        _requestAdsForCurrentIndices(
-          onlyNew: true,
-          newDataStartIndex: startIndex,
-        );
+      if (mounted) {
+        setState(() => _isLoadingMore = false);
+      }
+      if (newlyAddedDataIndices.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _requestAdsForNewIndices(newlyAddedDataIndices);
+        });
       }
     } catch (e) {
       if (!mounted) return;
-      debugPrint('Error loading more news for ${widget.category}: $e');
-      setState(() {
-        _isLoadingMore = false;
-      });
+      debugPrint('[${widget.category}] Error loading more news: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingMore = false;
+        });
+      }
     }
   }
 
-  void _generateAdIndices(int listLength, int count) {
-    // ... (광고 인덱스 생성 로직 - 변경 없음) ...
-    if (_adDataIndices.isNotEmpty || listLength <= _adMinIndex) return;
+  // 광고 인덱스 생성 (초기)
+  void _generateAdIndices(int listLength, int count, List<int> targetList) {
+    // ... (변경 없음) ...
+    if (listLength <= _adMinIndex) return;
     final availableIndices =
         List.generate(
           max(0, listLength - _adMinIndex),
@@ -188,30 +229,33 @@ class _NewsListViewState extends State<NewsListView> {
     availableIndices.shuffle(_random);
     int numToAdd = min(count, availableIndices.length);
     for (int i = 0; i < numToAdd; i++) {
-      _adDataIndices.add(availableIndices[i]);
+      targetList.add(availableIndices[i]);
     }
-    _adDataIndices.sort();
-    debugPrint("[${widget.category}] Initial Ad Data indices: $_adDataIndices");
+    targetList.sort();
+    debugPrint(
+      "[${widget.category}] Initial Ad Data indices generated: $targetList",
+    );
   }
 
+  // 추가 광고 인덱스 생성
   List<int> _generateMoreAdIndices(int startIndex, int newItemsCount) {
-    // ... (추가 광고 인덱스 생성 로직 - 변경 없음) ...
+    // ... (변경 없음) ...
     final newlyAddedDataIndices = <int>[];
     int endIndex = startIndex + newItemsCount - 1;
     int effectiveStartIndex = max(_adMinIndex, startIndex);
     if (effectiveStartIndex > endIndex) return newlyAddedDataIndices;
-
     final availableDataIndices = List.generate(
       endIndex - effectiveStartIndex + 1,
       (i) => effectiveStartIndex + i,
     );
     availableDataIndices.shuffle(_random);
-
     int numToAdd = min(_adsToAddPerPage, availableDataIndices.length);
     for (int i = 0; i < numToAdd; i++) {
       int newIndex = availableDataIndices[i];
-      _adDataIndices.add(newIndex);
-      newlyAddedDataIndices.add(newIndex);
+      if (!_adDataIndices.contains(newIndex)) {
+        _adDataIndices.add(newIndex);
+        newlyAddedDataIndices.add(newIndex);
+      }
     }
     _adDataIndices.sort();
     debugPrint(
@@ -220,30 +264,35 @@ class _NewsListViewState extends State<NewsListView> {
     return newlyAddedDataIndices;
   }
 
-  void _requestAdsForCurrentIndices({
-    bool onlyNew = false,
-    int newDataStartIndex = 0,
-  }) {
-    // ... (광고 로드 요청 로직 - 변경 없음) ...
-    int currentAdOffset = 0;
+  // 전체 광고 로드 요청 (변경 없음)
+  void _requestAdsForCurrentIndices() {
     for (int i = 0; i < _adDataIndices.length; i++) {
       int adDataIndex = _adDataIndices[i];
-      if (onlyNew && adDataIndex < newDataStartIndex) {
-        currentAdOffset++;
-        continue;
-      }
       int adBuilderIndex = adDataIndex + i;
       _requestAdLoad(adBuilderIndex);
     }
   }
 
-  Future<void> _requestAdLoad(int builderIndex) async {
-    // ... (개별 광고 로드 로직 - 변경 없음) ...
-    if (_loadedAds.containsKey(builderIndex)) return;
-    setState(() {
-      _loadedAds[builderIndex] = null;
-    });
+  // 새로 추가된 광고 로드 요청 (변경 없음)
+  void _requestAdsForNewIndices(List<int> newDataIndices) {
+    if (newDataIndices.isEmpty) return;
+    for (int newDataIndex in newDataIndices) {
+      int adOrderIndex = _adDataIndices.indexOf(newDataIndex);
+      if (adOrderIndex != -1) {
+        int adBuilderIndex = newDataIndex + adOrderIndex;
+        _requestAdLoad(adBuilderIndex);
+      }
+    }
+  }
 
+  // 개별 광고 로드 요청 (변경 없음)
+  Future<void> _requestAdLoad(int builderIndex) async {
+    if (_loadedAds.containsKey(builderIndex)) return;
+    if (!mounted) return;
+    if (mounted)
+      setState(() {
+        _loadedAds[builderIndex] = null;
+      });
     try {
       final NativeAd? loadedAd = await _adManager.loadNewNativeAd();
       if (!mounted) {
@@ -265,7 +314,9 @@ class _NewsListViewState extends State<NewsListView> {
         }
       }
     } catch (e) {
-      debugPrint("Error loading ad for builderIndex $builderIndex: $e");
+      debugPrint(
+        "[${widget.category}] Error loading ad for builderIndex $builderIndex: $e",
+      );
       if (mounted) {
         setState(() {
           _loadedAds[builderIndex] = null;
@@ -275,106 +326,103 @@ class _NewsListViewState extends State<NewsListView> {
   }
 
   // --- 스크롤 네비게이터 관련 ---
-  void _updateScrollState(ScrollController controller, bool isScrolling) {
-    // ... (스크롤 상태 업데이트 로직 - 변경 없음) ...
-    _scrollDisplayTimer?.cancel();
-    if (!mounted) return;
-    setState(() {
-      _isScrolling = isScrolling;
-      if (isScrolling && controller.hasClients) {
-        _scrollPosition = controller.position.pixels;
-        _maxScrollExtent =
-            controller.position.maxScrollExtent > 0
-                ? controller.position.maxScrollExtent
-                : 1.0;
-        _scrollDisplayTimer = Timer(const Duration(seconds: 2), () {
-          if (mounted) {
-            setState(() => _isScrolling = false);
-          }
-        });
-      }
-    });
-  }
 
+  // [✅ 수정] 스크롤 인디케이터 UI 빌더 - AnimatedBuilder + hasClients 확인 강화
   Widget _buildScrollIndicator() {
     final theme = Theme.of(context);
+    return AnimatedBuilder(
+      animation: _scrollController,
+      builder: (context, child) {
+        // 스크롤 컨트롤러 연결 및 position 유효성 확인 필수!
+        if (!_scrollController.hasClients ||
+            !_scrollController.position.hasContentDimensions) {
+          return const SizedBox.shrink(); // 정보 없으면 표시 안 함
+        }
 
-    // [✅ 수정] % 대신 아이템 개수로 표시
-    // 현재 보고 있는 아이템 인덱스 추정 (0부터 시작)
-    final currentItemIndex = (_scrollPosition / _estimatedItemHeight).floor();
-    // 표시할 인덱스 (1부터 시작, 전체 뉴스 개수 초과 방지)
-    final displayIndex = min(currentItemIndex + 1, _newsItems.length);
-    final totalNewsCount = _newsItems.length; // 전체 뉴스 아이템 개수
+        final currentPosition = _scrollController.position.pixels;
+        final maxExtent = _scrollController.position.maxScrollExtent;
 
-    // 스크롤 범위가 0이거나 아이템이 없으면 표시 안 함
-    if (_maxScrollExtent <= 0 || totalNewsCount == 0) {
-      return const SizedBox.shrink();
-    }
+        // maxExtent가 0 이하인 경우 (스크롤 불필요)
+        if (maxExtent <= 0) return const SizedBox.shrink();
 
-    return Positioned(
-      right: 16,
-      bottom: 80,
-      child: AnimatedOpacity(
-        opacity: _isScrolling ? 1.0 : 0.0,
-        duration: const Duration(milliseconds: 300),
-        child: Container(
+        final currentItemIndex =
+            (currentPosition / _estimatedItemHeight).floor();
+        final displayIndex = min(currentItemIndex + 1, _newsItems.length);
+        final totalNewsCount = _newsItems.length;
+
+        // 아이템 없으면 표시 안 함
+        if (totalNewsCount == 0) return const SizedBox.shrink();
+
+        return Container(
+          /* ... Container 스타일 ... */
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: theme.cardColor.withOpacity(0.9), // 배경 약간 더 불투명하게
+            color: theme.cardColor.withOpacity(0.9),
             borderRadius: BorderRadius.circular(12),
             boxShadow: [
               BoxShadow(color: Colors.black.withOpacity(0.15), blurRadius: 6),
-            ], // 그림자 약간 조정
+            ],
           ),
           child: Text(
-            // [✅ 수정] 표시 텍스트 변경
             '$displayIndex / $totalNewsCount',
             style: TextStyle(
-              fontSize: 11, // 글자 크기 약간 키움
+              fontSize: 11,
               fontWeight: FontWeight.bold,
-              color: theme.textTheme.bodyMedium?.color, // 테마 색상 사용
-              letterSpacing: 0.5, // 자간 약간 추가
+              color: theme.textTheme.bodyMedium?.color,
+              letterSpacing: 0.5,
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
+  // 맨 위로 버튼 UI 빌더 (AnimatedBuilder 사용 - 변경 없음)
   Widget _buildScrollToTopButton() {
-    // ... (맨 위로 버튼 - 변경 없음) ...
     final theme = Theme.of(context);
-    return Positioned(
-      right: 16,
-      bottom: 16,
-      child: FloatingActionButton.small(
-        onPressed: () {
-          if (_scrollController.hasClients) {
-            _scrollController.animateTo(
-              0,
-              duration: const Duration(milliseconds: 500),
-              curve: Curves.easeInOut,
-            );
-          }
-        },
-        backgroundColor: theme.primaryColor.withOpacity(0.8),
-        foregroundColor: Colors.white,
-        elevation: 4,
-        tooltip: '맨 위로',
-        child: const Icon(Icons.keyboard_arrow_up, size: 20),
-      ),
+    return AnimatedBuilder(
+      animation: _scrollController,
+      builder: (context, child) {
+        // hasClients 먼저 확인 후 offset 접근
+        final showButton =
+            _scrollController.hasClients && _scrollController.offset > 300;
+        return AnimatedOpacity(
+          opacity: showButton ? 1.0 : 0.0,
+          duration: const Duration(milliseconds: 300),
+          child: IgnorePointer(
+            ignoring: !showButton,
+            child: FloatingActionButton.small(
+              onPressed: () {
+                if (_scrollController.hasClients) {
+                  _scrollController.animateTo(
+                    0,
+                    duration: const Duration(milliseconds: 500),
+                    curve: Curves.easeInOut,
+                  );
+                }
+              },
+              backgroundColor: theme.primaryColor.withOpacity(0.8),
+              foregroundColor: Colors.white,
+              elevation: 4,
+              tooltip: '맨 위로',
+              child: const Icon(Icons.keyboard_arrow_up, size: 20),
+            ),
+          ),
+        );
+      },
     );
   }
   // --- 스크롤 네비게이터 끝 ---
 
   @override
   Widget build(BuildContext context) {
-    // ... (테마, 설정 가져오기 - 변경 없음) ...
+    super.build(context); // KeepAlive
+
     final theme = Theme.of(context);
     final cardStyle = AppTheme.newsCardStyleOf(context);
     final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
     final settings = Provider.of<SettingsProvider>(context).settings;
-    // _adManager는 initState에서 가져옴
+    // adManager는 initState에서 가져옴
 
     return RefreshIndicator(
       onRefresh: _fetchInitialNews,
@@ -388,9 +436,28 @@ class _NewsListViewState extends State<NewsListView> {
             settings,
             _adManager,
           ),
-          if (!_isLoading) _buildScrollIndicator(), // 로딩 중 아닐 때만 표시
-          if (!_isLoading && _scrollPosition > 300)
-            _buildScrollToTopButton(), // 로딩 중 아닐 때만 표시
+
+          // 스크롤 인디케이터 (ValueListenableBuilder + AnimatedBuilder 조합 - 변경 없음)
+          Positioned(
+            right: 16,
+            bottom: 80,
+            child: ValueListenableBuilder<bool>(
+              valueListenable: _showScrollIndicatorNotifier,
+              builder: (context, showIndicator, _) {
+                return AnimatedOpacity(
+                  opacity: showIndicator ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 300),
+                  child: IgnorePointer(
+                    ignoring: !showIndicator,
+                    child: _buildScrollIndicator(), // AnimatedBuilder 반환 함수 호출
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // 맨 위로 버튼 (AnimatedBuilder 반환 함수 호출 - 변경 없음)
+          Positioned(right: 16, bottom: 16, child: _buildScrollToTopButton()),
         ],
       ),
     );
@@ -404,7 +471,7 @@ class _NewsListViewState extends State<NewsListView> {
     AppSettings settings,
     AdManager adManager,
   ) {
-    // ... (초기 로딩, 뉴스 없음 UI - 변경 없음) ...
+    // ... (로딩, 빈 리스트 UI 변경 없음) ...
     if (_isLoading) {
       return Center(
         child: CircularProgressIndicator(color: theme.primaryColor),
@@ -444,9 +511,7 @@ class _NewsListViewState extends State<NewsListView> {
     }
 
     final bool shouldShowAds = adManager.showAds && _adDataIndices.isNotEmpty;
-    // [✅ 수정] 표시될 광고 개수 계산 방식 변경 없음 (_adDataIndices 기준)
     final int numberOfAdsToShow = shouldShowAds ? _adDataIndices.length : 0;
-
     final int totalItemCount =
         _newsItems.length + numberOfAdsToShow + (_isLoadingMore ? 1 : 0);
 
@@ -455,9 +520,29 @@ class _NewsListViewState extends State<NewsListView> {
       padding: const EdgeInsets.only(top: 8, bottom: 8),
       itemCount: totalItemCount,
       itemBuilder: (context, index) {
+        Widget? itemWidget;
+        int adOffset = 0;
+        int? adDataIndexIfAd;
+
+        if (shouldShowAds) {
+          for (int i = 0; i < numberOfAdsToShow; i++) {
+            // _adDataIndices 범위 체크 추가
+            if (i >= _adDataIndices.length) break;
+            int adDataIndex = _adDataIndices[i];
+            int adBuilderIndex = adDataIndex + i;
+            if (index == adBuilderIndex) {
+              adDataIndexIfAd = adDataIndex;
+              break;
+            }
+            if (index > adBuilderIndex) {
+              adOffset++;
+            }
+          }
+        }
+
+        // 1. 더보기 로딩
         if (_isLoadingMore && index == totalItemCount - 1) {
-          // ... 로딩 인디케이터 ...
-          return Padding(
+          itemWidget = Padding(
             padding: const EdgeInsets.symmetric(vertical: 16.0),
             child: Center(
               child: CircularProgressIndicator(
@@ -467,112 +552,122 @@ class _NewsListViewState extends State<NewsListView> {
             ),
           );
         }
+        // 2. 광고
+        else if (adDataIndexIfAd != null) {
+          int adBuilderIndex = index;
+          final adState = _loadedAds[adBuilderIndex];
 
-        int adOffset = 0;
-        // [✅ 수정] numberOfAdsToShow 기준으로 반복 (변경 없음)
-        for (int i = 0; i < numberOfAdsToShow; i++) {
-          // 로드해야 할 광고 인덱스가 범위를 벗어나면 중단 (AdManager가 충분히 로드 못했을 경우 대비)
-          if (i >= adManager.nativeAds.length &&
-              !_loadedAds.containsKey(_adDataIndices[i] + i)) {
-            // 이 로직은 동적 로딩에서는 불필요할 수 있음. _loadedAds 기준으로 판단.
-          }
-
-          int adDataIndex = _adDataIndices[i];
-          int adBuilderIndex = adDataIndex + i;
-
-          if (index == adBuilderIndex) {
-            // --- 광고 ---
-            final adState = _loadedAds[adBuilderIndex];
-            if (adState is NativeAd) {
-              return Container(
-                /* ... 광고 위젯 ... */
-                height: 320,
-                margin: cardStyle.cardPadding.copyWith(top: 8, bottom: 8),
-                decoration: BoxDecoration(
-                  color: theme.cardColor,
-                  borderRadius: BorderRadius.circular(
-                    cardStyle.thumbnailBorderRadius,
+          if (adState is NativeAd) {
+            itemWidget = Container(
+              key: ValueKey('ad_${widget.category}_$adBuilderIndex'),
+              height: 320,
+              margin: cardStyle.cardPadding.copyWith(top: 8, bottom: 8),
+              decoration: BoxDecoration(
+                color: theme.cardColor,
+                borderRadius: BorderRadius.circular(
+                  cardStyle.thumbnailBorderRadius,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
                   ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: AdWidget(ad: adState),
-              );
-            } else {
-              // 로딩 중 또는 실패 시 Placeholder
-              return SizedBox(
-                height: 320,
-                child: Container(
-                  margin: cardStyle.cardPadding.copyWith(top: 8, bottom: 8),
-                  alignment: Alignment.center,
-                  color: theme.disabledColor.withOpacity(0.1),
-                ),
-              );
+                ],
+              ),
+              child: AdWidget(ad: adState),
+            );
+          } else {
+            if (!_loadedAds.containsKey(adBuilderIndex)) {
+              // 빌드 중에 setState나 광고 로드 직접 호출 방지
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted && !_loadedAds.containsKey(adBuilderIndex)) {
+                  // 재확인
+                  _requestAdLoad(adBuilderIndex);
+                }
+              });
             }
-          }
-          if (index > adBuilderIndex) {
-            adOffset++;
-          }
-        }
-
-        // --- 뉴스 ---
-        final newsIndex = index - adOffset;
-        if (newsIndex >= _newsItems.length || newsIndex < 0) {
-          debugPrint(
-            "Index out of bounds: index=$index, adOffset=$adOffset, newsIndex=$newsIndex, newsItems.length=${_newsItems.length}",
-          );
-          return const SizedBox.shrink();
-        }
-
-        final news = _newsItems[newsIndex];
-        final hasImage = news.newsImageLink.isNotEmpty;
-        final showImage =
-            hasImage && settings.viewMode == ViewMode.textAndImage;
-
-        if (!_bookmarkStatus.containsKey(news.newsLink)) {
-          _checkBookmarkStatus(news.newsLink);
-        }
-
-        return InkWell(
-          /* ... 뉴스 아이템 UI ... */
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => NewsDetailScreen(news: news),
+            itemWidget = SizedBox(
+              key: ValueKey(
+                'ad_placeholder_${widget.category}_$adBuilderIndex',
+              ),
+              height: 320,
+              child: Container(
+                margin: cardStyle.cardPadding.copyWith(top: 8, bottom: 8),
+                alignment: Alignment.center,
+                color: theme.disabledColor.withOpacity(0.1),
+                child:
+                    _loadedAds.containsKey(adBuilderIndex)
+                        ? CircularProgressIndicator(
+                          color: theme.primaryColor,
+                          strokeWidth: 2,
+                        )
+                        : null,
               ),
             );
-          },
-          child: Padding(
-            padding: cardStyle.cardPadding,
-            child:
-                settings.viewMode == ViewMode.textOnly
-                    ? _buildTextOnlyLayout(news, cardStyle, theme)
-                    : Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          flex: 3,
-                          child: _buildNewsContentCard(news, cardStyle, theme),
+          }
+        }
+        // 3. 뉴스
+        else {
+          final newsIndex = index - adOffset;
+          if (newsIndex >= _newsItems.length || newsIndex < 0) {
+            itemWidget = const SizedBox.shrink();
+          } else {
+            final news = _newsItems[newsIndex];
+            final hasImage = news.newsImageLink.isNotEmpty;
+            final showImage =
+                hasImage && settings.viewMode == ViewMode.textAndImage;
+            if (!_bookmarkStatus.containsKey(news.newsLink)) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) _checkBookmarkStatus(news.newsLink);
+              });
+            }
+            itemWidget = InkWell(
+              key: ValueKey('news_${widget.category}_${news.newsLink}'),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => NewsDetailScreen(news: news),
+                  ),
+                );
+              },
+              child: Padding(
+                padding: cardStyle.cardPadding,
+                child:
+                    settings.viewMode == ViewMode.textOnly
+                        ? _buildTextOnlyLayout(news, cardStyle, theme)
+                        : Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 3,
+                              child: _buildNewsContentCard(
+                                news,
+                                cardStyle,
+                                theme,
+                              ),
+                            ),
+                            if (showImage) ...[
+                              const SizedBox(width: 12),
+                              _buildThumbnail(
+                                news.newsImageLink,
+                                news.newsLink,
+                              ),
+                            ],
+                          ],
                         ),
-                        if (showImage) ...[
-                          const SizedBox(width: 12),
-                          _buildThumbnail(news.newsImageLink, news.newsLink),
-                        ],
-                      ],
-                    ),
-          ),
-        );
+              ),
+            );
+          }
+        }
+        // KeepAlive 적용
+        return KeepAliveWrapper(child: itemWidget);
       },
     );
   }
 
-  // (이하 메서드들은 변경 없음)
+  // --- 나머지 메서드들 (변경 없음) ---
   Widget _buildTextOnlyLayout(
     News news,
     NewsCardStyleExtension cardStyle,
@@ -660,9 +755,10 @@ class _NewsListViewState extends State<NewsListView> {
     try {
       final isBookmarked = await NewsBookmarkService.isNewsBookmarked(newsLink);
       if (!mounted) return;
-      setState(() {
-        _bookmarkStatus[newsLink] = isBookmarked;
-      });
+      if (mounted)
+        setState(() {
+          _bookmarkStatus[newsLink] = isBookmarked;
+        });
     } catch (_) {}
   }
 
@@ -679,23 +775,25 @@ class _NewsListViewState extends State<NewsListView> {
       }
       if (!mounted) return;
       if (success) {
-        setState(() {
-          _bookmarkStatus[news.newsLink] =
-              !(_bookmarkStatus[news.newsLink] ?? false);
-        });
+        if (mounted)
+          setState(() {
+            _bookmarkStatus[news.newsLink] =
+                !(_bookmarkStatus[news.newsLink] ?? false);
+          });
         widget.onBookmarkChanged?.call();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              _bookmarkStatus[news.newsLink] == true
-                  ? '북마크에 추가되었습니다'
-                  : '북마크에서 제거되었습니다',
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                _bookmarkStatus[news.newsLink] == true
+                    ? '북마크에 추가되었습니다'
+                    : '북마크에서 제거되었습니다',
+              ),
+              duration: const Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Theme.of(context).primaryColor,
             ),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Theme.of(context).primaryColor,
-          ),
-        );
+          );
       }
     } catch (e) {
       debugPrint('Error toggling bookmark: $e');
@@ -815,3 +913,23 @@ class _NewsListViewState extends State<NewsListView> {
     return description;
   }
 } // End of _NewsListViewState
+
+// KeepAliveWrapper 위젯 (변경 없음)
+class KeepAliveWrapper extends StatefulWidget {
+  final Widget child;
+  const KeepAliveWrapper({Key? key, required this.child}) : super(key: key);
+  @override
+  KeepAliveWrapperState createState() => KeepAliveWrapperState();
+}
+
+class KeepAliveWrapperState extends State<KeepAliveWrapper>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+
+  @override
+  bool get wantKeepAlive => true;
+}

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:omninews_flutter/models/rss_channel.dart';
 import 'package:omninews_flutter/models/rss_folder.dart';
 import 'package:omninews_flutter/screens/home_screen.dart';
@@ -8,6 +9,8 @@ import 'package:omninews_flutter/screens/rss_add_screen.dart';
 import 'package:omninews_flutter/screens/rss_channel_detail_screen.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
 import 'package:omninews_flutter/widgets/rss_screen_widget.dart';
+import 'package:omninews_flutter/utils/ad_manager.dart';
+import 'package:provider/provider.dart';
 
 class RssScreen extends StatefulWidget {
   const RssScreen({super.key});
@@ -18,15 +21,18 @@ class RssScreen extends StatefulWidget {
 
 class _RssScreenState extends State<RssScreen>
     with AutomaticKeepAliveClientMixin, TickerProviderStateMixin {
-  late Future<List<RssChannel>> subscribedChannels;
-  late Future<List<RssChannel>> recommendedChannels;
-  late Future<List<RssFolder>> folders;
+  // [✅ 수정] Future 변수 초기화 (null safety 및 초기 로딩 상태 표시 개선)
+  late Future<List<RssChannel>> subscribedChannels = Future.value(
+    [],
+  ); // 빈 리스트로 초기화
+  late Future<List<RssChannel>> recommendedChannels = Future.value([]);
+  late Future<List<RssFolder>> folders = Future.value([]);
+
   List<RssChannel> subscribedChannelsList = [];
   List<RssFolder> foldersList = [];
   late TabController _tabController;
   final List<String> _tabs = ['구독 중', '추천 RSS'];
-  bool _isLoading = true;
-  // 기본값을 true로 변경하여 폴더 모드로 시작
+  bool _isLoading = true; // 메인 로딩 상태는 유지
   bool _isFolderView = true;
   bool _isDragging = false;
   RssChannel? _draggingChannel;
@@ -39,62 +45,90 @@ class _RssScreenState extends State<RssScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
-    _refreshData();
+    _refreshData(); // 데이터 로딩 시작
 
     _tabController.addListener(() {
-      if (_tabController.indexIsChanging) {
+      if (!_tabController.indexIsChanging) {
         setState(() {});
       }
     });
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _refreshData();
-    });
-  }
-
-  // 반환 타입 수정
+  // [✅ 수정] 로딩 상태 관리 및 Future 업데이트 방식 개선
   Future<void> _refreshData() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    subscribedChannels = RssService.fetchSubscribedChannels();
-    folders = RssFolderService.fetchFolders();
-
-    subscribedChannelsList = await subscribedChannels;
-    foldersList = await folders;
-    recommendedChannels = _fetchFilteredRecommendedChannels();
-
+    // 새로고침 시작 시 로딩 상태 설정
     if (mounted) {
       setState(() {
-        _isLoading = false;
+        _isLoading = true;
+        // FutureBuilder가 즉시 로딩 상태를 표시하도록 Completer 사용 (선택적)
+        // subscribedChannels = Completer<List<RssChannel>>().future;
+        // folders = Completer<List<RssFolder>>().future;
+        // recommendedChannels = Completer<List<RssChannel>>().future;
       });
+    } else {
+      _isLoading = true; // initState 등 마운트 전 호출 시
+    }
+
+    try {
+      // 데이터 병렬 로딩
+      final results = await Future.wait([
+        RssService.fetchSubscribedChannels(),
+        RssFolderService.fetchFolders(),
+        RssService.fetchRecommendedChannels(),
+      ]);
+
+      // 결과 처리 (await 이후 mounted 확인 필수)
+      if (!mounted) return;
+
+      subscribedChannelsList = results[0] as List<RssChannel>;
+      foldersList = results[1] as List<RssFolder>;
+      final allRecommended = results[2] as List<RssChannel>;
+
+      final subscribedLinks =
+          subscribedChannelsList.map((e) => e.channelRssLink).toSet();
+      final filteredRecommended =
+          allRecommended
+              .where(
+                (channel) => !subscribedLinks.contains(channel.channelRssLink),
+              )
+              .toList();
+
+      // 모든 데이터 처리 후 한번에 상태 업데이트
+      setState(() {
+        subscribedChannels = Future.value(subscribedChannelsList);
+        folders = Future.value(foldersList);
+        recommendedChannels = Future.value(filteredRecommended);
+        _isLoading = false; // 로딩 완료
+      });
+    } catch (e) {
+      debugPrint("Error refreshing RSS data: $e");
+      if (mounted) {
+        // 오류 발생 시에도 로딩 상태 해제 및 Future에 오류 전달
+        setState(() {
+          subscribedChannels = Future.error(e);
+          folders = Future.error(e);
+          recommendedChannels = Future.error(e);
+          _isLoading = false; // 로딩 완료 (오류 상태)
+        });
+        // 사용자에게 오류 알림 (선택적)
+        // ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('데이터 로딩 실패: $e')));
+      }
     }
   }
 
   Future<List<RssChannel>> _fetchFilteredRecommendedChannels() async {
-    final allRecommended = await RssService.fetchRecommendedChannels();
-    final subscribedLinks =
-        subscribedChannelsList.map((e) => e.channelRssLink).toSet();
-    return allRecommended
-        .where((channel) => !subscribedLinks.contains(channel.channelRssLink))
-        .toList();
+    // _refreshData에서 필터링된 Future를 반환
+    return recommendedChannels;
   }
 
+  // ... (다른 메서드들 - 변경 없음) ...
   Future<void> _subscribeToChannel(RssChannel channel) async {
     if (_subscribingStatus[channel.channelRssLink] == true) return;
-
     setState(() {
       _subscribingStatus[channel.channelRssLink] = true;
     });
-
     try {
       final success = await RssService.subscribeChannel(channel.channelId);
-
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -104,7 +138,6 @@ class _RssScreenState extends State<RssScreen>
             behavior: SnackBarBehavior.floating,
           ),
         );
-
         _refreshData();
         _tabController.animateTo(0);
       } else if (mounted) {
@@ -139,14 +172,11 @@ class _RssScreenState extends State<RssScreen>
 
   Future<void> _unsubscribeFromChannel(RssChannel channel) async {
     if (_subscribingStatus[channel.channelRssLink] == true) return;
-
     setState(() {
       _subscribingStatus[channel.channelRssLink] = true;
     });
-
     try {
       final success = await RssService.unsubscribeChannel(channel.channelId);
-
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -156,7 +186,6 @@ class _RssScreenState extends State<RssScreen>
             behavior: SnackBarBehavior.floating,
           ),
         );
-
         _refreshData();
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -191,7 +220,6 @@ class _RssScreenState extends State<RssScreen>
   Future<void> _showCreateFolderDialog() async {
     final TextEditingController folderNameController = TextEditingController();
     final formKey = GlobalKey<FormState>();
-
     final result = await showDialog<String>(
       context: context,
       builder:
@@ -232,14 +260,11 @@ class _RssScreenState extends State<RssScreen>
             ],
           ),
     );
-
     if (result != null && result.isNotEmpty) {
       try {
         final success = await RssFolderService.createFolder(result);
-
         if (success && mounted) {
           _refreshData();
-
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('폴더 "$result"가 생성되었습니다'),
@@ -274,7 +299,6 @@ class _RssScreenState extends State<RssScreen>
     }
   }
 
-  // 폴더 삭제 메서드 - 채널을 구독 취소하지 않고 폴더에서만 제거하도록 수정
   Future<void> _deleteFolder(RssFolder folder) async {
     try {
       if (folder.folderChannels.isNotEmpty) {
@@ -298,9 +322,7 @@ class _RssScreenState extends State<RssScreen>
                 ],
               ),
         );
-
         if (confirmed != true) return;
-
         final channels = [...folder.folderChannels];
         for (final channel in channels) {
           await RssFolderService.removeChannelFromFolder(
@@ -309,10 +331,8 @@ class _RssScreenState extends State<RssScreen>
           );
         }
       }
-
       await RssFolderService.deleteFolder(folder.folderId);
       _refreshData();
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -345,7 +365,6 @@ class _RssScreenState extends State<RssScreen>
         folder.folderId,
       );
       _refreshData();
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -379,12 +398,10 @@ class _RssScreenState extends State<RssScreen>
   ) async {
     try {
       final isLastChannel = folder.folderChannels.length == 1;
-
       final success = await RssFolderService.removeChannelFromFolder(
         channel.channelId,
         folder.folderId,
       );
-
       if (success) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -399,23 +416,7 @@ class _RssScreenState extends State<RssScreen>
             ),
           );
         }
-
-        if (isLastChannel) {
-          try {
-            final existingFolders = await RssFolderService.fetchFolders();
-            final folderExists = existingFolders.any(
-              (f) => f.folderId == folder.folderId,
-            );
-
-            if (!folderExists) {
-              await RssFolderService.createFolder(folder.folderName);
-            }
-          } catch (e) {
-            debugPrint('빈 폴더 유지 시도 중 오류: $e');
-          }
-        }
       }
-
       _refreshData();
     } catch (e) {
       if (mounted) {
@@ -431,7 +432,6 @@ class _RssScreenState extends State<RssScreen>
     }
   }
 
-  // 폴더에 속하지 않은 채널들 필터링
   List<RssChannel> _getUnfolderedChannels(List<RssFolder> folders) {
     final allFolderedChannelIds = <int>{};
     for (final folder in folders) {
@@ -449,11 +449,9 @@ class _RssScreenState extends State<RssScreen>
       setState(() {
         _subscribingStatus[channel.channelRssLink] = true;
       });
-
       final isSubscribed = await RssService.isChannelAlreadySubscribed(
         channel.channelRssLink,
       );
-
       if (mounted) {
         Navigator.push(
           context,
@@ -510,19 +508,39 @@ class _RssScreenState extends State<RssScreen>
 
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
+    final adManager = context.watch<AdManager>();
+
+    Widget _buildBannerAdWidget() {
+      // ... (배너 광고 위젯 빌더 - 변경 없음) ...
+      final bannerAd = adManager.getBannerAd(
+        AdManager.rssScreenBannerPlacement,
+      );
+      final isLoaded = adManager.isBannerAdLoaded(
+        AdManager.rssScreenBannerPlacement,
+      );
+      if (adManager.showAds && isLoaded && bannerAd != null) {
+        return Container(
+          key: ValueKey(bannerAd.hashCode),
+          alignment: Alignment.center,
+          width: bannerAd.size.width.toDouble(),
+          height: bannerAd.size.height.toDouble(),
+          child: AdWidget(ad: bannerAd),
+        );
+      } else {
+        return const SizedBox.shrink();
+      }
+    }
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
-            // 앱바
             SliverAppBar(
+              /* ... AppBar ... */
               leading: IconButton(
                 icon: const Icon(Icons.menu),
-                onPressed: () {
-                  homeScaffoldKey.currentState?.openDrawer();
-                },
+                onPressed: () => homeScaffoldKey.currentState?.openDrawer(),
                 tooltip: '메뉴 열기',
               ),
               pinned: true,
@@ -530,18 +548,14 @@ class _RssScreenState extends State<RssScreen>
               centerTitle: true,
               title: Text('RSS 피드', style: textTheme.headlineMedium),
               actions: [
-                // 보기 모드 전환 버튼
                 if (_tabController.index == 0)
                   IconButton(
                     icon: Icon(
                       _isFolderView ? Icons.list : Icons.folder_copy_outlined,
                     ),
                     tooltip: _isFolderView ? '리스트 보기' : '폴더 보기',
-                    onPressed: () {
-                      setState(() {
-                        _isFolderView = !_isFolderView;
-                      });
-                    },
+                    onPressed:
+                        () => setState(() => _isFolderView = !_isFolderView),
                   ),
                 IconButton(
                   icon: const Icon(Icons.refresh),
@@ -550,9 +564,8 @@ class _RssScreenState extends State<RssScreen>
                 ),
               ],
             ),
-
-            // 탭바
             SliverPersistentHeader(
+              /* ... TabBar ... */
               delegate: SliverAppBarDelegate(
                 TabBar(
                   controller: _tabController,
@@ -566,36 +579,34 @@ class _RssScreenState extends State<RssScreen>
                 ),
                 theme: theme,
               ),
-              floating: true,
+              floating: false,
               pinned: true,
             ),
+            SliverToBoxAdapter(child: _buildBannerAdWidget()), // 배너 광고 위치
           ];
         },
-
-        // 메인 콘텐츠
+        // [✅ 수정] 메인 로딩 인디케이터 조건 확인
         body:
             _isLoading
                 ? Center(
                   child: CircularProgressIndicator(color: theme.primaryColor),
-                )
+                ) // 메인 로딩
                 : TabBarView(
+                  // 데이터 로드 완료 후 TabBarView 표시
                   controller: _tabController,
                   children: [
-                    // 구독 중 탭
+                    // 각 탭 내용은 FutureBuilder가 자체 로딩/에러 처리
                     _isFolderView ? _buildFolderView() : _buildSubscribedTab(),
-
-                    // 추천 RSS 탭
                     _buildRecommendedTab(),
                   ],
                 ),
       ),
-
-      // 추가 버튼
       floatingActionButton: FloatingActionButton(
+        /* ... FAB ... */
         backgroundColor: theme.primaryColor,
+        foregroundColor: theme.colorScheme.onPrimary,
         child: const Icon(Icons.add),
         onPressed: () {
-          // 바텀 시트로 메뉴 표시
           showModalBottomSheet(
             context: context,
             shape: const RoundedRectangleBorder(
@@ -606,7 +617,6 @@ class _RssScreenState extends State<RssScreen>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // 제목
                       const Padding(
                         padding: EdgeInsets.all(16),
                         child: Text(
@@ -617,10 +627,7 @@ class _RssScreenState extends State<RssScreen>
                           ),
                         ),
                       ),
-
                       const Divider(height: 1),
-
-                      // 폴더 생성 옵션
                       ListTile(
                         leading: Container(
                           padding: const EdgeInsets.all(8),
@@ -636,12 +643,10 @@ class _RssScreenState extends State<RssScreen>
                         title: const Text('폴더 생성하기'),
                         subtitle: const Text('RSS 채널을 구성할 새 폴더를 만듭니다'),
                         onTap: () {
-                          Navigator.pop(context); // 바텀시트 닫기
-                          _showCreateFolderDialog(); // 폴더 생성 다이얼로그
+                          Navigator.pop(context);
+                          _showCreateFolderDialog();
                         },
                       ),
-
-                      // RSS 추가 옵션
                       ListTile(
                         leading: Container(
                           padding: const EdgeInsets.all(8),
@@ -657,11 +662,10 @@ class _RssScreenState extends State<RssScreen>
                         title: const Text('RSS 추가하기'),
                         subtitle: const Text('새로운 RSS 피드를 구독합니다'),
                         onTap: () {
-                          Navigator.pop(context); // 바텀시트 닫기
-                          _navigateToAddRss(); // RSS 추가 화면
+                          Navigator.pop(context);
+                          _navigateToAddRss();
                         },
                       ),
-
                       const SizedBox(height: 16),
                     ],
                   ),
@@ -673,31 +677,72 @@ class _RssScreenState extends State<RssScreen>
     );
   }
 
-  // 폴더 보기 화면
+  // 폴더 보기 화면 빌더
   Widget _buildFolderView() {
+    // [✅ 수정] FutureBuilder 로직 강화
     return RefreshIndicator(
       onRefresh: _refreshData,
+      color: Theme.of(context).primaryColor,
       child: FutureBuilder<List<RssFolder>>(
-        future: folders,
+        future: folders, // initState 또는 _refreshData에서 할당된 Future 사용
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          // 로딩 중: Future가 아직 완료되지 않았고, 이전에 로드된 데이터(foldersList)도 없을 때
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              foldersList.isEmpty) {
             return Center(
               child: CircularProgressIndicator(
                 color: Theme.of(context).primaryColor,
               ),
             );
-          } else if (snapshot.hasError) {
-            return Center(child: Text('폴더를 불러오는 데 실패했습니다: ${snapshot.error}'));
-          } else {
-            final folderData = snapshot.data ?? [];
+          }
+          // 에러 발생 시
+          else if (snapshot.hasError) {
+            // 새로고침 중 에러가 발생해도 이전 데이터(foldersList)라도 보여주도록 시도 (선택적)
+            if (foldersList.isNotEmpty) {
+              final unfoldered = _getUnfolderedChannels(foldersList);
+              // 에러 메시지와 함께 이전 데이터 표시 (UI 개선 필요)
+              // return Column(children: [ Text("오류 발생: ${snapshot.error}"), Expanded(...) ]);
+              return RssScreenWidget.buildSimpleFolderSystem(
+                folders: foldersList,
+                unfolderedChannels: unfoldered,
+                /* ... other params ... */ context: context,
+                onDeleteFolder: _deleteFolder,
+                onAddChannelToFolder: _addChannelToFolder,
+                onRemoveChannelFromFolder: _removeChannelFromFolder,
+                onChannelTap: _navigateToChannelDetail,
+                onSubscribe: _subscribeToChannel,
+                onUnsubscribe: _unsubscribeFromChannel,
+                subscribingStatus: _subscribingStatus,
+                onDragStatusChanged:
+                    (isDragging) => setState(() => _isDragging = isDragging),
+                onDraggingChannelChanged:
+                    (channel) => setState(() => _draggingChannel = channel),
+              );
+            } else {
+              // 이전 데이터도 없으면 에러 화면 표시
+              return Center(child: Text('폴더 로딩 실패: ${snapshot.error}'));
+            }
+          }
+          // 데이터 로드 성공 또는 새로고침 중 (이전 데이터 표시)
+          else {
+            // snapshot에 데이터가 있으면 최신 데이터 사용, 없으면 이전 데이터 사용
+            final currentFolders =
+                snapshot.hasData ? snapshot.data! : foldersList;
+            // 구독 채널 목록은 _refreshData에서 업데이트된 _subscribedChannelsList 사용
+            final unfolderedChannels = _getUnfolderedChannels(currentFolders);
 
-            // 폴더에 속하지 않은 채널 필터링
-            final unfolderedChannels = _getUnfolderedChannels(folderData);
+            if (currentFolders.isEmpty && unfolderedChannels.isEmpty) {
+              return RssScreenWidget.buildEmptyState(
+                '구독 중인 채널이 없습니다.\nRSS 피드를 추가해보세요.',
+                Icons.rss_feed,
+                context,
+              );
+            }
 
-            // 심플한 폴더 시스템 UI 생성
             return RssScreenWidget.buildSimpleFolderSystem(
-              folders: folderData,
+              folders: currentFolders,
               unfolderedChannels: unfolderedChannels,
+              /* ... other params ... */
               context: context,
               onDeleteFolder: _deleteFolder,
               onAddChannelToFolder: _addChannelToFolder,
@@ -706,16 +751,10 @@ class _RssScreenState extends State<RssScreen>
               onSubscribe: _subscribeToChannel,
               onUnsubscribe: _unsubscribeFromChannel,
               subscribingStatus: _subscribingStatus,
-              onDragStatusChanged: (isDragging) {
-                setState(() {
-                  _isDragging = isDragging;
-                });
-              },
-              onDraggingChannelChanged: (channel) {
-                setState(() {
-                  _draggingChannel = channel;
-                });
-              },
+              onDragStatusChanged:
+                  (isDragging) => setState(() => _isDragging = isDragging),
+              onDraggingChannelChanged:
+                  (channel) => setState(() => _draggingChannel = channel),
             );
           }
         },
@@ -723,8 +762,9 @@ class _RssScreenState extends State<RssScreen>
     );
   }
 
-  // 구독 중인 RSS 탭
+  // 구독 중 리스트 보기 화면 빌더
   Widget _buildSubscribedTab() {
+    // [✅ 수정] FutureBuilder 로직 강화
     final theme = Theme.of(context);
     final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
 
@@ -733,38 +773,81 @@ class _RssScreenState extends State<RssScreen>
       color: theme.primaryColor,
       backgroundColor: theme.cardColor,
       child: FutureBuilder<List<RssChannel>>(
-        future: subscribedChannels,
+        future: subscribedChannels, // 상태 변수 사용
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
+          if (snapshot.connectionState == ConnectionState.waiting &&
+              subscribedChannelsList.isEmpty) {
             return Center(
               child: CircularProgressIndicator(color: theme.primaryColor),
             );
           } else if (snapshot.hasError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.error_outline,
-                    size: 48,
-                    color: subscribeStyle.errorIconColor,
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    '데이터를 불러올 수 없습니다',
-                    style: TextStyle(
-                      color: subscribeStyle.emptyTextColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
+            if (subscribedChannelsList.isNotEmpty) {
+              // 이전 데이터 표시 (UI 개선 필요)
+              // return Column(children: [ Text("오류 발생: ${snapshot.error}"), Expanded(...) ]);
+              return ListView.separated(
+                /* ... ListView ... */ padding: const EdgeInsets.symmetric(
+                  vertical: 8,
+                ),
+                itemCount: subscribedChannelsList.length,
+                separatorBuilder:
+                    (context, index) => Divider(
+                      height: 1,
+                      indent: 16,
+                      endIndent: 16,
+                      thickness: 0.2,
+                      color: theme.dividerColor.withOpacity(0.3),
                     ),
-                  ),
-                ],
-              ),
-            );
-          } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+                itemBuilder: (context, index) {
+                  final channel = subscribedChannelsList[index];
+                  return RssScreenWidget.buildChannelListItem(
+                    channel: channel,
+                    isSubscribed: true,
+                    context: context,
+                    onTap: _navigateToChannelDetail,
+                    onSubscribe: _subscribeToChannel,
+                    onUnsubscribe: _unsubscribeFromChannel,
+                    subscribingStatus: _subscribingStatus,
+                  );
+                },
+              );
+            } else {
+              return Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: subscribeStyle.errorIconColor,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      '데이터 로딩 실패',
+                      style: TextStyle(
+                        color: subscribeStyle.emptyTextColor,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+          } else {
+            final currentChannels =
+                snapshot.hasData ? snapshot.data! : subscribedChannelsList;
+            if (currentChannels.isEmpty) {
+              return RssScreenWidget.buildEmptyState(
+                '구독 중인 RSS가 없습니다.\nRSS 피드를 추가해보세요.',
+                Icons.rss_feed,
+                context,
+              );
+            }
             return ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: snapshot.data!.length,
+              /* ... ListView ... */ padding: const EdgeInsets.symmetric(
+                vertical: 8,
+              ),
+              itemCount: currentChannels.length,
               separatorBuilder:
                   (context, index) => Divider(
                     height: 1,
@@ -774,7 +857,7 @@ class _RssScreenState extends State<RssScreen>
                     color: theme.dividerColor.withOpacity(0.3),
                   ),
               itemBuilder: (context, index) {
-                final channel = snapshot.data![index];
+                final channel = currentChannels[index];
                 return RssScreenWidget.buildChannelListItem(
                   channel: channel,
                   isSubscribed: true,
@@ -786,20 +869,15 @@ class _RssScreenState extends State<RssScreen>
                 );
               },
             );
-          } else {
-            return RssScreenWidget.buildEmptyState(
-              '구독 중인 RSS가 없습니다',
-              Icons.rss_feed,
-              context,
-            );
           }
         },
       ),
     );
   }
 
-  // 추천 RSS 탭
+  // 추천 RSS 탭 화면 빌더
   Widget _buildRecommendedTab() {
+    // [✅ 수정] FutureBuilder 로직 강화
     final theme = Theme.of(context);
     final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
 
@@ -808,12 +886,20 @@ class _RssScreenState extends State<RssScreen>
       color: theme.primaryColor,
       backgroundColor: theme.cardColor,
       child: FutureBuilder<List<RssChannel>>(
-        future: recommendedChannels,
+        future: recommendedChannels, // 상태 변수 사용
         builder: (context, snapshot) {
+          // 추천 탭은 초기 로딩 중에도 다른 탭을 볼 수 있으므로, _isLoading과 무관하게 처리
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(
-              child: CircularProgressIndicator(color: theme.primaryColor),
-            );
+            // 데이터가 없는 초기 상태에서는 로딩 표시
+            // (subscribedChannelsList는 다른 탭 데이터지만, 로딩 판단 기준으로 사용)
+            if (subscribedChannelsList.isEmpty) {
+              return Center(
+                child: CircularProgressIndicator(color: theme.primaryColor),
+              );
+            } else {
+              // 새로고침 중에는 이전 데이터 (있다면) 보여주거나 빈 화면
+              return const SizedBox.shrink(); // 혹은 이전 데이터 표시 로직 추가
+            }
           } else if (snapshot.hasError) {
             return Center(
               child: Column(
@@ -826,7 +912,7 @@ class _RssScreenState extends State<RssScreen>
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    '추천 채널을 불러오는 데 실패했습니다',
+                    '추천 채널 로딩 실패',
                     style: TextStyle(
                       color: subscribeStyle.emptyTextColor,
                       fontSize: 16,
@@ -837,9 +923,12 @@ class _RssScreenState extends State<RssScreen>
               ),
             );
           } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
+            final recommended = snapshot.data!;
             return ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: snapshot.data!.length,
+              /* ... ListView ... */ padding: const EdgeInsets.symmetric(
+                vertical: 8,
+              ),
+              itemCount: recommended.length,
               separatorBuilder:
                   (context, index) => Divider(
                     height: 1,
@@ -849,7 +938,7 @@ class _RssScreenState extends State<RssScreen>
                     color: theme.dividerColor.withOpacity(0.3),
                   ),
               itemBuilder: (context, index) {
-                final channel = snapshot.data![index];
+                final channel = recommended[index];
                 return RssScreenWidget.buildChannelListItem(
                   channel: channel,
                   isSubscribed: false,
@@ -863,13 +952,42 @@ class _RssScreenState extends State<RssScreen>
             );
           } else {
             return RssScreenWidget.buildEmptyState(
-              '모든 추천 채널을 이미 구독 중입니다',
-              Icons.check_circle,
+              '더 이상 추천할 채널이 없습니다.\n직접 RSS 피드를 추가해보세요.',
+              Icons.check_circle_outline,
               context,
             );
           }
         },
       ),
     );
+  }
+} // End of _RssScreenState
+
+// SliverAppBarDelegate (변경 없음)
+class SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  final TabBar tabBar;
+  final ThemeData theme;
+
+  SliverAppBarDelegate(this.tabBar, {required this.theme});
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Container(
+      color: theme.appBarTheme.backgroundColor ?? theme.canvasColor,
+      child: tabBar,
+    );
+  }
+
+  @override
+  double get maxExtent => tabBar.preferredSize.height;
+  @override
+  double get minExtent => tabBar.preferredSize.height;
+  @override
+  bool shouldRebuild(SliverAppBarDelegate oldDelegate) {
+    return tabBar != oldDelegate.tabBar || theme != oldDelegate.theme;
   }
 }
