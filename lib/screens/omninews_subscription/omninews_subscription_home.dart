@@ -1,12 +1,10 @@
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:omninews_flutter/models/omninews_subscription.dart';
 import 'package:omninews_flutter/screens/webview_screen.dart';
-import 'package:omninews_flutter/services/auth_service.dart';
+import 'package:omninews_flutter/services/auth_service.dart'; // Keep AuthService import if needed elsewhere, or remove if only used for isRecentLogin
 import 'package:provider/provider.dart';
-
 import '../../provider/subscription_provider.dart';
 
 class SubscriptionHomePage extends StatefulWidget {
@@ -17,7 +15,7 @@ class SubscriptionHomePage extends StatefulWidget {
 }
 
 class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
-  final AuthService _authService = AuthService();
+  // final AuthService _authService = AuthService(); // No longer needed for notice logic
 
   // 구독 변경 여부를 상위 라우트에 전달하기 위한 플래그
   bool _subscriptionChanged = false;
@@ -39,14 +37,15 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     setState(() {
       _subscriptionChanged = true;
     });
-    Navigator.of(context).pop(true);
+    // [✅ 수정] pop(true) -> pop(_subscriptionChanged)로 변경 (일관성)
+    Navigator.of(context).pop(_subscriptionChanged);
   }
 
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<SubscriptionProvider>(context);
     final status = provider.status;
-    final isRecentLogin = _authService.isRecentLogin();
+    // final isRecentLogin = _authService.isRecentLogin(); // No longer needed for notice logic
     final availablePlans = provider.availablePlans;
 
     return WillPopScope(
@@ -65,7 +64,9 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (isRecentLogin) _buildAccountSwitchNotice(),
+                        // [✅ 수정] if 조건 제거, 항상 표시
+                        _buildAccountSubscriptionNotice(),
+                        const SizedBox(height: 16), // 공지 카드와 상태 카드 사이 간격 추가
                         _buildStatusCard(
                           context,
                           status,
@@ -80,48 +81,52 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     );
   }
 
-  // 계정 전환 알림 카드
-  Widget _buildAccountSwitchNotice() {
+  // [✅ 수정] 계정 구독 안내 카드 (isRecentLogin 조건 제거 및 문구 수정)
+  Widget _buildAccountSubscriptionNotice() {
     return Semantics(
-      label: '계정 전환 알림',
+      label: '구독 계정 안내', // 라벨 변경
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
+        // margin 제거 (위젯 호출 시 SizedBox로 간격 조정)
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.amber.shade50,
+          color: Colors.blue.shade50, // 색상 변경 (정보성)
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.amber.shade200),
+          border: Border.all(color: Colors.blue.shade200), // 색상 변경
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(Icons.info_outline, color: Colors.amber.shade800),
+                Icon(
+                  Icons.account_circle_outlined,
+                  color: Colors.blue.shade800,
+                ), // 아이콘 변경
                 const SizedBox(width: 8),
                 Text(
-                  '계정 전환 알림',
+                  '구독 계정 안내', // 타이틀 변경
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 16,
-                    color: Colors.amber.shade900,
+                    color: Colors.blue.shade900, // 색상 변경
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             const Text(
-              '다른 계정으로 로그인하셨습니다. 구독은 각 계정마다 별도로 관리됩니다. '
-              '이전 계정의 구독 상태는 이전 계정으로 다시 로그인하면 확인할 수 있습니다.',
+              // 문구 수정
+              '구독 정보는 각 계정별로 관리됩니다. 만약 다른 계정으로 구독하셨다면, 해당 계정으로 로그인하여 구독 상태를 확인하고 서비스를 이용해주세요.',
               style: TextStyle(fontSize: 14),
             ),
             const SizedBox(height: 8),
             Text(
-              '새 계정으로 구독 시 별도 요금이 부과될 수 있습니다.',
+              // 문구 수정 (강조)
+              '현재 계정으로 구독 시 별도 요금이 부과될 수 있습니다.',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
-                color: Colors.amber.shade900,
+                color: Colors.blue.shade900, // 색상 변경
               ),
             ),
           ],
@@ -130,6 +135,7 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     );
   }
 
+  // --- _buildStatusCard 및 이하 코드는 변경 없음 ---
   Widget _buildStatusCard(
     BuildContext context,
     SubscriptionStatus status,
@@ -346,6 +352,9 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
                 '상품 정보를 불러올 수 없습니다. 네트워크 상태 또는 스토어 설정을 확인한 뒤 다시 시도해 주세요.',
                 style: TextStyle(color: Colors.red.shade700),
               ),
+              // 상품 정보 없을 때도 복원 버튼은 표시
+              const SizedBox(height: 8),
+              _buildSupportAndRestoreTile(context, provider),
             ],
           ],
         ),
@@ -353,7 +362,7 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     }
   }
 
-  // 간단한 라벨:값 행
+  // --- 이하 Helper Widgets 및 Functions (변경 없음) ---
   Widget _infoRow(String label, String value) {
     final theme = Theme.of(context);
     return Row(
@@ -372,7 +381,6 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     );
   }
 
-  // '구독 정보 및 약관' 토글 (비구독 상태에서 사용)
   Widget _buildTermsAndLinksTile(BuildContext context, SubscriptionPlan plan) {
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -394,7 +402,6 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     );
   }
 
-  // 약관/고지 내용 (공통)
   Widget _buildTermsContent(BuildContext context, SubscriptionPlan? plan) {
     final theme = Theme.of(context);
     final price = plan == null ? null : _formatPriceDisplay(plan);
@@ -411,10 +418,8 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
             ),
           ),
         if (plan != null) const SizedBox(height: 6),
-        // 중요 고지
         if (plan != null) _bullet('구독 기간: 1개월(자동 갱신)'),
         if (plan != null && price != null) _bullet('가격: $price/월'),
-        // 요청사항: Google 문구 제거
         _bullet('결제는 Apple ID로 청구됩니다.'),
         _bullet('현재 기간 종료 최소 24시간 전에 취소하지 않으면 자동으로 갱신됩니다.'),
         _bullet('갱신 시점 24시간 이내에 다음 기간 요금이 청구됩니다.'),
@@ -460,7 +465,6 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     );
   }
 
-  // 도움말 및 설정(복원 포함) 토글
   Widget _buildSupportAndRestoreTile(
     BuildContext context,
     SubscriptionProvider provider,
@@ -493,6 +497,10 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
                   backgroundColor: ok ? Colors.green : Colors.red,
                 ),
               );
+              // 복원 성공 시 상태 변경 알림
+              if (ok) {
+                setState(() => _subscriptionChanged = true);
+              }
             },
           ),
           const SizedBox(height: 8),
@@ -519,7 +527,7 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
           const Icon(
             Icons.check_circle_outline,
             size: 18,
-            color: Color(0xFF1565C0),
+            color: Color(0xFF1565C0), // Consistent blue color
           ),
           const SizedBox(width: 8),
           Expanded(child: Text(benefit, style: const TextStyle(fontSize: 14))),
@@ -528,28 +536,18 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     );
   }
 
-  // 이메일 추출 패턴
   String _extractEmail(String text) {
-    // "Already exists element: existing user: omninews1027+1@gmail.com"} 형태에서
-    // 마지막 ': ' 이후 부분을 이메일로 간주
     final parts = text.split(": ");
     if (parts.length >= 3) {
-      // 마지막 부분에서 "}"나 다른 잡문자 제거
       String email = parts.last.trim();
-
-      // "}"와 같은 JSON 관련 문자 제거
       email = email.replaceAll("\"}", "").replaceAll("\"", "");
-
       return email;
     }
-
-    // 스플릿이 잘 안 되었거나 다른 형식인 경우를 위한 백업
     final emailPattern = RegExp(r'[\w.+\-]+@[\w\-]+\.[a-zA-Z0-9\-.]+');
     final match = emailPattern.firstMatch(text);
     return match != null ? match.group(0)! : '';
   }
 
-  // 이미 다른 계정으로 구독 중인 경우 다이얼로그
   Future<void> _showAlreadyExistsDialog(
     BuildContext context,
     SubscriptionProvider provider,
@@ -579,29 +577,16 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
               ),
               TextButton(
                 onPressed: () async {
-                  // 계정 전환 선택 시 로그아웃 처리
                   await AuthService().signOut();
                   if (!mounted) return;
-
-                  // 모든 화면을 제거하고 HomeScreen으로 이동
-                  // HomeScreen은 로그인 상태가 아니므로 LoginScreen을 표시함
                   Navigator.of(
                     context,
                   ).pushNamedAndRemoveUntil('/', (route) => false);
-
-                  // 또는 아래와 같이 직접 라우트 생성 (HomeScreen 코드 참조)
-                  /*
-            Navigator.of(context).pushAndRemoveUntil(
-              MaterialPageRoute(builder: (context) => const HomeScreen()),
-              (route) => false, // 모든 이전 라우트 제거
-            );
-            */
                 },
                 child: const Text('계정 전환하기'),
               ),
               ElevatedButton(
                 onPressed: () async {
-                  // 구독 관리 페이지로 이동
                   Navigator.of(context).pop();
                   await provider.navigateToSubscriptionManagement();
                 },
@@ -612,14 +597,11 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     );
   }
 
-  // 구독 처리 메서드 - 최종 결과(purchaseResultStream)를 기다려 성공/실패 결정
-  // 구독 처리 메서드 - 최종 결과(purchaseResultStream)를 기다려 성공/실패 결정
   Future<void> _handleSubscribe(
     BuildContext context,
     SubscriptionProvider provider,
     SubscriptionPlan plan,
   ) async {
-    // 로딩 표시
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -627,22 +609,15 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     );
 
     try {
-      // 1) 구매 플로우 시작
       final started = await provider.purchaseSubscription(plan);
-      if (!started) {
-        if (mounted) {
-          Navigator.of(context, rootNavigator: true).pop(); // 로딩 닫기
-
-          // 구매창이 뜨지 않은 경우 이전 구독이 있을 가능성이 높음
-          await _showSubscriptionExpiredDialog(context, provider, plan);
-        }
+      if (!started && mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        await _showSubscriptionExpiredDialog(context, provider, plan);
         return;
       }
 
-      // 2) 최종 결과(스토어 콜백 + 서버 검증)를 기다림
       final result = await provider.waitForPurchaseResult(plan.id);
 
-      // 로딩 닫기
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
       }
@@ -650,23 +625,13 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
       if (!result.success) {
         if (mounted) {
           final errorMsg = result.message ?? '';
-
-          // 2-1. 에러 메시지가 "Already exists element: existing user:" 패턴을 포함하는지 확인
           if (errorMsg.contains('Already exists element') &&
               errorMsg.contains('existing user')) {
-            // 이메일 추출
             final email = _extractEmail(errorMsg);
-
-            // 2-1-1. 다른 계정 구독 중 다이얼로그 표시
             await _showAlreadyExistsDialog(context, provider, email);
-          }
-          // 2-2. 만료 관련 에러인지 확인
-          else if (_isExpiredError(errorMsg)) {
-            // 2-2-1. 만료 안내 다이얼로그 표시
+          } else if (_isExpiredError(errorMsg)) {
             await _showSubscriptionExpiredDialog(context, provider, plan);
-          }
-          // 2-3. 그 외 일반 오류
-          else {
+          } else {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 content: Text('서버 검증에 실패하여 구독이 처리되지 않았습니다.'),
@@ -678,7 +643,7 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
         return;
       }
 
-      // 성공 UX
+      // Success
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -688,10 +653,10 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
         );
       }
       await Future.delayed(const Duration(milliseconds: 300));
-      await _onPurchaseSuccess(context);
+      await _onPurchaseSuccess(context); // This will pop with true
     } catch (e) {
       if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop(); // 로딩 닫기
+        Navigator.of(context, rootNavigator: true).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('구독 처리 중 오류가 발생했습니다.'),
@@ -702,7 +667,6 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     }
   }
 
-  // 만료된 구독에 대한 안내 다이얼로그
   Future<void> _showSubscriptionExpiredDialog(
     BuildContext context,
     SubscriptionProvider provider,
@@ -722,9 +686,8 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
                   '새로운 구독을 시작하려면 다음 방법 중 하나를 선택해주세요:',
                 ),
                 const SizedBox(height: 16),
-
-                // 방법 1: 구독 초기화 시도
                 Container(
+                  // 방법 1
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.blue.shade50,
@@ -755,11 +718,9 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
                     ],
                   ),
                 ),
-
                 const SizedBox(height: 12),
-
-                // 방법 2: 스토어 관리 페이지
                 Container(
+                  // 방법 2
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Colors.green.shade50,
@@ -801,11 +762,9 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
               ),
               TextButton(
                 onPressed: () async {
-                  // 방법 1: 구독 복원 시도
                   Navigator.pop(context);
                   final ok = await provider.restorePurchases();
                   if (!mounted) return;
-
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(
@@ -814,12 +773,15 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
                       backgroundColor: ok ? Colors.blue : Colors.red,
                     ),
                   );
+                  // 복원 성공 시 상태 변경 알림
+                  if (ok) {
+                    setState(() => _subscriptionChanged = true);
+                  }
                 },
                 child: const Text('구독 복원 시도'),
               ),
               ElevatedButton(
                 onPressed: () async {
-                  // 방법 2: 구독 관리 페이지로 이동
                   Navigator.pop(context);
                   await provider.navigateToSubscriptionManagement();
                 },
@@ -833,10 +795,8 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
     );
   }
 
-  // 만료 관련 에러인지 확인하는 함수
   bool _isExpiredError(String errorMsg) {
     final lowerMsg = errorMsg.toLowerCase();
-    // 만료 관련 키워드 체크
     return lowerMsg.contains('expired') ||
         lowerMsg.contains('ended') ||
         lowerMsg.contains('subscription ended') ||
@@ -845,23 +805,19 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
         lowerMsg.contains('종료');
   }
 
-  // 날짜 포맷팅
   String _formatDate(DateTime? date) {
     if (date == null) return '알 수 없음';
     return '${date.year}년 ${date.month}월 ${date.day}일';
   }
 
-  // 가격 포맷팅
   String _formatPriceDisplay(SubscriptionPlan plan) {
     final currencyCode = (plan.currencyCode ?? '').toUpperCase();
     final priceString = plan.priceString;
 
-    // 스토어가 제공한 포맷이 있으면 우선 사용 (예: '$1.99', '€2,29', '¥240')
     if (priceString != null && priceString.trim().isNotEmpty) {
       return priceString;
     }
 
-    // KRW는 소수점 없이 천 단위 구분 + "원"
     if (currencyCode == 'KRW') {
       final formatter = NumberFormat.currency(
         locale: 'ko_KR',
@@ -871,7 +827,6 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
       return formatter.format(plan.price);
     }
 
-    // 그 외 통화는 심플 포맷
     final generic = NumberFormat.simpleCurrency(
       name: currencyCode.isEmpty ? null : currencyCode,
     );
@@ -890,7 +845,6 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // 플랫폼별 문구
                 Text(
                   Platform.isIOS
                       ? '구독을 취소하려면 App Store의 구독 관리 페이지로 이동해야 합니다.'
@@ -931,4 +885,4 @@ class _SubscriptionHomePageState extends State<SubscriptionHomePage> {
           ),
     );
   }
-}
+} // End of _SubscriptionHomePageState

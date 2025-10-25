@@ -7,32 +7,40 @@ import 'package:omninews_flutter/services/omninews_subscription/omninews_subscri
 import 'package:omninews_flutter/models/omninews_subscription.dart';
 
 class AdManager with ChangeNotifier {
-  // [✅ 수정] 클래스명 변경 반영 (만약 SubscriptionService 클래스명이 다르다면 맞춰주세요)
   final SubscriptionService _subscriptionService = SubscriptionService();
 
-  // --- 광고 단위 ID (실제 ID로 변경 필요) ---
+  // --- 광고 단위 ID (Google 공식 테스트 ID) ---
+  // [✅ 수정] iOS 보상형 전면 ID를 테스트 ID로 수정 (실제 ID는 필요시 적용)
   final String _nativeAdUnitId =
       Platform.isAndroid
-          ? 'ca-app-pub-3940256099942544/2247696110' // Android 네이티브 테스트 ID
-          : 'ca-app-pub-8274643755495491/6309338228'; // iOS 네이티브 테스트 ID
+          ? 'ca-app-pub-3940256099942544/2247696110'
+          : 'ca-app-pub-8274643755495491/6309338228';
   final String _bannerAdUnitId =
       Platform.isAndroid
-          ? 'ca-app-pub-3940256099942544/6300978111' // Android 배너 테스트 ID
-          : 'ca-app-pub-8274643755495491/8422310331'; // iOS 배너 테스트 ID
+          ? 'ca-app-pub-3940256099942544/6300978111'
+          : 'ca-app-pub-8274643755495491/8422310331';
+  final String _rewardedInterstitialAdUnitId =
+      Platform.isAndroid
+          ? 'ca-app-pub-3940256099942544/5224354917'
+          // : 'ca-app-pub-8274643755495491/2721488560'; // 실제 ID
+          : 'ca-app-pub-8274643755495491/5204181676'; // iOS 테스트 ID로 변경
 
-  // --- [✅ 추가] 배너 광고 위치 식별자 ---
+  // --- 배너 광고 위치 식별자 ---
   static const String newsScreenBannerPlacement = 'news_screen_banner';
   static const String rssScreenBannerPlacement = 'rss_screen_banner';
-  // 필요하다면 다른 위치 ID 추가...
 
   // --- 구독 상태 변수 ---
   bool _isLoadingSubscriptionStatus = true;
   bool _isSubscribed = false;
   SubscriptionStatus? _status;
 
-  // --- [✅ 수정] 배너 광고 상태 변수 (Map으로 복원) ---
-  final Map<String, BannerAd?> _bannerAds = {}; // Placement ID -> BannerAd
-  final Map<String, bool> _bannerAdLoadedStatus = {}; // Placement ID -> 로드 상태
+  // --- 배너 광고 상태 변수 ---
+  final Map<String, BannerAd?> _bannerAds = {};
+  final Map<String, bool> _bannerAdLoadedStatus = {};
+
+  // --- 보상형 전면 광고 상태 변수 ---
+  RewardedInterstitialAd? _rewardedInterstitialAd;
+  static bool _isRewardedInterstitialAdLoaded = false;
 
   // ===========================================================================
   // Public Getters
@@ -42,14 +50,11 @@ class AdManager with ChangeNotifier {
   bool get isSubscribed => _isSubscribed;
   SubscriptionStatus? get subscriptionStatus => _status;
   bool get showAds => !_isLoadingSubscriptionStatus && !_isSubscribed;
-
-  // --- [✅ 수정] 배너 광고 Getters (placementId 사용) ---
-  /// 특정 위치의 배너 광고 객체 가져오기
   BannerAd? getBannerAd(String placementId) => _bannerAds[placementId];
-
-  /// 특정 위치의 배너 광고 로드 완료 여부 가져오기
   bool isBannerAdLoaded(String placementId) =>
       _bannerAdLoadedStatus[placementId] ?? false;
+  static bool get isRewardedInterstitialAdLoaded =>
+      _isRewardedInterstitialAdLoaded;
 
   // ===========================================================================
   // Methods
@@ -58,11 +63,14 @@ class AdManager with ChangeNotifier {
   Future<void> initialize() async {
     await _checkSubscriptionStatus();
     if (showAds) {
-      // [✅ 수정] 각 위치별 배너 광고 로드 시작
       loadBannerAd(placementId: newsScreenBannerPlacement);
       loadBannerAd(placementId: rssScreenBannerPlacement);
-      // 필요하다면 다른 배너 광고도 미리 로드...
+      loadRewardedInterstitialAd();
     }
+  }
+
+  Future<void> refreshSubscriptionStatus() async {
+    await _checkSubscriptionStatus();
   }
 
   Future<void> _checkSubscriptionStatus() async {
@@ -72,70 +80,186 @@ class AdManager with ChangeNotifier {
       final status = await _subscriptionService.checkSubscriptionStatus();
       _status = status;
       _isSubscribed = status.isActive;
-      _isSubscribed = false; // 테스트용 임시 하드코딩
     } catch (e) {
       debugPrint("구독 상태 확인 오류: $e");
       _isSubscribed = false;
     } finally {
       _isLoadingSubscriptionStatus = false;
+      // 구독 상태가 변경되었을 수 있으므로 광고 로드 로직 재확인
+      if (showAds) {
+        // 광고가 아직 로드되지 않았다면 로드 시도
+        if (_bannerAds.isEmpty) {
+          // 간단한 체크, 더 정교하게 할 수 있음
+          loadBannerAd(placementId: newsScreenBannerPlacement);
+          loadBannerAd(placementId: rssScreenBannerPlacement);
+        }
+        if (_rewardedInterstitialAd == null &&
+            !_isRewardedInterstitialAdLoaded) {
+          loadRewardedInterstitialAd();
+        }
+      } else {
+        // 구독자가 되었으면 광고 제거
+        disposeAds(); // 광고 해제 함수 호출 (disposeAds 함수 추가 필요)
+      }
       notifyListeners();
     }
   }
 
-  /// [✅ 유지] 요청 시 새로운 네이티브 광고를 로드하고 Future로 반환
-  Future<NativeAd?> loadNewNativeAd() async {
-    if (!showAds) {
-      debugPrint("AdManager: Ads disabled. Skipping native ad load.");
-      return null;
+  // [✅ 추가] 광고만 해제하는 함수
+  void disposeAds() {
+    _bannerAds.forEach((_, ad) {
+      ad?.dispose();
+    });
+    _bannerAds.clear();
+    _bannerAdLoadedStatus.clear();
+    _rewardedInterstitialAd?.dispose();
+    _rewardedInterstitialAd = null;
+    _isRewardedInterstitialAdLoaded = false;
+    debugPrint("AdManager: Ads disposed due to subscription status change.");
+    notifyListeners(); // UI 갱신을 위해 호출
+  }
+
+  void loadRewardedInterstitialAd() {
+    if (!showAds ||
+        _rewardedInterstitialAd != null ||
+        _isRewardedInterstitialAdLoaded) {
+      // 이미 로드되었거나 로딩 중이면 return
+      // _isRewardedInterstitialAdLoaded 체크 추가: 로드 성공 후 다시 호출 방지
+      return;
     }
-    final Completer<NativeAd?> completer = Completer<NativeAd?>();
-    debugPrint("AdManager: Attempting to load NativeAd ID: $_nativeAdUnitId");
-    NativeAd(
-      adUnitId: _nativeAdUnitId,
+    debugPrint("AdManager: Loading RewardedInterstitialAd...");
+    // 로드 시도 상태 표시 (선택적)
+    // _isRewardedInterstitialAdLoaded = false; // 로드 시도 중임을 명시
+
+    RewardedInterstitialAd.load(
+      adUnitId: _rewardedInterstitialAdUnitId,
       request: const AdRequest(),
-      listener: NativeAdListener(
-        onAdLoaded: (Ad ad) {
-          debugPrint('AdManager: New NativeAd loaded.');
-          if (!completer.isCompleted)
-            completer.complete(ad as NativeAd);
-          else
+      rewardedInterstitialAdLoadCallback: RewardedInterstitialAdLoadCallback(
+        onAdLoaded: (RewardedInterstitialAd ad) {
+          debugPrint('AdManager: RewardedInterstitialAd loaded.');
+          // 로드 성공 후 광고가 여전히 필요한지(showAds) 다시 확인
+          if (showAds) {
+            _rewardedInterstitialAd = ad;
+            _isRewardedInterstitialAdLoaded = true;
+          } else {
+            // 로드되는 동안 구독 상태가 바뀌었으면 해제
             ad.dispose();
+            _rewardedInterstitialAd = null;
+            _isRewardedInterstitialAdLoaded = false;
+            debugPrint(
+              'AdManager: Discarded loaded RewardedInterstitialAd as ads are no longer needed.',
+            );
+          }
+          notifyListeners();
         },
-        onAdFailedToLoad: (Ad ad, LoadAdError error) {
-          debugPrint('AdManager: Failed to load new NativeAd: $error');
-          ad.dispose();
-          if (!completer.isCompleted) completer.complete(null);
+        onAdFailedToLoad: (LoadAdError error) {
+          debugPrint(
+            'AdManager: RewardedInterstitialAd failed to load: $error',
+          );
+          _rewardedInterstitialAd = null;
+          _isRewardedInterstitialAdLoaded = false;
+          notifyListeners();
         },
-        onAdClicked: (Ad ad) => debugPrint('Ad clicked.'),
-        onAdImpression: (Ad ad) => debugPrint('Ad impression.'),
       ),
-      nativeTemplateStyle: NativeTemplateStyle(
-        templateType: TemplateType.medium,
-      ),
-    ).load();
-    return completer.future.timeout(
-      const Duration(seconds: 10),
-      onTimeout: () {
-        debugPrint("AdManager: NativeAd loading timed out.");
-        if (!completer.isCompleted) completer.complete(null);
-        return null;
-      },
     );
   }
 
-  /// [✅ 수정] 특정 위치 ID에 대한 배너 광고 로드
-  void loadBannerAd({required String placementId}) {
-    if (!showAds || _bannerAds.containsKey(placementId)) {
-      // 이미 로드 요청/완료되었거나 광고 표시 안 함 상태면 중복 로드 방지
+  // [✅ 수정] executeRewardedAction 수정
+  Future<void> executeRewardedAction({
+    required Future<void> Function() action,
+    required VoidCallback onAdDismissedWithoutReward,
+    required VoidCallback onAdFailed,
+  }) async {
+    // 1. 구독자인지 먼저 확인
+    if (isSubscribed) {
+      debugPrint("AdManager: User is subscribed. Executing action directly.");
+      await action();
       return;
     }
 
-    debugPrint("AdManager: Loading BannerAd for placement: $placementId");
+    // --- 비구독자 로직 ---
+    // 2. 지역 변수에 광고 객체와 로드 상태 저장 (안전한 사용 위해)
+    final RewardedInterstitialAd? adToShow = _rewardedInterstitialAd;
+    final bool isAdCurrentlyLoaded = _isRewardedInterstitialAdLoaded;
 
-    // 로딩 시작 상태 표시
+    // 3. 광고가 로드되었는지 지역 변수로 확인
+    if (isAdCurrentlyLoaded && adToShow != null) {
+      debugPrint("AdManager: Rewarded ad is loaded. Showing ad...");
+      bool rewardEarned = false;
+
+      adToShow.fullScreenContentCallback = FullScreenContentCallback(
+        onAdShowedFullScreenContent: (RewardedInterstitialAd ad) {
+          debugPrint('AdManager: Ad showed full screen.');
+          // 보여준 후에는 로드 상태를 false로 바꿔서 중복 표시 방지
+          _isRewardedInterstitialAdLoaded = false;
+          _rewardedInterstitialAd = null; // 참조 제거
+          notifyListeners();
+        },
+        onAdDismissedFullScreenContent: (RewardedInterstitialAd ad) {
+          debugPrint('AdManager: Ad dismissed.');
+          ad.dispose(); // 콜백에서 받은 ad 객체 dispose
+          // _rewardedInterstitialAd 등은 이미 위에서 null 처리됨
+
+          loadRewardedInterstitialAd(); // 다음 광고 미리 로드
+
+          if (rewardEarned) {
+            debugPrint("AdManager: Reward earned. Executing action.");
+            action(); // 보상 받았으면 액션 실행
+          } else {
+            debugPrint("AdManager: Ad dismissed without reward.");
+            onAdDismissedWithoutReward(); // 보상 못 받음 콜백 호출
+          }
+        },
+        onAdFailedToShowFullScreenContent: (
+          RewardedInterstitialAd ad,
+          AdError error,
+        ) {
+          debugPrint('AdManager: Ad failed to show: $error');
+          ad.dispose(); // 콜백에서 받은 ad 객체 dispose
+          _rewardedInterstitialAd = null; // 참조 제거 확실히
+          _isRewardedInterstitialAdLoaded = false; // 로드 상태 false
+          notifyListeners();
+
+          loadRewardedInterstitialAd(); // 다음 광고 미리 로드
+
+          onAdFailed(); // 실패 콜백 호출
+          action(); // 실패 시에도 액션 실행 (사용자 편의)
+        },
+      );
+
+      adToShow.setImmersiveMode(true);
+      adToShow.show(
+        onUserEarnedReward: (AdWithoutView ad, RewardItem reward) {
+          debugPrint(
+            'AdManager: User earned reward: ${reward.amount} ${reward.type}',
+          );
+          rewardEarned = true; // 보상 획득!
+        },
+      );
+    } else {
+      // 4. 광고가 로드되지 않은 경우 (로딩 중 or 로드 실패)
+      debugPrint(
+        "AdManager: Rewarded ad is not loaded (isLoaded: $isAdCurrentlyLoaded). Executing action directly after fail callback.",
+      );
+      onAdFailed(); // 실패 콜백 호출
+      await action(); // 액션 실행 (사용자 편의)
+
+      // 광고 로드를 다시 시도 (이미 로딩 중이라면 loadRewardedInterstitialAd 내부에서 중단됨)
+      if (!isAdCurrentlyLoaded && _rewardedInterstitialAd == null) {
+        loadRewardedInterstitialAd();
+      }
+    }
+  }
+
+  // --- 배너/네이티브 광고 로직 (큰 변경 없음, showAds 체크는 내부에서 함) ---
+  void loadBannerAd({required String placementId}) {
+    if (!showAds || _bannerAds.containsKey(placementId)) {
+      return;
+    }
+    debugPrint("AdManager: Loading BannerAd for placement: $placementId");
     _bannerAds[placementId] = null;
     _bannerAdLoadedStatus[placementId] = false;
-    // notifyListeners(); // 필요 시 로딩 시작 알림
+    // notifyListeners(); // 로딩 시작 알림 필요 시
 
     final bannerAd = BannerAd(
       adUnitId: _bannerAdUnitId,
@@ -144,49 +268,87 @@ class AdManager with ChangeNotifier {
       listener: BannerAdListener(
         onAdLoaded: (Ad ad) {
           debugPrint('AdManager: BannerAd for $placementId loaded.');
-          // AdManager가 아직 살아있을 때만 Map 업데이트
-          if (!_isLoadingSubscriptionStatus &&
-              _bannerAds.containsKey(placementId)) {
+          // 로드 성공 후에도 광고 표시 상태(showAds) 재확인
+          if (showAds && _bannerAds.containsKey(placementId)) {
             _bannerAds[placementId] = ad as BannerAd;
             _bannerAdLoadedStatus[placementId] = true;
-            notifyListeners();
           } else {
-            // 이미 dispose 되었거나, 로드 요청이 취소된 경우 광고 해제
+            // 로드 중에 구독 상태 변경 시 광고 해제
             ad.dispose();
-            debugPrint(
-              'AdManager: Disposing loaded BannerAd for $placementId as manager might be disposed.',
-            );
-            _bannerAds.remove(placementId); // 맵에서도 제거
+            _bannerAds.remove(placementId);
             _bannerAdLoadedStatus.remove(placementId);
+            debugPrint(
+              'AdManager: Discarded loaded BannerAd for $placementId as ads are no longer needed.',
+            );
           }
+          notifyListeners();
         },
         onAdFailedToLoad: (Ad ad, LoadAdError error) {
           debugPrint('AdManager: BannerAd for $placementId failed: $error');
           ad.dispose();
-          // AdManager가 아직 살아있을 때만 Map 업데이트 (실패 상태 반영)
-          if (!_isLoadingSubscriptionStatus &&
-              _bannerAds.containsKey(placementId)) {
-            _bannerAds.remove(placementId); // 실패 시 제거 (재로드 가능)
-            _bannerAdLoadedStatus[placementId] = false;
-            notifyListeners(); // 실패 상태 알림 (선택적)
-          } else {
-            // 이미 dispose된 경우
-            _bannerAds.remove(placementId);
-            _bannerAdLoadedStatus.remove(placementId);
-          }
+          // 실패 시에도 map에서 제거하여 재시도 가능하게 함
+          _bannerAds.remove(placementId);
+          _bannerAdLoadedStatus[placementId] = false;
+          notifyListeners(); // 실패 상태 알림 (선택적)
         },
       ),
     )..load();
   }
 
+  Future<NativeAd?> loadNewNativeAd() async {
+    if (!showAds) {
+      debugPrint("AdManager: Ads disabled. Skipping native ad load.");
+      return null;
+    }
+    final Completer<NativeAd?> completer = Completer<NativeAd?>();
+    debugPrint("AdManager: Attempting to load NativeAd ID: $_nativeAdUnitId");
+
+    NativeAd(
+      adUnitId: _nativeAdUnitId,
+      request: const AdRequest(),
+      listener: NativeAdListener(
+        onAdLoaded: (Ad ad) {
+          debugPrint('AdManager: New NativeAd loaded.');
+          // 로드 성공 후에도 광고 표시 상태(showAds) 재확인
+          if (showAds) {
+            if (!completer.isCompleted) {
+              completer.complete(ad as NativeAd);
+            } else {
+              ad.dispose(); // 이미 완료되었으면 즉시 해제
+            }
+          } else {
+            // 로드 중에 구독 상태 변경 시 광고 해제
+            ad.dispose();
+            if (!completer.isCompleted) completer.complete(null); // 실패로 완료
+            debugPrint(
+              'AdManager: Discarded loaded NativeAd as ads are no longer needed.',
+            );
+          }
+        },
+        onAdFailedToLoad: (Ad ad, LoadAdError error) {
+          debugPrint('AdManager: Failed to load new NativeAd: $error');
+          ad.dispose();
+          if (!completer.isCompleted) completer.complete(null);
+        },
+      ),
+      nativeTemplateStyle: NativeTemplateStyle(
+        templateType: TemplateType.medium,
+      ),
+    ).load();
+
+    return completer.future.timeout(
+      const Duration(seconds: 10), // 타임아웃 설정
+      onTimeout: () {
+        debugPrint("AdManager: NativeAd loading timed out.");
+        if (!completer.isCompleted) completer.complete(null);
+        return null;
+      },
+    );
+  }
+
   @override
   void dispose() {
-    // [✅ 수정] Map에 있는 모든 배너 광고 dispose
-    _bannerAds.forEach((_, ad) {
-      ad?.dispose();
-    });
-    _bannerAds.clear();
-    _bannerAdLoadedStatus.clear();
+    disposeAds(); // 모든 광고 해제
     super.dispose();
   }
 }

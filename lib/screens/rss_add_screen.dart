@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:omninews_flutter/models/omninews_subscription.dart';
+import 'package:omninews_flutter/models/omninews_subscription.dart'; // 구독 모델 필요
 import 'package:omninews_flutter/models/rss_channel.dart';
 import 'package:omninews_flutter/screens/home_screen.dart';
 import 'package:omninews_flutter/screens/omninews_subscription/omninews_subscription_home.dart';
+// [✅ 복원] 로컬 구독 서비스 import 복원
 import 'package:omninews_flutter/services/omninews_subscription/omninews_subscription_service.dart';
 import 'package:omninews_flutter/services/rss_service.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
+// [✅ 추가] Provider와 AdManager 임포트
+import 'package:provider/provider.dart';
+import 'package:omninews_flutter/utils/ad_manager.dart'; // AdManager 경로 (정확히 확인)
 
 class RssAddScreen extends StatefulWidget {
   final Function onChannelAdded;
@@ -18,10 +22,10 @@ class RssAddScreen extends StatefulWidget {
 
 class _RssAddScreenState extends State<RssAddScreen>
     with SingleTickerProviderStateMixin {
+  // --- Controllers (변경 없음) ---
   final TextEditingController _urlController = TextEditingController();
   final TextEditingController _generateUrlController = TextEditingController();
   final TextEditingController _searchController = TextEditingController();
-
   final TextEditingController _cssChannelLinkController =
       TextEditingController();
   final TextEditingController _cssChannelImageController =
@@ -42,31 +46,29 @@ class _RssAddScreenState extends State<RssAddScreen>
       TextEditingController();
   final TextEditingController _cssItemImageController = TextEditingController();
 
+  // --- State variables ---
   bool _showCssForm = false;
   bool _isCssGenerating = false;
-
   bool _isLoading = false;
   bool _isPreviewLoading = false;
   bool _isGenerating = false;
-
   RssChannel? _previewChannel;
   String? _errorMessage;
   bool _isExistingRss = false;
-  bool _isAlreadySubscribed = false;
+  bool _isAlreadySubscribed =
+      false; // Note: This checks if *this specific channel* is already subscribed
   int? _channelId;
   late TabController _tabController;
-  SubscriptionStatus? _subscriptionStatus;
   String _selectedPlatform = 'Naver';
-  bool _isLoadingSubscriptionStatus = true;
   String _searchQuery = '';
-
-  // 인스타그램 생성 후 아이템이 아직 수집 중인지 표시
   bool _instagramItemsPending = false;
-
-  // 방금 generate 응답이 "이미 존재(is_exist=true)" 였는지 표시 (배너/안내용)
   bool _generatedExisted = false;
 
-  // 플랫폼 목록 (Facebook 제거됨)
+  // [✅ 복원] 로컬 구독 상태 변수 복원
+  SubscriptionStatus? _subscriptionStatus;
+  bool _isLoadingSubscriptionStatus = true;
+
+  // --- Platform Data (변경 없음) ---
   final List<Map<String, dynamic>> _platforms = [
     {
       'id': 'Naver',
@@ -119,17 +121,18 @@ class _RssAddScreenState extends State<RssAddScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    // [✅ 복원] 로컬 구독 상태 확인 호출
     _checkSubscriptionStatus();
     _searchController.addListener(_onSearchChanged);
   }
 
   @override
   void dispose() {
+    // --- Dispose controllers ---
     _urlController.dispose();
     _generateUrlController.dispose();
     _searchController.dispose();
     _tabController.dispose();
-
     _cssChannelLinkController.dispose();
     _cssChannelImageController.dispose();
     _cssChannelTitleController.dispose();
@@ -141,7 +144,6 @@ class _RssAddScreenState extends State<RssAddScreen>
     _cssItemAuthorController.dispose();
     _cssItemPubDateController.dispose();
     _cssItemImageController.dispose();
-
     super.dispose();
   }
 
@@ -151,30 +153,28 @@ class _RssAddScreenState extends State<RssAddScreen>
     });
   }
 
+  // [✅ 복원] 로컬 구독 상태 확인 함수 복원
   Future<void> _checkSubscriptionStatus() async {
     setState(() => _isLoadingSubscriptionStatus = true);
-    final service = SubscriptionService();
+    final service = SubscriptionService(); // 로컬 서비스 사용
     final status = await service.checkSubscriptionStatus();
     if (!mounted) return;
     setState(() {
-      _subscriptionStatus = status;
+      _subscriptionStatus = status; // 로컬 상태 업데이트
       _isLoadingSubscriptionStatus = false;
     });
   }
 
-  // 구독 페이지로 이동 후, 돌아올 때 결과에 따라 상태 새로고침
+  // 구독 페이지 이동 후, 로컬 상태 새로고침
   Future<void> _openSubscriptionAndRefresh() async {
     final changed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (context) => const SubscriptionHomePage()),
     );
-
-    if (changed == true) {
-      // 구독이 변경되었으면 즉시 상태 재확인
+    if (changed == true && mounted) {
+      // [✅ 복원] 로컬 상태 갱신
       await _checkSubscriptionStatus();
-      if (mounted) {
-        _showSnackBar('구독이 활성화되었습니다.');
-      }
+      _showSnackBar('구독이 활성화되었습니다.');
     }
   }
 
@@ -188,6 +188,7 @@ class _RssAddScreenState extends State<RssAddScreen>
     }
   }
 
+  // --- RSS 미리보기, 추가, 구독 관련 로직 (변경 없음) ---
   Future<void> _previewRss() async {
     final url = _urlController.text.trim();
     if (url.isEmpty) {
@@ -219,8 +220,8 @@ class _RssAddScreenState extends State<RssAddScreen>
         if (!mounted) return;
         setState(() {
           _previewChannel = preview;
-          _isExistingRss = exists;
-          _isAlreadySubscribed = already;
+          _isExistingRss = exists; // DB 존재 여부 업데이트
+          _isAlreadySubscribed = already; // 내가 구독 중인지 업데이트
         });
         if (already) _showSnackBar('이미 구독 중인 RSS 채널입니다.');
       } else {
@@ -237,7 +238,103 @@ class _RssAddScreenState extends State<RssAddScreen>
     }
   }
 
+  Future<void> _addRssToDb() async {
+    if (_previewChannel == null) return;
+    final url = _urlController.text.trim();
+    setState(() {
+      _isLoading = true; // isLoading은 버튼 비활성화용으로 계속 사용
+      _errorMessage = null;
+    });
+    try {
+      final id = await RssService.addRssToDb(url);
+      if (id != null && id != 0) {
+        _channelId = id;
+        if (!mounted) return;
+        setState(() {
+          _isExistingRss = true; // DB에 추가되었으므로 true로 변경
+          _isLoading = false;
+        });
+        _showSnackBar('RSS를 추가했습니다. 이제 구독할 수 있습니다.');
+        // 미리보기 상태 업데이트 (이제 '구독하기' 버튼이 보이도록)
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _errorMessage = 'RSS 추가 중 오류가 발생했습니다.';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'RSS 추가 중 오류가 발생했습니다: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _subscribeChannel() async {
+    if (_previewChannel == null) return;
+    setState(() => _isLoading = true); // isLoading은 버튼 비활성화용으로 계속 사용
+    try {
+      bool success;
+      if (_channelId != null) {
+        success = await RssService.subscribeChannel(_channelId!);
+      } else {
+        success = await RssService.subscribeChannelByRssLink(
+          _previewChannel!.channelRssLink,
+        );
+      }
+      if (success) {
+        widget.onChannelAdded(); // 부모 위젯에 알림
+        if (!mounted) return;
+        _navigateToRssScreen(); // 홈 화면으로 이동
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _errorMessage = '이미 구독 중인 채널입니다.';
+          _isAlreadySubscribed = true; // 상태 업데이트
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = '구독 중 오류가 발생했습니다: $e';
+        _isLoading = false;
+      });
+    }
+  }
+  // --- END: RSS 미리보기, 추가, 구독 관련 로직 ---
+
+  // [✅ 추가] "RSS 추가하기" 버튼에 대한 광고 처리 래퍼
+  Future<void> _handleAddRssWithAd() async {
+    // 1. 로컬 구독 상태 확인
+    if (_subscriptionStatus?.isActive == true) {
+      // 구독자는 광고 없이 바로 실행
+      await _addRssToDb();
+      return;
+    }
+
+    // 2. 비구독자인 경우, AdManager 접근
+    if (!mounted) return;
+    final adManager = Provider.of<AdManager>(context, listen: false);
+
+    await adManager.executeRewardedAction(
+      action: _addRssToDb, // 보상 획득 시 실행할 함수
+      onAdDismissedWithoutReward: () {
+        if (!mounted) return;
+        _showSnackBar("광고 시청을 완료해야 RSS를 추가할 수 있습니다.");
+      },
+      onAdFailed: () {
+        if (!mounted) return;
+        _showSnackBar("광고를 준비 중입니다. RSS를 바로 추가합니다.");
+      },
+    );
+  }
+
+  // --- 실제 RSS 생성 로직 (변경 없음, 광고 로직 없음) ---
   Future<void> _generateRssByCss() async {
+    // [✅ 확인] 광고 로직 없이 직접 실행 (구독 여부는 _buildGenerateTab에서 UI 분기)
     if (_isCssGenerating) return;
 
     setState(() {
@@ -248,7 +345,7 @@ class _RssAddScreenState extends State<RssAddScreen>
       _generatedExisted = false;
     });
 
-    // 필수값 체크 (예시: 채널링크, 타이틀, 주요 css)
+    // 필수값 체크
     if (_cssChannelLinkController.text.trim().isEmpty ||
         _cssChannelTitleController.text.trim().isEmpty ||
         _cssItemTitleController.text.trim().isEmpty ||
@@ -303,74 +400,8 @@ class _RssAddScreenState extends State<RssAddScreen>
     }
   }
 
-  Future<void> _addRssToDb() async {
-    if (_previewChannel == null) return;
-    final url = _urlController.text.trim();
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-    try {
-      final id = await RssService.addRssToDb(url);
-      if (id != null && id != 0) {
-        _channelId = id;
-        if (!mounted) return;
-        setState(() {
-          _isExistingRss = true;
-          _isLoading = false;
-        });
-        _showSnackBar('RSS를 추가했습니다. 이제 구독할 수 있습니다.');
-      } else {
-        if (!mounted) return;
-        setState(() {
-          _errorMessage = 'RSS 추가 중 오류가 발생했습니다.';
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = 'RSS 추가 중 오류가 발생했습니다: $e';
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _subscribeChannel() async {
-    if (_previewChannel == null) return;
-    setState(() => _isLoading = true);
-    try {
-      bool success;
-      if (_channelId != null) {
-        success = await RssService.subscribeChannel(_channelId!);
-      } else {
-        success = await RssService.subscribeChannelByRssLink(
-          _previewChannel!.channelRssLink,
-        );
-      }
-      if (success) {
-        widget.onChannelAdded();
-        if (!mounted) return;
-        _navigateToRssScreen();
-      } else {
-        if (!mounted) return;
-        setState(() {
-          _errorMessage = '이미 구독 중인 채널입니다.';
-          _isAlreadySubscribed = true;
-          _isLoading = false;
-        });
-      }
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = '구독 중 오류가 발생했습니다: $e';
-        _isLoading = false;
-      });
-    }
-  }
-
   Future<void> _generateRss() async {
-    // 이미 로딩 중이면 아무 것도 안 함
+    // [✅ 확인] 광고 로직 없이 직접 실행 (구독 여부는 _buildGenerateTab에서 UI 분기)
     if (_isGenerating) return;
 
     final url = _generateUrlController.text.trim();
@@ -419,7 +450,9 @@ class _RssAddScreenState extends State<RssAddScreen>
       setState(() => _isGenerating = false);
     }
   }
+  // --- END: 실제 RSS 생성 로직 ---
 
+  // --- Navigation & Snackbar (변경 없음) ---
   void _navigateToRssScreen() {
     Navigator.pop(context);
     Navigator.pushReplacement(
@@ -448,6 +481,8 @@ class _RssAddScreenState extends State<RssAddScreen>
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
     final colorScheme = theme.colorScheme;
+    // AdManager는 광고 호출을 위해서만 사용 (상태 관찰 불필요 시 listen: false)
+    // final adManager = context.read<AdManager>(); // or Provider.of<AdManager>(context, listen: false);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -467,17 +502,24 @@ class _RssAddScreenState extends State<RssAddScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildAddExistingTab(theme, textTheme, colorScheme),
-          _buildGenerateTab(theme, textTheme, colorScheme),
+          _buildAddExistingTab(
+            theme,
+            textTheme,
+            colorScheme,
+          ), // AdManager 전달 제거
+          _buildGenerateTab(theme, textTheme, colorScheme), // AdManager 전달 제거
         ],
       ),
     );
   }
 
+  // --- Widget Builders ---
+
   Widget _buildAddExistingTab(
     ThemeData theme,
     TextTheme textTheme,
     ColorScheme colorScheme,
+    // AdManager 전달 제거
   ) {
     return SingleChildScrollView(
       child: Padding(
@@ -495,11 +537,12 @@ class _RssAddScreenState extends State<RssAddScreen>
               style: textTheme.bodyMedium,
             ),
             const SizedBox(height: 24),
-            _buildUrlInputField(theme),
+            _buildUrlInputField(theme), // 미리보기 버튼 포함
             if (_errorMessage != null && _tabController.index == 0)
               _buildErrorMessage(colorScheme),
+            // 미리보기 결과 및 "RSS 추가/구독" 버튼 표시
             if (_previewChannel != null && _tabController.index == 0)
-              _buildPreviewSection(theme, textTheme),
+              _buildPreviewSection(theme, textTheme), // AdManager 전달 제거
             const SizedBox(height: 30),
           ],
         ),
@@ -511,42 +554,55 @@ class _RssAddScreenState extends State<RssAddScreen>
     ThemeData theme,
     TextTheme textTheme,
     ColorScheme colorScheme,
+    // AdManager 전달 제거
   ) {
     final isWebSelected = _selectedPlatform == "Web";
+    // [✅ 복원] 로컬 구독 상태 사용
+    final bool isSubscribed = _subscriptionStatus?.isActive == true;
+
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child:
-            _isLoadingSubscriptionStatus
+            _isLoadingSubscriptionStatus // [✅ 복원] 로컬 로딩 상태 사용
                 ? const Center(child: CircularProgressIndicator())
                 : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildPremiumFeatureBanner(theme, textTheme),
                     const SizedBox(height: 20),
-                    if (_subscriptionStatus?.isActive == true) ...[
+                    // [✅ 복원] 로컬 구독 상태(isSubscribed)로 UI 분기
+                    if (isSubscribed) ...[
+                      // --- 구독자 UI ---
                       _buildPlatformSelectionSection(theme, textTheme),
                       const SizedBox(height: 24),
                       if (isWebSelected && _showCssForm) ...[
-                        _buildCssRssForm(theme, textTheme),
+                        // --- CSS 폼 ---
+                        _buildCssRssForm(
+                          theme,
+                          textTheme,
+                        ), // isSubscribed 전달 제거
                         if (_errorMessage != null && _tabController.index == 1)
                           _buildErrorMessage(colorScheme),
                         if (_previewChannel != null &&
                             _tabController.index == 1)
-                          _buildPreviewSection(theme, textTheme),
+                          _buildPreviewSection(
+                            theme,
+                            textTheme,
+                          ), // AdManager 전달 제거
                         const SizedBox(height: 10),
                         Center(
                           child: TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _showCssForm = false;
-                                _errorMessage = null;
-                              });
-                            },
+                            onPressed:
+                                () => setState(() {
+                                  _showCssForm = false;
+                                  _errorMessage = null;
+                                }),
                             child: const Text('자동 추출로 돌아가기'),
                           ),
                         ),
                       ] else ...[
+                        // --- 일반 URL 입력 폼 ---
                         Text(
                           '사이트 주소 입력',
                           style: textTheme.titleLarge?.copyWith(fontSize: 18),
@@ -557,12 +613,18 @@ class _RssAddScreenState extends State<RssAddScreen>
                           style: textTheme.bodyMedium,
                         ),
                         const SizedBox(height: 12),
-                        _buildGenerateUrlInputField(theme),
+                        _buildGenerateUrlInputField(
+                          theme,
+                        ), // isSubscribed 전달 제거
                         if (_errorMessage != null && _tabController.index == 1)
                           _buildErrorMessage(colorScheme),
                         if (_previewChannel != null &&
                             _tabController.index == 1)
-                          _buildPreviewSection(theme, textTheme),
+                          _buildPreviewSection(
+                            theme,
+                            textTheme,
+                          ), // AdManager 전달 제거
+                        // CSS 폼으로 전환 버튼
                         if (isWebSelected)
                           Padding(
                             padding: const EdgeInsets.only(top: 12),
@@ -590,6 +652,8 @@ class _RssAddScreenState extends State<RssAddScreen>
                           ),
                       ],
                     ] else ...[
+                      // --- 비구독자 UI ---
+                      // "RSS 생성" 탭에서는 기능을 바로 보여주지 않고 구독 유도 프롬프트만 표시
                       _buildSubscriptionPrompt(theme, textTheme),
                     ],
                     const SizedBox(height: 30),
@@ -599,15 +663,22 @@ class _RssAddScreenState extends State<RssAddScreen>
     );
   }
 
+  // [✅ 복원] isSubscribed 매개변수 제거, 내부 버튼은 광고 로직 없음
   Widget _buildCssRssForm(ThemeData theme, TextTheme textTheme) {
     InputDecoration cssInputDeco(String label) => InputDecoration(
       labelText: label,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
     );
+
+    // [✅ 복원] 버튼 텍스트/아이콘 고정 (광고 없음)
+    const String buttonText = 'CSS 요소로 RSS 생성';
+    const IconData buttonIcon = Icons.auto_awesome;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // ... (CSS 폼 TextField들은 동일) ...
         Text('채널 정보 입력', style: textTheme.titleLarge?.copyWith(fontSize: 16)),
         const SizedBox(height: 10),
         TextField(
@@ -672,17 +743,20 @@ class _RssAddScreenState extends State<RssAddScreen>
         const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,
-          child: ElevatedButton(
+          child: ElevatedButton.icon(
+            // Use ElevatedButton.icon
+            // [✅ 복원] 광고 로직 없이 _generateRssByCss 직접 호출
             onPressed: _isCssGenerating ? null : _generateRssByCss,
             style: ElevatedButton.styleFrom(
-              backgroundColor: theme.primaryColor,
+              backgroundColor: theme.primaryColor, // 프리미엄 기능이므로 primaryColor 사용
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
               ),
+              disabledBackgroundColor: theme.primaryColor.withOpacity(0.5),
             ),
-            child:
+            icon:
                 _isCssGenerating
                     ? const SizedBox(
                       width: 18,
@@ -692,7 +766,11 @@ class _RssAddScreenState extends State<RssAddScreen>
                         strokeWidth: 2,
                       ),
                     )
-                    : const Text('CSS 요소로 RSS 생성하기'),
+                    : Icon(buttonIcon, size: 18),
+            label: Text(
+              _isCssGenerating ? '생성 중...' : buttonText,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
           ),
         ),
       ],
@@ -700,6 +778,7 @@ class _RssAddScreenState extends State<RssAddScreen>
   }
 
   Widget _buildPlatformSelectionSection(ThemeData theme, TextTheme textTheme) {
+    // --- (변경 없음) ---
     final platforms = _filteredPlatforms;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -788,6 +867,7 @@ class _RssAddScreenState extends State<RssAddScreen>
   }
 
   Widget _buildSearchField(ThemeData theme) {
+    // --- (변경 없음) ---
     return Container(
       height: 42,
       decoration: BoxDecoration(
@@ -865,6 +945,7 @@ class _RssAddScreenState extends State<RssAddScreen>
   }
 
   Widget _buildPremiumFeatureBanner(ThemeData theme, TextTheme textTheme) {
+    // --- (변경 없음) ---
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -893,6 +974,7 @@ class _RssAddScreenState extends State<RssAddScreen>
   }
 
   Widget _buildUrlInputField(ThemeData theme) {
+    // --- (변경 없음) ---
     return _buildUrlBox(
       theme: theme,
       controller: _urlController,
@@ -905,7 +987,12 @@ class _RssAddScreenState extends State<RssAddScreen>
     );
   }
 
+  // [✅ 복원] isSubscribed 매개변수 제거, 내부 버튼은 광고 로직 없음
   Widget _buildGenerateUrlInputField(ThemeData theme) {
+    // [✅ 복원] 버튼 텍스트/아이콘 고정 (광고 없음)
+    const String buttonText = 'RSS 생성하기';
+    const IconData buttonIcon = Icons.auto_awesome;
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
@@ -923,6 +1010,7 @@ class _RssAddScreenState extends State<RssAddScreen>
         children: [
           TextField(
             controller: _generateUrlController,
+            // ...(TextField 설정 동일)...
             decoration: InputDecoration(
               hintText: _getUrlHintByPlatform(),
               hintStyle: TextStyle(color: theme.hintColor),
@@ -950,15 +1038,18 @@ class _RssAddScreenState extends State<RssAddScreen>
               ),
             ),
             style: theme.textTheme.bodyLarge?.copyWith(fontSize: 16),
-            onSubmitted: (_) => _generateRss(),
+            // [✅ 복원] 광고 로직 없이 _generateRss 직접 호출
+            onSubmitted: (_) => _generateRss,
           ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
+            child: ElevatedButton.icon(
+              // Use ElevatedButton.icon
+              // [✅ 복원] 광고 로직 없이 _generateRss 직접 호출
               onPressed: _isGenerating ? null : _generateRss,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
+                backgroundColor: Colors.green, // 생성 버튼 색상
                 foregroundColor: Colors.white,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 14),
@@ -967,7 +1058,7 @@ class _RssAddScreenState extends State<RssAddScreen>
                 ),
                 disabledBackgroundColor: Colors.green.withOpacity(0.5),
               ),
-              child:
+              icon:
                   _isGenerating
                       ? const SizedBox(
                         width: 20,
@@ -977,13 +1068,14 @@ class _RssAddScreenState extends State<RssAddScreen>
                           strokeWidth: 2,
                         ),
                       )
-                      : const Text(
-                        'RSS 생성하기',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      : Icon(buttonIcon, size: 20),
+              label: Text(
+                _isGenerating ? '생성 중...' : buttonText,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
         ],
@@ -1001,6 +1093,7 @@ class _RssAddScreenState extends State<RssAddScreen>
     required bool loading,
     required Color mainColor,
   }) {
+    // --- (변경 없음) ---
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
@@ -1087,6 +1180,7 @@ class _RssAddScreenState extends State<RssAddScreen>
   }
 
   String _getUrlHintByPlatform() {
+    // --- (변경 없음) ---
     switch (_selectedPlatform) {
       case 'Naver':
         return 'https://blog.naver.com/사용자명';
@@ -1104,6 +1198,7 @@ class _RssAddScreenState extends State<RssAddScreen>
   }
 
   Widget _buildEmptySearchResult(ThemeData theme) {
+    // --- (변경 없음) ---
     return SizedBox(
       height: 90,
       width: double.infinity,
@@ -1122,6 +1217,7 @@ class _RssAddScreenState extends State<RssAddScreen>
   }
 
   Widget _buildSubscriptionPrompt(ThemeData theme, TextTheme textTheme) {
+    // --- (변경 없음, 생성 탭에서만 사용됨) ---
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -1166,7 +1262,7 @@ class _RssAddScreenState extends State<RssAddScreen>
           ),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: _openSubscriptionAndRefresh, // 변경: 구독 후 돌아오면 상태 새로고침
+            onPressed: _openSubscriptionAndRefresh,
             style: ElevatedButton.styleFrom(
               backgroundColor: theme.primaryColor,
               foregroundColor: Colors.white,
@@ -1186,6 +1282,7 @@ class _RssAddScreenState extends State<RssAddScreen>
   }
 
   Widget _buildErrorMessage(ColorScheme colorScheme) {
+    // --- (변경 없음) ---
     return Padding(
       padding: const EdgeInsets.only(top: 20),
       child: Container(
@@ -1212,6 +1309,7 @@ class _RssAddScreenState extends State<RssAddScreen>
     );
   }
 
+  // [✅ 수정] AdManager 전달 제거
   Widget _buildPreviewSection(ThemeData theme, TextTheme textTheme) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1230,12 +1328,13 @@ class _RssAddScreenState extends State<RssAddScreen>
         const SizedBox(height: 16),
         if (_generatedExisted) _buildExistInfoBanner(theme),
         if (_instagramItemsPending) _buildInstagramPendingBanner(theme),
-        _buildPreviewCard(theme, textTheme),
+        _buildPreviewCard(theme, textTheme), // AdManager 전달 제거
       ],
     );
   }
 
   Widget _buildExistInfoBanner(ThemeData theme) {
+    // --- (변경 없음) ---
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 16),
@@ -1264,6 +1363,7 @@ class _RssAddScreenState extends State<RssAddScreen>
   }
 
   Widget _buildInstagramPendingBanner(ThemeData theme) {
+    // --- (변경 없음) ---
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 16),
@@ -1291,6 +1391,7 @@ class _RssAddScreenState extends State<RssAddScreen>
     );
   }
 
+  // [✅ 수정] AdManager 전달 제거
   Widget _buildPreviewCard(ThemeData theme, TextTheme textTheme) {
     if (_previewChannel == null) return const SizedBox.shrink();
     final rssTheme = AppTheme.rssThemeOf(context);
@@ -1312,6 +1413,7 @@ class _RssAddScreenState extends State<RssAddScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ... (채널 정보 표시 동일) ...
             Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
@@ -1367,6 +1469,7 @@ class _RssAddScreenState extends State<RssAddScreen>
             ),
             const SizedBox(height: 16),
             Wrap(
+              // 정보 칩들
               spacing: 8,
               runSpacing: 8,
               children: [
@@ -1388,7 +1491,7 @@ class _RssAddScreenState extends State<RssAddScreen>
                     icon: Icons.settings,
                     theme: theme,
                   ),
-                if (_tabController.index == 1)
+                if (_tabController.index == 1) // 생성 탭에서 생성된 경우
                   _buildInfoChip(
                     label: '프리미엄으로 생성',
                     icon: Icons.stars,
@@ -1405,6 +1508,7 @@ class _RssAddScreenState extends State<RssAddScreen>
               ],
             ),
             const SizedBox(height: 24),
+            // [✅ 수정] 버튼 빌더 호출 시 AdManager 전달 제거
             _buildSubscriptionButton(theme, rssTheme),
           ],
         ),
@@ -1418,6 +1522,7 @@ class _RssAddScreenState extends State<RssAddScreen>
     Color? iconColor,
     required ThemeData theme,
   }) {
+    // --- (변경 없음) ---
     final chipTheme = theme.chipTheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1440,8 +1545,10 @@ class _RssAddScreenState extends State<RssAddScreen>
     );
   }
 
+  // [✅ 수정] AdManager 매개변수 제거, 내부에서 로컬 구독 상태 사용
   Widget _buildSubscriptionButton(ThemeData theme, dynamic rssTheme) {
     if (_isAlreadySubscribed) {
+      // --- 이미 구독 중인 채널 버튼 (변경 없음) ---
       return SizedBox(
         width: double.infinity,
         child: ElevatedButton.icon(
@@ -1466,17 +1573,56 @@ class _RssAddScreenState extends State<RssAddScreen>
       );
     }
 
-    final addingNew = !_isExistingRss;
-    final isGeneratedRss = _tabController.index == 1;
+    // --- 추가 또는 구독 버튼 ---
+    final bool addingNew = !_isExistingRss; // DB에 없는 새로운 RSS인가?
+    // [✅ 수정] 로컬 구독 상태 사용
+    final bool isSubscribedUser = _subscriptionStatus?.isActive == true;
+    final bool isRewardedAdLoaded = AdManager.isRewardedInterstitialAdLoaded;
+
+    // 버튼 텍스트와 아이콘 결정
+    String buttonText;
+    IconData buttonIcon;
+    VoidCallback? onPressedAction;
+
+    if (addingNew) {
+      // DB에 없는 RSS 추가 시
+      buttonText = isSubscribedUser ? 'RSS 추가하기' : '광고 보고 추가';
+      buttonIcon =
+          isSubscribedUser ? Icons.add_circle_outline : Icons.ads_click;
+      // [✅ 수정] 광고 로드 상태 및 _isLoading 체크
+      onPressedAction =
+          (_isLoading || (!isSubscribedUser && !isRewardedAdLoaded))
+              ? null // 로딩 중이거나, 비구독자인데 광고 로드 안됐으면 비활성화
+              : _handleAddRssWithAd;
+    } else {
+      // DB에 이미 있는 RSS 구독 시
+      buttonText = '구독하기';
+      buttonIcon = Icons.rss_feed;
+      onPressedAction = _isLoading ? null : _subscribeChannel;
+    }
+
+    // 버튼 스타일 결정 (색상 등)
+    final isGeneratedRssPreview =
+        _tabController.index == 1; // 미리보기가 생성 탭에서 온 것인가?
+    Color buttonColor =
+        addingNew
+            ? (isGeneratedRssPreview
+                ? theme.primaryColor
+                : Colors.green) // 추가 시 색상
+            : rssTheme.subscribeButtonActiveBackground; // 구독 시 색상
 
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed:
-            _isLoading ? null : (addingNew ? _addRssToDb : _subscribeChannel),
+        onPressed: onPressedAction,
         icon:
-            _isLoading
+            (_isLoading ||
+                    (addingNew &&
+                        !isSubscribedUser &&
+                        !isRewardedAdLoaded &&
+                        !_isLoading))
                 ? const SizedBox(
+                  /* Loading or Ad Loading Indicator */
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
@@ -1484,36 +1630,31 @@ class _RssAddScreenState extends State<RssAddScreen>
                     strokeWidth: 2,
                   ),
                 )
-                : Icon(
-                  addingNew ? Icons.add_circle_outline : Icons.rss_feed,
-                  size: 18,
-                ),
+                : Icon(buttonIcon, size: 18),
         label: Text(
-          addingNew ? 'RSS 추가하기' : '구독하기',
+          // [✅ 수정] 광고 로딩 중일 때 텍스트 변경 (선택적)
+          (addingNew && !isSubscribedUser && !isRewardedAdLoaded && !_isLoading)
+              ? '광고 로딩 중...'
+              : buttonText,
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor:
-              addingNew
-                  ? (isGeneratedRss ? theme.primaryColor : Colors.green)
-                  : rssTheme.subscribeButtonActiveBackground,
+          backgroundColor: buttonColor, // 결정된 색상
           foregroundColor: Colors.white,
           elevation: 0,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
           ),
-          disabledBackgroundColor:
-              addingNew
-                  ? (isGeneratedRss ? theme.primaryColor : Colors.green)
-                      .withOpacity(0.5)
-                  : theme.primaryColor.withOpacity(0.5),
+          disabledBackgroundColor: buttonColor.withOpacity(0.5),
+          disabledForegroundColor: Colors.white.withOpacity(0.7),
         ),
       ),
     );
   }
 
   Widget _buildDefaultChannelIcon(dynamic rssTheme) {
+    // --- (변경 없음) ---
     return Container(
       width: 70,
       height: 70,
@@ -1528,4 +1669,4 @@ class _RssAddScreenState extends State<RssAddScreen>
       child: const Icon(Icons.rss_feed, color: Colors.white, size: 34),
     );
   }
-}
+} // End of _RssAddScreenState

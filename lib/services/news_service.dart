@@ -68,6 +68,7 @@ class NewsService {
       if (response.statusCode == 200) {
         String decodedResponse = utf8.decode(response.bodyBytes);
         List<dynamic> jsonResponse = json.decode(decodedResponse);
+        debugPrint('뉴스 응답: ${jsonResponse.length} items');
 
         // HTML 엔티티 디코딩 - 각 항목의 필드별로 처리
         return jsonResponse.map((newsItem) {
