@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
 import 'package:omninews_flutter/models/rss_channel.dart';
 import 'package:omninews_flutter/models/rss_folder.dart';
 import 'package:omninews_flutter/services/subscribe_service.dart';
 import 'package:omninews_flutter/services/rss_folder_service.dart';
+import 'package:omninews_flutter/utils/ad_manager.dart';
 import 'package:omninews_flutter/widgets/subscribe_date_view.dart';
 import 'package:omninews_flutter/widgets/subscribe_folder_view.dart';
 import 'package:omninews_flutter/screens/home_screen.dart';
+import 'package:provider/provider.dart';
 
 class SubscribeScreen extends StatefulWidget {
   const SubscribeScreen({super.key});
@@ -171,6 +174,29 @@ class _SubscribeScreenState extends State<SubscribeScreen>
 
     final theme = Theme.of(context);
     final textTheme = theme.textTheme;
+    final adManager = context.watch<AdManager>();
+
+    Widget _buildBannerAdWidget() {
+      // RssScreen과 다른 고유한 광고 ID 사용 (AdManager에 정의되어 있다고 가정)
+      final bannerAd = adManager.getBannerAd(
+        AdManager.subscribeScreenBannerPlacement, // 구독 화면용 배너 ID
+      );
+      final isLoaded = adManager.isBannerAdLoaded(
+        AdManager.subscribeScreenBannerPlacement, // 구독 화면용 배너 ID
+      );
+
+      if (adManager.showAds && isLoaded && bannerAd != null) {
+        return Container(
+          key: ValueKey(bannerAd.hashCode), // 고유 키 보장
+          alignment: Alignment.center,
+          width: bannerAd.size.width.toDouble(),
+          height: bannerAd.size.height.toDouble(),
+          child: AdWidget(ad: bannerAd),
+        );
+      } else {
+        return const SizedBox.shrink();
+      }
+    }
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -241,6 +267,8 @@ class _SubscribeScreenState extends State<SubscribeScreen>
               floating: true,
               pinned: true,
             ),
+
+            SliverToBoxAdapter(child: _buildBannerAdWidget()),
           ];
         },
         body: TabBarView(

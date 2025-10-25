@@ -28,6 +28,8 @@ class AdManager with ChangeNotifier {
   // --- 배너 광고 위치 식별자 ---
   static const String newsScreenBannerPlacement = 'news_screen_banner';
   static const String rssScreenBannerPlacement = 'rss_screen_banner';
+  static const String subscribeScreenBannerPlacement =
+      'subscribe_screen_banner';
 
   // --- 구독 상태 변수 ---
   bool _isLoadingSubscriptionStatus = true;
@@ -65,6 +67,7 @@ class AdManager with ChangeNotifier {
     if (showAds) {
       loadBannerAd(placementId: newsScreenBannerPlacement);
       loadBannerAd(placementId: rssScreenBannerPlacement);
+      loadBannerAd(placementId: subscribeScreenBannerPlacement);
       loadRewardedInterstitialAd();
     }
   }
@@ -92,6 +95,7 @@ class AdManager with ChangeNotifier {
           // 간단한 체크, 더 정교하게 할 수 있음
           loadBannerAd(placementId: newsScreenBannerPlacement);
           loadBannerAd(placementId: rssScreenBannerPlacement);
+          loadBannerAd(placementId: subscribeScreenBannerPlacement);
         }
         if (_rewardedInterstitialAd == null &&
             !_isRewardedInterstitialAdLoaded) {
