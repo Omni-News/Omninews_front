@@ -13,15 +13,15 @@ class AdManager with ChangeNotifier {
   // [✅ 수정] iOS 보상형 전면 ID를 테스트 ID로 수정 (실제 ID는 필요시 적용)
   final String _nativeAdUnitId =
       Platform.isAndroid
-          ? 'ca-app-pub-3940256099942544/2247696110'
+          ? 'ca-app-pub-8274643755495491/6309338228'
           : 'ca-app-pub-8274643755495491/6309338228';
   final String _bannerAdUnitId =
       Platform.isAndroid
-          ? 'ca-app-pub-3940256099942544/6300978111'
+          ? 'ca-app-pub-8274643755495491/8422310331'
           : 'ca-app-pub-8274643755495491/8422310331';
   final String _rewardedInterstitialAdUnitId =
       Platform.isAndroid
-          ? 'ca-app-pub-3940256099942544/5224354917'
+          ? 'ca-app-pub-8274643755495491/5204181676'
           // : 'ca-app-pub-8274643755495491/2721488560'; // 실제 ID
           : 'ca-app-pub-8274643755495491/5204181676'; // iOS 테스트 ID로 변경
 
