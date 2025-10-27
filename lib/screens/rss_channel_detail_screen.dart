@@ -26,21 +26,80 @@ class RssChannelDetailScreen extends StatefulWidget {
 }
 
 class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
-  late Future<List<RssItem>> _rssItems;
+  final List<RssItem> _rssItems = [];
+  final ScrollController _scrollController = ScrollController();
+  bool _isLoading = false;
+  bool _hasMore = true;
+  int _page = 1;
   bool _isSubscribing = false;
-  late bool _localIsSubscribed; // 지역 상태
+  late bool _localIsSubscribed;
 
   @override
   void initState() {
     super.initState();
-    _localIsSubscribed = widget.isSubscribed; // 초기값 설정
+    _localIsSubscribed = widget.isSubscribed;
     _loadRssItems();
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels ==
+              _scrollController.position.maxScrollExtent &&
+          !_isLoading) {
+        _loadRssItems();
+      }
+    });
   }
 
-  void _loadRssItems() {
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadRssItems() async {
+    if (_isLoading || !_hasMore) return;
+
     setState(() {
-      _rssItems = RssService.fetchChannelItems(widget.channel.channelId);
+      _isLoading = true;
     });
+
+    try {
+      final newItems = await RssService.fetchChannelItems(
+        widget.channel.channelId,
+        page: _page,
+      );
+      if (mounted) {
+        setState(() {
+          if (newItems.isNotEmpty) {
+            _rssItems.addAll(newItems);
+            _page++;
+          } else {
+            _hasMore = false;
+          }
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('피드를 불러오는 데 실패했습니다: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _refreshRssItems() async {
+    setState(() {
+      _rssItems.clear();
+      _page = 1;
+      _hasMore = true;
+      _isLoading = false;
+    });
+    await _loadRssItems();
   }
 
   Future<void> _toggleSubscription() async {
@@ -158,52 +217,45 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
                       size: 20,
                     ),
                   ),
-                  onPressed: _loadRssItems,
+                  onPressed: _refreshRssItems,
                 ),
               ],
             ),
           ];
         },
         body: RefreshIndicator(
-          onRefresh: () async {
-            _loadRssItems();
-            // 약간의 대기 시간을 두어 인디케이터가 자연스럽게 보이도록 처리
-            await Future.delayed(const Duration(milliseconds: 300));
-          },
+          onRefresh: _refreshRssItems,
           color: theme.primaryColor,
           backgroundColor: theme.cardColor,
-          child: SingleChildScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 채널 헤더 섹션
-                _buildChannelHeader(settings),
-
-                // 구분선
-                Container(height: 8, color: theme.dividerTheme.color),
-
-                // 최신 피드 섹션
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                  child: Row(
-                    children: [
-                      Icon(Icons.article, size: 18, color: theme.primaryColor),
-                      const SizedBox(width: 8),
-                      Text(
-                        '최신 피드',
-                        style: textTheme.titleLarge?.copyWith(fontSize: 18),
+          child: CustomScrollView(
+            controller: _scrollController,
+            slivers: [
+              SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildChannelHeader(settings),
+                    Container(height: 8, color: theme.dividerTheme.color),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                      child: Row(
+                        children: [
+                          Icon(Icons.article, size: 18, color: theme.primaryColor),
+                          const SizedBox(width: 8),
+                          Text(
+                            '최신 피드',
+                            style: textTheme.titleLarge?.copyWith(fontSize: 18),
+                          ),
+                          const Spacer(),
+                          Text('아래로 당겨 새로고침', style: textTheme.bodySmall),
+                        ],
                       ),
-                      const Spacer(),
-                      Text('아래로 당겨 새로고침', style: textTheme.bodySmall),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-
-                // RSS 아이템 목록
-                _buildRssItems(),
-              ],
-            ),
+              ),
+              _buildRssItems(),
+            ],
           ),
         ),
       ),
@@ -449,95 +501,49 @@ class _RssChannelDetailScreenState extends State<RssChannelDetailScreen> {
   Widget _buildRssItems() {
     final theme = Theme.of(context);
 
-    return FutureBuilder<List<RssItem>>(
-      future: _rssItems,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return SizedBox(
-            height: 300,
-            child: Center(
-              child: CircularProgressIndicator(color: theme.primaryColor),
-            ),
-          );
-        } else if (snapshot.hasError) {
-          return _buildErrorState(snapshot.error);
-        } else if (snapshot.hasData && snapshot.data!.isNotEmpty) {
-          return ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(16),
-            itemCount: snapshot.data!.length,
-            separatorBuilder:
-                (context, index) =>
+    if (_rssItems.isEmpty && _isLoading) {
+      return SliverToBoxAdapter(
+        child: SizedBox(
+          height: 300,
+          child: Center(
+            child: CircularProgressIndicator(color: theme.primaryColor),
+          ),
+        ),
+      );
+    } else if (_rssItems.isEmpty && !_hasMore) {
+      return SliverToBoxAdapter(child: _buildEmptyState());
+    } else {
+      return SliverList(
+        delegate: SliverChildBuilderDelegate(
+          (context, index) {
+            if (index < _rssItems.length) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Column(
+                  children: [
+                    RssItemCard(
+                      item: _rssItems[index],
+                      onBookmarkChanged: () {
+                        // 필요 시 새로고침 처리
+                      },
+                    ),
                     Divider(height: 30, color: theme.dividerTheme.color),
-            itemBuilder: (context, index) {
-              return RssItemCard(
-                item: snapshot.data![index],
-                onBookmarkChanged: () {
-                  // 필요 시 새로고침 처리
-                },
+                  ],
+                ),
               );
-            },
-          );
-        } else {
-          return _buildEmptyState();
-        }
-      },
-    );
-  }
-
-  // 에러 상태 위젯
-  Widget _buildErrorState(Object? error) {
-    final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
-    final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
-
-    return Container(
-      height: 300,
-      padding: const EdgeInsets.all(20),
-      alignment: Alignment.center,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.error_outline,
-            size: 48,
-            color: subscribeStyle.errorIconColor,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '피드를 불러오는 데 실패했습니다.',
-            style: TextStyle(
-              color: textTheme.bodyLarge?.color,
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '$error',
-            style: textTheme.bodySmall,
-            textAlign: TextAlign.center,
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton.icon(
-            onPressed: _loadRssItems,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: theme.primaryColor,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-            icon: const Icon(Icons.refresh),
-            label: const Text('다시 시도'),
-          ),
-        ],
-      ),
-    );
+            } else if (_hasMore) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 32.0),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            } else {
+              return const SizedBox.shrink();
+            }
+          },
+          childCount: _rssItems.length + (_hasMore ? 1 : 0),
+        ),
+      );
+    }
   }
 
   // 빈 상태 위젯

@@ -59,11 +59,14 @@ class RssService {
   }
 
   // 특정 채널의 아이템 가져오기
-  static Future<List<RssItem>> fetchChannelItems(int channelId) async {
+  static Future<List<RssItem>> fetchChannelItems(
+    int channelId, {
+    int page = 1,
+  }) async {
     try {
       final response = await _authService.apiRequest(
         'GET',
-        '/rss/items?channel_id=$channelId',
+        '/rss/items?channel_id=$channelId&page=$page',
       );
 
       if (response.statusCode == 200) {
