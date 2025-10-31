@@ -21,7 +21,6 @@ class SubscribeScreen extends StatefulWidget {
 class _SubscribeScreenState extends State<SubscribeScreen>
     with AutomaticKeepAliveClientMixin, TickerProviderStateMixin {
   late TabController _tabController;
-  late Future<List<RssItem>> _subscribedItems;
   late Future<List<RssFolder>> _folders;
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
@@ -31,6 +30,13 @@ class _SubscribeScreenState extends State<SubscribeScreen>
   // 테마 체크를 위한 변수
   ThemeData? _currentTheme;
 
+  // PAGENATION: '날짜별 보기' 탭을 위한 상태 변수
+  List<RssItem> _subscribedItemsList = [];
+  final ScrollController _dateViewScrollController = ScrollController();
+  int _dateViewPage = 1;
+  bool _isDateViewLoading = false;
+  bool _hasMoreDateViewItems = true;
+
   @override
   bool get wantKeepAlive => true;
 
@@ -39,6 +45,17 @@ class _SubscribeScreenState extends State<SubscribeScreen>
     super.initState();
     _tabController = TabController(length: _tabs.length, vsync: this);
     _refreshData();
+
+    // PAGENATION: '날짜별 보기' 탭의 스크롤 리스너 추가
+    _dateViewScrollController.addListener(() {
+      if (_dateViewScrollController.position.pixels >=
+              _dateViewScrollController.position.maxScrollExtent -
+                  300 && // 300px 전에 로드
+          !_isDateViewLoading &&
+          _hasMoreDateViewItems) {
+        _loadMoreDateViewItems();
+      }
+    });
   }
 
   @override
@@ -63,14 +80,93 @@ class _SubscribeScreenState extends State<SubscribeScreen>
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _dateViewScrollController.dispose(); // PAGENATION: 컨트롤러 해제
     super.dispose();
   }
 
+  // PAGENATION: 데이터 새로고침 (페이지 1로 리셋)
   void _refreshData() {
+    // 검색 중일 때는 검색 로직을 따름
+    if (_isSearching && _searchQuery.isNotEmpty) {
+      _handleSearch(_searchQuery);
+      return;
+    }
+
     setState(() {
-      _subscribedItems = SubscribeService.getSubscribedItems();
+      // '날짜별 보기' 상태 리셋
+      _isDateViewLoading = true;
+      _hasMoreDateViewItems = true;
+      _dateViewPage = 1;
+      _subscribedItemsList.clear();
+
+      // '폴더별 보기' 데이터 로드 (변경 없음)
       _folders = RssFolderService.fetchFolders();
     });
+
+    // '날짜별 보기' 첫 페이지 로드
+    _fetchDateViewItems();
+  }
+
+  // PAGENATION: '날짜별 보기' 아이템의 첫 페이지 로드
+  Future<void> _fetchDateViewItems() async {
+    if (_isSearching) return; // 검색 중에는 페이지네이션 중지
+
+    setState(() {
+      _isDateViewLoading = true;
+    });
+
+    try {
+      final newItems = await SubscribeService.getSubscribedItems(_dateViewPage);
+      if (mounted) {
+        setState(() {
+          if (newItems.isEmpty) {
+            _hasMoreDateViewItems = false;
+          } else {
+            _subscribedItemsList.addAll(newItems);
+          }
+          _isDateViewLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching subscribed items: $e');
+      if (mounted) {
+        setState(() {
+          _isDateViewLoading = false;
+        });
+      }
+    }
+  }
+
+  // PAGENATION: '날짜별 보기' 아이템의 다음 페이지 로드
+  Future<void> _loadMoreDateViewItems() async {
+    if (_isDateViewLoading || !_hasMoreDateViewItems || _isSearching) return;
+
+    setState(() {
+      _isDateViewLoading = true;
+      _dateViewPage++;
+    });
+
+    try {
+      final newItems = await SubscribeService.getSubscribedItems(_dateViewPage);
+      if (mounted) {
+        setState(() {
+          if (newItems.isEmpty) {
+            _hasMoreDateViewItems = false;
+          } else {
+            _subscribedItemsList.addAll(newItems);
+          }
+          _isDateViewLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading more subscribed items: $e');
+      if (mounted) {
+        setState(() {
+          _isDateViewLoading = false;
+          _dateViewPage--; // 에러 발생 시 페이지 번호 롤백
+        });
+      }
+    }
   }
 
   void _toggleSearch() {
@@ -79,20 +175,37 @@ class _SubscribeScreenState extends State<SubscribeScreen>
       if (!_isSearching) {
         _searchController.clear();
         _searchQuery = '';
-        _refreshData();
+        _refreshData(); // PAGENATION: 검색 종료 시 페이지네이션 데이터로 복구
       }
     });
   }
 
-  void _handleSearch(String query) {
+  // PAGENATION: 검색 로직 수정
+  void _handleSearch(String query) async {
     setState(() {
       _searchQuery = query;
-      if (query.isNotEmpty) {
-        _subscribedItems = SubscribeService.searchBookmarkedItems(query);
-      } else {
-        _refreshData();
-      }
     });
+
+    if (query.isNotEmpty) {
+      // 검색 시에는 페이지네이션 비활성화
+      setState(() {
+        _isDateViewLoading = true;
+        _subscribedItemsList.clear();
+        _hasMoreDateViewItems = false; // 검색 결과는 '더 보기' 없음
+      });
+
+      // 기존 로직: searchBookmarkedItems는 모든 검색 결과를 반환 (페이지네이션 X)
+      final searchResults = await SubscribeService.searchBookmarkedItems(query);
+      if (mounted) {
+        setState(() {
+          _subscribedItemsList = searchResults;
+          _isDateViewLoading = false;
+        });
+      }
+    } else {
+      // 검색어 비었을 때 새로고침
+      _refreshData();
+    }
   }
 
   Future<void> _showCreateFolderDialog() async {
@@ -267,16 +380,21 @@ class _SubscribeScreenState extends State<SubscribeScreen>
               floating: true,
               pinned: true,
             ),
-
             SliverToBoxAdapter(child: _buildBannerAdWidget()),
           ];
         },
         body: TabBarView(
           controller: _tabController,
           children: [
-            // 날짜별 보기 탭
+            // PAGENATION: '날짜별 보기' 탭에 새 props 전달
+            // !! 중요 !!
+            // SubscribeDateView 파일 내부에서 이 props를 받도록 수정해야 합니다.
+            // (items: List<RssItem>, isLoading: bool, controller: ScrollController, hasMore: bool)
             SubscribeDateView(
-              items: _subscribedItems,
+              items: _subscribedItemsList,
+              isLoading: _isDateViewLoading,
+              controller: _dateViewScrollController,
+              hasMore: _hasMoreDateViewItems,
               searchQuery: _searchQuery,
               onRefresh: _refreshData,
             ),

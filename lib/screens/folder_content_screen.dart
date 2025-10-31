@@ -24,74 +24,214 @@ class FolderContentScreen extends StatefulWidget {
 }
 
 class _FolderContentScreenState extends State<FolderContentScreen> {
-  late Future<List<RssItem>> _folderItems;
+  // PAGENATION: FutureBuilder 대신 리스트 직접 관리
+  List<RssItem> _folderItemsList = [];
+  final ScrollController _scrollController = ScrollController();
+  int _currentPage = 1;
+  bool _isLoading = false;
+  bool _hasMore = true;
+
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
-
   Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
     _refreshData();
+
+    // PAGENATION: 스크롤 리스너 추가
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+              _scrollController.position.maxScrollExtent - 300 &&
+          !_isLoading &&
+          _hasMore) {
+        _loadMoreFolderItems();
+      }
+    });
   }
 
   @override
   void dispose() {
     _searchDebounce?.cancel();
     _searchController.dispose();
+    _scrollController.dispose(); // PAGENATION: 컨트롤러 해제
     super.dispose();
   }
 
+  // PAGENATION: 새로고침 (페이지 1로 리셋)
   Future<void> _refreshData() async {
-    final future = _getFolderItems();
+    // 검색 중일 때는 검색 로직 실행
+    if (_isSearching && _searchQuery.isNotEmpty) {
+      _handleSearch(_searchQuery);
+      return;
+    }
+
     setState(() {
-      _folderItems = future;
+      _isLoading = true;
+      _hasMore = true;
+      _currentPage = 1;
+      _folderItemsList.clear();
     });
-    // 부모에게도 새로고침을 알림 (필요 시 외부 목록 갱신)
-    await future;
+
+    // 첫 페이지 데이터 로드
+    await _fetchPaginatedFolderItems();
+
     if (mounted) {
-      widget.onRefresh();
+      widget.onRefresh(); // 부모에게 알림
     }
   }
 
-  Future<List<RssItem>> _getFolderItems() async {
+  // PAGENATION: 다음 페이지 로드
+  Future<void> _loadMoreFolderItems() async {
+    if (_isLoading || !_hasMore || _isSearching) return;
+
+    setState(() {
+      _isLoading = true;
+      _currentPage++;
+    });
+
+    await _fetchPaginatedFolderItems();
+  }
+
+  // PAGENATION: 페이지네이션용 데이터 fetching 로직
+  Future<void> _fetchPaginatedFolderItems() async {
+    // 검색 중이 아닐 때만 실행 (안전장치)
+    if (_isSearching) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+
     final channelIds =
         widget.folder.folderChannels
             .map((channel) => channel.channelId)
             .toList();
 
     if (channelIds.isEmpty) {
-      return [];
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasMore = false;
+        });
+      }
+      return;
     }
 
     try {
       final items = await SubscribeService.getSubscribedItemsByChannelIds(
         channelIds,
+        _currentPage,
       );
 
-      // 최신순으로 정렬 (pubDate 내림차순)
-      items.sort((a, b) {
+      if (mounted) {
+        setState(() {
+          if (items.isEmpty) {
+            _hasMore = false;
+          } else {
+            _folderItemsList.addAll(items);
+            // 기존 로직 유지: 새 데이터 추가 후 전체 목록 정렬
+            _folderItemsList.sort((a, b) {
+              final da = _parsePubDate(a.rssPubDate);
+              final db = _parsePubDate(b.rssPubDate);
+              return db.compareTo(da);
+            });
+          }
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching folder items: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          if (_currentPage > 1) _currentPage--; // "더 보기" 실패 시 페이지 롤백
+        });
+      }
+    }
+  }
+
+  // PAGENATION: 검색 로직 (기존 로직 유지 - 모든 아이템 로컬 필터링)
+  void _handleSearch(String query) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () async {
+      if (!mounted) return;
+
+      setState(() {
+        _searchQuery = query;
+      });
+
+      if (query.isEmpty) {
+        // 검색어 비었으면 페이지네이션 뷰로 복귀
+        _refreshData();
+        return;
+      }
+
+      // 검색 모드: 페이지네이션 중지, 로딩 시작
+      setState(() {
+        _isLoading = true;
+        _hasMore = false; // 검색 결과는 '더 보기' 없음
+        _folderItemsList.clear();
+      });
+
+      // 기존 로직(로컬 필터링)을 위해 모든 아이템을 가져옴
+      final allItems = await _fetchAllItemsForFolder();
+
+      // 기존 로직: 로컬 필터링
+      final q = query.toLowerCase();
+      final filteredItems =
+          allItems.where((item) {
+            final title = (item.rssTitle).toLowerCase();
+            final desc = (item.rssDescription).toLowerCase();
+            return title.contains(q) || desc.contains(q);
+          }).toList();
+
+      // 기존 로직: 정렬
+      filteredItems.sort((a, b) {
         final da = _parsePubDate(a.rssPubDate);
         final db = _parsePubDate(b.rssPubDate);
         return db.compareTo(da);
       });
 
-      if (_searchQuery.isNotEmpty) {
-        final q = _searchQuery.toLowerCase();
-        return items.where((item) {
-          final title = (item.rssTitle).toLowerCase();
-          final desc = (item.rssDescription).toLowerCase();
-          return title.contains(q) || desc.contains(q);
-        }).toList();
+      if (mounted) {
+        setState(() {
+          _folderItemsList = filteredItems;
+          _isLoading = false;
+        });
       }
+    });
+  }
 
-      return items;
-    } catch (e) {
-      debugPrint('Error fetching folder items: $e');
-      return [];
+  // PAGENATION: 검색을 위해 모든 페이지의 아이템을 가져오는 헬퍼
+  Future<List<RssItem>> _fetchAllItemsForFolder() async {
+    final channelIds =
+        widget.folder.folderChannels
+            .map((channel) => channel.channelId)
+            .toList();
+    if (channelIds.isEmpty) return [];
+
+    List<RssItem> allItems = [];
+    int page = 1;
+    bool hasMoreItems = true;
+
+    while (hasMoreItems) {
+      try {
+        final items = await SubscribeService.getSubscribedItemsByChannelIds(
+          channelIds,
+          page,
+        );
+        if (items.isEmpty) {
+          hasMoreItems = false;
+        } else {
+          allItems.addAll(items);
+          page++;
+        }
+      } catch (e) {
+        debugPrint('Error fetching all items for search: $e');
+        hasMoreItems = false; // 에러 발생 시 중지
+      }
     }
+    return allItems;
   }
 
   DateTime _parsePubDate(String value) {
@@ -108,20 +248,9 @@ class _FolderContentScreenState extends State<FolderContentScreen> {
       _isSearching = !_isSearching;
       if (!_isSearching) {
         _searchController.clear();
-        _searchQuery = '';
-        _refreshData();
+        // _searchQuery = ''; // _handleSearch가 처리
+        _handleSearch(''); // 검색 종료 시 데이터 복구
       }
-    });
-  }
-
-  void _handleSearch(String query) {
-    _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
-      if (!mounted) return;
-      setState(() {
-        _searchQuery = query;
-        _folderItems = _getFolderItems();
-      });
     });
   }
 
@@ -168,83 +297,97 @@ class _FolderContentScreenState extends State<FolderContentScreen> {
           ),
         ],
       ),
-      body: FutureBuilder<List<RssItem>>(
-        future: _folderItems,
-        builder: (context, snapshot) {
-          final isWaiting = snapshot.connectionState == ConnectionState.waiting;
-          if (isWaiting) {
-            return Center(
-              child: CircularProgressIndicator(color: theme.primaryColor),
-            );
-          } else if (snapshot.hasError) {
-            return _buildErrorState('데이터를 불러오는 데 실패했습니다', context);
-          }
+      // PAGENATION: FutureBuilder 대신 _buildBody() 사용
+      body: _buildBody(),
+    );
+  }
 
-          final data = snapshot.data ?? [];
-          if (data.isEmpty) {
-            return _buildEmptyState(
-              _searchQuery.isEmpty ? '폴더에 컨텐츠가 없습니다' : '검색 결과가 없습니다',
-              _searchQuery.isEmpty ? Icons.folder_open : Icons.search,
-              context,
-            );
-          }
+  // PAGENATION: 바디 위젯 분리
+  Widget _buildBody() {
+    final theme = Theme.of(context);
 
-          final itemsByDate = _groupItemsByDate(data);
+    // 1. 초기 로딩 상태
+    if (_isLoading && _folderItemsList.isEmpty) {
+      return Center(
+        child: CircularProgressIndicator(color: theme.primaryColor),
+      );
+    }
 
-          return RefreshIndicator(
-            onRefresh: _refreshData,
-            color: theme.primaryColor,
-            backgroundColor: theme.cardColor,
-            child: ListView.builder(
-              padding: const EdgeInsets.only(top: 8, bottom: 20),
-              itemCount: itemsByDate.length,
-              itemBuilder: (context, index) {
-                final dateKey = itemsByDate.keys.elementAt(index);
-                final items = itemsByDate[dateKey]!;
-                final formattedDate = _formatDate(dateKey);
+    // 2. 데이터가 없는 상태 (검색 결과 없음 포함)
+    if (_folderItemsList.isEmpty && !_isLoading) {
+      return _buildEmptyState(
+        _searchQuery.isEmpty ? '폴더에 컨텐츠가 없습니다' : '검색 결과가 없습니다',
+        _searchQuery.isEmpty ? Icons.folder_open : Icons.search,
+        context,
+      );
+    }
 
-                return StickyHeader(
-                  header: _buildDateHeader(
-                    formattedDate,
-                    items.length,
-                    context,
+    // 3. 데이터가 있는 상태
+    final itemsByDate = _groupItemsByDate(_folderItemsList);
+
+    return RefreshIndicator(
+      onRefresh: _refreshData,
+      color: theme.primaryColor,
+      backgroundColor: theme.cardColor,
+      child: ListView.builder(
+        controller: _scrollController, // PAGENATION: 스크롤 컨트롤러 연결
+        padding: const EdgeInsets.only(top: 8, bottom: 20),
+        // PAGENATION: 로딩 인디케이터를 위해 +1
+        itemCount: itemsByDate.length + (_hasMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          // PAGENATION: 마지막 아이템이면 로딩 인디케이터 표시
+          if (index == itemsByDate.length) {
+            return _isLoading
+                ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32.0),
+                  child: Center(
+                    child: CircularProgressIndicator(color: theme.primaryColor),
                   ),
-                  content: Column(
+                )
+                : const SizedBox.shrink();
+          }
+
+          // --- 기존 아이템 빌더 로직 ---
+          final dateKey = itemsByDate.keys.elementAt(index);
+          final items = itemsByDate[dateKey]!;
+          final formattedDate = _formatDate(dateKey);
+
+          return StickyHeader(
+            header: _buildDateHeader(formattedDate, items.length, context),
+            content: Column(
+              children: [
+                // 인덱스로 순회하여 indexOf 호출을 피하고 성능 개선
+                ...List.generate(items.length, (i) {
+                  final item = items[i];
+                  return Column(
                     children: [
-                      // 인덱스로 순회하여 indexOf 호출을 피하고 성능 개선
-                      ...List.generate(items.length, (i) {
-                        final item = items[i];
-                        return Column(
-                          children: [
-                            RssItemCard(
-                              item: item,
-                              onBookmarkChanged: _refreshData,
-                            ),
-                            if (i < items.length - 1)
-                              Divider(
-                                height: 1,
-                                indent: 16,
-                                endIndent: 16,
-                                color: theme.dividerTheme.color?.withOpacity(
-                                  0.5,
-                                ),
-                              ),
-                          ],
-                        );
-                      }),
-                      if (index < itemsByDate.length - 1)
-                        Container(
-                          height: 8,
-                          color:
-                              AppTheme.subscribeViewStyleOf(
-                                context,
-                              ).sectionDividerColor,
-                          margin: const EdgeInsets.only(top: 8),
+                      RssItemCard(
+                        item: item,
+                        // PAGENATION: 북마크 변경 시 _refreshData(페이지1) 대신
+                        // _handleBookmarkChanged(로컬) 등으로 최적화할 수 있으나,
+                        // 일단 기존 로직(전체 새로고침)을 유지합니다.
+                        onBookmarkChanged: _refreshData,
+                      ),
+                      if (i < items.length - 1)
+                        Divider(
+                          height: 1,
+                          indent: 16,
+                          endIndent: 16,
+                          color: theme.dividerTheme.color?.withOpacity(0.5),
                         ),
                     ],
+                  );
+                }),
+                if (index < itemsByDate.length - 1)
+                  Container(
+                    height: 8,
+                    color:
+                        AppTheme.subscribeViewStyleOf(
+                          context,
+                        ).sectionDividerColor,
+                    margin: const EdgeInsets.only(top: 8),
                   ),
-                );
-              },
+              ],
             ),
           );
         },

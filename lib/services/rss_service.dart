@@ -269,13 +269,14 @@ class RssService {
   // 사용자 구독 채널 아이템 가져오기 - 새 API 스펙 사용
   static Future<List<RssItem>> fetchSubscribedItems(
     List<int> channelIds,
+    int page,
   ) async {
     try {
       final String channelIdsString = channelIds.join(',');
 
       final response = await _authService.apiRequest(
         'GET',
-        '/subscription/items?channel_ids=$channelIdsString',
+        '/subscription/items?channel_ids=$channelIdsString&page=$page',
       );
 
       if (response.statusCode == 200) {
