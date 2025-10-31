@@ -15,7 +15,7 @@ class SubscribeService {
   }
 
   // 구독한 채널의 아이템 가져오기
-  static Future<List<RssItem>> getSubscribedItems() async {
+  static Future<List<RssItem>> getSubscribedItems(int page) async {
     try {
       // 구독 중인 채널 ID 목록 가져오기
       final subscribedChannels = await RssService.fetchSubscribedChannels();
@@ -27,7 +27,7 @@ class SubscribeService {
       }
 
       // 서버에 요청하여 구독 아이템 가져오기
-      return await RssService.fetchSubscribedItems(channelIds);
+      return await RssService.fetchSubscribedItems(channelIds, page);
     } catch (e) {
       debugPrint('Error getting subscribed items: $e');
       return [];
@@ -272,6 +272,7 @@ class SubscribeService {
   // SubscribeService 클래스에 추가할 메서드
   static Future<List<RssItem>> getSubscribedItemsByChannelIds(
     List<int> channelIds,
+    int page,
   ) async {
     try {
       if (channelIds.isEmpty) {
@@ -279,7 +280,7 @@ class SubscribeService {
       }
 
       // 서버에 요청하여 구독 아이템 가져오기
-      return await RssService.fetchSubscribedItems(channelIds);
+      return await RssService.fetchSubscribedItems(channelIds, page);
     } catch (e) {
       debugPrint('Error getting items by channel IDs: $e');
       return [];

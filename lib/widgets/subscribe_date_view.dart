@@ -6,109 +6,131 @@ import 'package:sticky_headers/sticky_headers.dart';
 import 'package:omninews_flutter/theme/app_theme.dart';
 
 class SubscribeDateView extends StatelessWidget {
-  final Future<List<RssItem>> items;
+  // --- ▼ 1. PAGENATION: props 변경 ---
+  // Future<List<RssItem>> -> List<RssItem>
+  final List<RssItem> items;
   final String searchQuery;
   final VoidCallback onRefresh;
+  // PAGENATION: 새 props 추가
+  final bool isLoading;
+  final ScrollController controller;
+  final bool hasMore;
+  // --- ▲ 1. PAGENATION: props 변경 ---
 
   const SubscribeDateView({
     super.key,
     required this.items,
     required this.searchQuery,
     required this.onRefresh,
+    // --- ▼ 2. PAGENATION: 생성자 변경 ---
+    required this.isLoading,
+    required this.controller,
+    required this.hasMore,
+    // --- ▲ 2. PAGENATION: 생성자 변경 ---
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    // --- ▼ 3. PAGENATION: FutureBuilder 제거, 새 로직 적용 ---
     return RefreshIndicator(
       onRefresh: () async {
         onRefresh();
       },
       color: theme.primaryColor,
       backgroundColor: theme.scaffoldBackgroundColor,
-      child: FutureBuilder<List<RssItem>>(
-        future: items,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            // RefreshIndicator가 동작하도록 스크롤 가능한 위젯 반환
-            return ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              children: [
-                const SizedBox(height: 200),
-                Center(
-                  child: CircularProgressIndicator(color: theme.primaryColor),
-                ),
-              ],
+      // 데이터가 비어있고, 로딩 중일 때 (초기 로딩)
+      child:
+          (isLoading && items.isEmpty)
+              ? Center(
+                child: CircularProgressIndicator(color: theme.primaryColor),
+              )
+              // 로딩이 끝났는데 데이터가 없을 때 (빈 상태)
+              : (!isLoading && items.isEmpty)
+              ? _buildEmptyState(
+                searchQuery.isEmpty ? '구독 항목이 없습니다' : '검색 결과가 없습니다',
+                searchQuery.isEmpty ? Icons.feed_outlined : Icons.search,
+                context,
+              )
+              // 데이터가 있을 때
+              : _buildListView(context, theme),
+    );
+    // --- ▲ 3. PAGENATION: FutureBuilder 제거 ---
+  }
+
+  // --- ▼ 4. PAGENATION: ListView.builder를 별도 메서드로 분리 ---
+  Widget _buildListView(BuildContext context, ThemeData theme) {
+    // 날짜별로 아이템 그룹화 (snapshot.data! 대신 props.items 사용)
+    final itemsByDate = _groupItemsByDate(items);
+
+    return ListView.builder(
+      // PAGENATION: 부모로부터 받은 컨트롤러 연결
+      controller: controller,
+      padding: const EdgeInsets.only(top: 8, bottom: 20),
+      // PAGENATION: '더 보기' 로딩 인디케이터를 위해 +1
+      itemCount: itemsByDate.length + 1,
+      itemBuilder: (context, index) {
+        // PAGENATION: 마지막 아이템(로딩 인디케이터) 처리
+        if (index == itemsByDate.length) {
+          if (hasMore) {
+            // 로딩 중이고 더 많은 아이템이 있으면 인디케이터 표시
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 32.0),
+              child: Center(child: CircularProgressIndicator()),
             );
-          } else if (snapshot.hasError) {
-            return _buildErrorState('데이터를 불러오는데 실패했습니다', context);
-          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return _buildEmptyState(
-              searchQuery.isEmpty ? '구독 항목이 없습니다' : '검색 결과가 없습니다',
-              searchQuery.isEmpty ? Icons.feed_outlined : Icons.search,
-              context,
-            );
+          } else {
+            // 더 이상 아이템이 없으면 아무것도 표시 안 함
+            return const SizedBox.shrink();
           }
+        }
 
-          // 날짜별로 아이템 그룹화
-          final itemsByDate = _groupItemsByDate(snapshot.data!);
+        // --- 기존 StickyHeader 렌더링 로직 ---
+        final date = itemsByDate.keys.elementAt(index);
+        final dayItems = itemsByDate[date]!;
+        final formattedDate = _formatDate(date);
 
-          return ListView.builder(
-            padding: const EdgeInsets.only(top: 8, bottom: 20),
-            itemCount: itemsByDate.length,
-            itemBuilder: (context, index) {
-              final date = itemsByDate.keys.elementAt(index);
-              final dayItems = itemsByDate[date]!;
-              final formattedDate = _formatDate(date);
-
-              return StickyHeader(
-                header: _buildDateHeader(
-                  formattedDate,
-                  dayItems.length,
-                  context,
-                ),
-                content: Column(
+        return StickyHeader(
+          header: _buildDateHeader(formattedDate, dayItems.length, context),
+          content: Column(
+            children: [
+              // index 기반으로 렌더링하여 indexOf 비용 방지
+              ...List.generate(dayItems.length, (i) {
+                final item = dayItems[i];
+                return Column(
                   children: [
-                    // index 기반으로 렌더링하여 indexOf 비용 방지
-                    ...List.generate(dayItems.length, (i) {
-                      final item = dayItems[i];
-                      return Column(
-                        children: [
-                          RssItemCard(
-                            item: item,
-                            onBookmarkChanged: onRefresh, // 북마크 변경 시 상위 새로고침
-                          ),
-                          if (i < dayItems.length - 1)
-                            Divider(
-                              height: 1,
-                              indent: 16,
-                              endIndent: 16,
-                              color: theme.dividerTheme.color,
-                            ),
-                        ],
-                      );
-                    }),
-
-                    // 날짜 섹션 구분선 - 마지막 날짜가 아니면 추가
-                    if (index < itemsByDate.length - 1)
-                      Container(
-                        height: 8,
-                        color:
-                            theme.brightness == Brightness.dark
-                                ? theme.cardColor.withOpacity(0.2)
-                                : theme.cardColor.withOpacity(0.8),
-                        margin: const EdgeInsets.only(top: 8),
+                    RssItemCard(
+                      item: item,
+                      onBookmarkChanged: onRefresh, // 북마크 변경 시 상위 새로고침
+                    ),
+                    if (i < dayItems.length - 1)
+                      Divider(
+                        height: 1,
+                        indent: 16,
+                        endIndent: 16,
+                        color: theme.dividerTheme.color,
                       ),
                   ],
+                );
+              }),
+
+              // 날짜 섹션 구분선 - 마지막 날짜가 아니면 추가
+              if (index < itemsByDate.length - 1)
+                Container(
+                  height: 8,
+                  color:
+                      theme.brightness == Brightness.dark
+                          ? theme.cardColor.withOpacity(0.2)
+                          : theme.cardColor.withOpacity(0.8),
+                  margin: const EdgeInsets.only(top: 8),
                 ),
-              );
-            },
-          );
-        },
-      ),
+            ],
+          ),
+        );
+      },
     );
   }
+  // --- ▲ 4. PAGENATION: ListView.builder를 별도 메서드로 분리 ---
 
   // 날짜별로 아이템을 그룹화하는 함수 (각 그룹 내에서도 최신순 정렬)
   Map<String, List<RssItem>> _groupItemsByDate(List<RssItem> items) {
@@ -225,53 +247,9 @@ class SubscribeDateView extends StatelessWidget {
     );
   }
 
-  // 에러 상태도 당겨서 새로고침 되도록 스크롤 가능 위젯으로 구성
-  Widget _buildErrorState(String message, BuildContext context) {
-    final theme = Theme.of(context);
-    final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
-
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      children: [
-        const SizedBox(height: 160),
-        Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                size: 48,
-                color: subscribeStyle.errorIconColor,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                message,
-                style: TextStyle(
-                  color: subscribeStyle.emptyTextColor,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: onRefresh,
-                icon: const Icon(Icons.refresh),
-                label: const Text('다시 시도'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.primaryColor,
-                  foregroundColor: theme.colorScheme.onPrimary,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
+  // --- 5. PAGENATION: _buildErrorState 제거 ---
+  // 에러 처리는 이제 부모 위젯(SubscribeScreen)에서 담당하므로
+  // 이 위젯에서는 더 이상 필요하지 않습니다.
 
   // 빈 상태도 당겨서 새로고침 되도록 스크롤 가능 위젯으로 구성
   Widget _buildEmptyState(String message, IconData icon, BuildContext context) {
