@@ -200,6 +200,10 @@ class SubscriptionService {
 
   // 구독 플랜 로드
   Future<List<SubscriptionPlan>> loadSubscriptionPlans() async {
+    if (Platform.isAndroid) {
+      debugPrint('Android에서는 인앱 구매를 지원하지 않습니다.');
+      return [];
+    }
     try {
       // InAppPurchase 사용 가능 여부 먼저 체크
       final bool isAvailable = await _inAppPurchase.isAvailable();
@@ -265,6 +269,10 @@ class SubscriptionService {
 
   // 구독 구매 시작 (사용자 버튼 → 여기서만 register 가능하도록 플래그 설정)
   Future<bool> purchasePlan(String productId) async {
+    if (Platform.isAndroid) {
+      debugPrint('Android에서는 인앱 구매를 지원하지 않습니다.');
+      return false;
+    }
     _userInitiatedPurchase = true; // 사용자 유도 구매 시작
     try {
       debugPrint("구독 구매 시작: $productId");

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/rss_channel.dart';
 import 'package:omninews_flutter/models/rss_item.dart';
@@ -155,10 +157,18 @@ class _RssDetailScreenState extends State<RssDetailScreen> {
   }
 
   void _goToSubscription() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const SubscriptionHomePage()),
-    );
+    if (Platform.isAndroid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('구독 정보는 서버에서 자동으로 관리됩니다.'),
+        ),
+      );
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const SubscriptionHomePage()),
+      );
+    }
   }
 
   String _hostOf(String url) {

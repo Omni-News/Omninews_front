@@ -132,12 +132,20 @@ class SettingsScreen extends StatelessWidget {
           subtitle: const Text('프리미엄 기능과 구독 상태를 확인합니다'),
           trailing: const Icon(Icons.chevron_right),
           onTap: () async {
-            await Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const SubscriptionHomePage(),
-              ),
-            );
+            if (Platform.isAndroid) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('구독 정보는 서버에서 자동으로 관리됩니다.'),
+                ),
+              );
+            } else {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SubscriptionHomePage(),
+                ),
+              );
+            }
           },
         ),
       ],
