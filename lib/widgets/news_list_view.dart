@@ -10,8 +10,10 @@ import 'package:omninews_flutter/screens/news_detail_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:omninews_flutter/services/news_bookmark_service.dart';
 import 'package:omninews_flutter/services/news_service.dart';
+import 'package:omninews_flutter/services/recently_read_service.dart'; // [✅ 추가]
 import 'package:omninews_flutter/theme/app_theme.dart';
 import 'package:omninews_flutter/utils/ad_manager.dart';
+import 'package:omninews_flutter/utils/url_launcher_helper.dart'; // [✅ 추가]
 import 'package:provider/provider.dart';
 
 class NewsListView extends StatefulWidget {
@@ -86,7 +88,6 @@ class _NewsListViewState extends State<NewsListView>
   }
 
   Future<void> _fetchInitialNews() async {
-    // ... (데이터 로딩, 광고 위치 생성, 광고 로드 요청 - 변경 없음) ...
     if (!_isLoading) {
       if (mounted) {
         setState(() {
@@ -124,7 +125,6 @@ class _NewsListViewState extends State<NewsListView>
         _generateAdIndices(newItems.length, _initialAdCount, newAdIndices);
       }
 
-      // setState는 build 메서드를 다시 호출하므로, 여기서 position이 null일 수 있음
       setState(() {
         _newsItems.clear();
         _newsItems.addAll(newItems);
@@ -134,7 +134,7 @@ class _NewsListViewState extends State<NewsListView>
         _adDataIndices.addAll(newAdIndices);
         _isLoading = false;
       });
-      // 광고 로드는 build가 완료된 후 (또는 다음 프레임)에 시작하는 것이 더 안전할 수 있음
+
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _requestAdsForCurrentIndices();
       });
@@ -155,7 +155,6 @@ class _NewsListViewState extends State<NewsListView>
   }
 
   void _scrollListener() {
-    // ... (인디케이터 표시/숨김 타이머 로직 - 변경 없음) ...
     if (_scrollController.hasClients) {
       if (!_showScrollIndicatorNotifier.value) {
         _showScrollIndicatorNotifier.value = true;
@@ -167,10 +166,10 @@ class _NewsListViewState extends State<NewsListView>
         }
       });
     }
-    // --- 더보기 로직 (변경 없음) ---
+
     if (!_isLoadingMore &&
         _hasMore &&
-        _scrollController.hasClients && // hasClients 확인 추가
+        _scrollController.hasClients &&
         _scrollController.position.pixels >=
             _scrollController.position.maxScrollExtent - 300) {
       _loadMore();
@@ -178,7 +177,6 @@ class _NewsListViewState extends State<NewsListView>
   }
 
   Future<void> _loadMore() async {
-    // ... (더보기 로직 - 변경 없음) ...
     if (_isLoadingMore || !_hasMore) return;
     setState(() => _isLoadingMore = true);
     try {
@@ -219,7 +217,6 @@ class _NewsListViewState extends State<NewsListView>
 
   // 광고 인덱스 생성 (초기)
   void _generateAdIndices(int listLength, int count, List<int> targetList) {
-    // ... (변경 없음) ...
     if (listLength <= _adMinIndex) return;
     final availableIndices =
         List.generate(
@@ -239,7 +236,6 @@ class _NewsListViewState extends State<NewsListView>
 
   // 추가 광고 인덱스 생성
   List<int> _generateMoreAdIndices(int startIndex, int newItemsCount) {
-    // ... (변경 없음) ...
     final newlyAddedDataIndices = <int>[];
     int endIndex = startIndex + newItemsCount - 1;
     int effectiveStartIndex = max(_adMinIndex, startIndex);
@@ -264,7 +260,7 @@ class _NewsListViewState extends State<NewsListView>
     return newlyAddedDataIndices;
   }
 
-  // 전체 광고 로드 요청 (변경 없음)
+  // 전체 광고 로드 요청
   void _requestAdsForCurrentIndices() {
     for (int i = 0; i < _adDataIndices.length; i++) {
       int adDataIndex = _adDataIndices[i];
@@ -273,7 +269,7 @@ class _NewsListViewState extends State<NewsListView>
     }
   }
 
-  // 새로 추가된 광고 로드 요청 (변경 없음)
+  // 새로 추가된 광고 로드 요청
   void _requestAdsForNewIndices(List<int> newDataIndices) {
     if (newDataIndices.isEmpty) return;
     for (int newDataIndex in newDataIndices) {
@@ -285,7 +281,7 @@ class _NewsListViewState extends State<NewsListView>
     }
   }
 
-  // 개별 광고 로드 요청 (변경 없음)
+  // 개별 광고 로드 요청
   Future<void> _requestAdLoad(int builderIndex) async {
     if (_loadedAds.containsKey(builderIndex)) return;
     if (!mounted) return;
@@ -325,24 +321,38 @@ class _NewsListViewState extends State<NewsListView>
     }
   }
 
+  // [✅ 수정] 뉴스 클릭 핸들러 - 주요 카테고리는 설정값에 맞춰 URL 열기
+  void _handleNewsItemTap(News news) {
+    if (widget.category == "주요") {
+      // 주요 카테고리는 최근 읽은 뉴스에 추가하고 설정값에 맞춰 링크 열기
+      RecentlyReadService.addNews(news);
+      final settings =
+          Provider.of<SettingsProvider>(context, listen: false).settings;
+      UrlLauncherHelper.openUrl(context, news.newsLink, settings.webOpenMode);
+    } else {
+      // 다른 카테고리는 상세 화면으로 이동
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => NewsDetailScreen(news: news)),
+      );
+    }
+  }
+
   // --- 스크롤 네비게이터 관련 ---
 
-  // [✅ 수정] 스크롤 인디케이터 UI 빌더 - AnimatedBuilder + hasClients 확인 강화
   Widget _buildScrollIndicator() {
     final theme = Theme.of(context);
     return AnimatedBuilder(
       animation: _scrollController,
       builder: (context, child) {
-        // 스크롤 컨트롤러 연결 및 position 유효성 확인 필수!
         if (!_scrollController.hasClients ||
             !_scrollController.position.hasContentDimensions) {
-          return const SizedBox.shrink(); // 정보 없으면 표시 안 함
+          return const SizedBox.shrink();
         }
 
         final currentPosition = _scrollController.position.pixels;
         final maxExtent = _scrollController.position.maxScrollExtent;
 
-        // maxExtent가 0 이하인 경우 (스크롤 불필요)
         if (maxExtent <= 0) return const SizedBox.shrink();
 
         final currentItemIndex =
@@ -350,11 +360,9 @@ class _NewsListViewState extends State<NewsListView>
         final displayIndex = min(currentItemIndex + 1, _newsItems.length);
         final totalNewsCount = _newsItems.length;
 
-        // 아이템 없으면 표시 안 함
         if (totalNewsCount == 0) return const SizedBox.shrink();
 
         return Container(
-          /* ... Container 스타일 ... */
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: theme.cardColor.withOpacity(0.9),
@@ -377,13 +385,11 @@ class _NewsListViewState extends State<NewsListView>
     );
   }
 
-  // 맨 위로 버튼 UI 빌더 (AnimatedBuilder 사용 - 변경 없음)
   Widget _buildScrollToTopButton() {
     final theme = Theme.of(context);
     return AnimatedBuilder(
       animation: _scrollController,
       builder: (context, child) {
-        // hasClients 먼저 확인 후 offset 접근
         final showButton =
             _scrollController.hasClients && _scrollController.offset > 300;
         return AnimatedOpacity(
@@ -412,17 +418,15 @@ class _NewsListViewState extends State<NewsListView>
       },
     );
   }
-  // --- 스크롤 네비게이터 끝 ---
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // KeepAlive
+    super.build(context);
 
     final theme = Theme.of(context);
     final cardStyle = AppTheme.newsCardStyleOf(context);
     final subscribeStyle = AppTheme.subscribeViewStyleOf(context);
     final settings = Provider.of<SettingsProvider>(context).settings;
-    // adManager는 initState에서 가져옴
 
     return RefreshIndicator(
       onRefresh: _fetchInitialNews,
@@ -437,7 +441,6 @@ class _NewsListViewState extends State<NewsListView>
             _adManager,
           ),
 
-          // 스크롤 인디케이터 (ValueListenableBuilder + AnimatedBuilder 조합 - 변경 없음)
           Positioned(
             right: 16,
             bottom: 80,
@@ -449,14 +452,13 @@ class _NewsListViewState extends State<NewsListView>
                   duration: const Duration(milliseconds: 300),
                   child: IgnorePointer(
                     ignoring: !showIndicator,
-                    child: _buildScrollIndicator(), // AnimatedBuilder 반환 함수 호출
+                    child: _buildScrollIndicator(),
                   ),
                 );
               },
             ),
           ),
 
-          // 맨 위로 버튼 (AnimatedBuilder 반환 함수 호출 - 변경 없음)
           Positioned(right: 16, bottom: 16, child: _buildScrollToTopButton()),
         ],
       ),
@@ -464,14 +466,12 @@ class _NewsListViewState extends State<NewsListView>
   }
 
   Widget _buildNewsContentList(
-    /* ... 인자 ... */
     ThemeData theme,
     NewsCardStyleExtension cardStyle,
     SubscribeViewStyleExtension subscribeStyle,
     AppSettings settings,
     AdManager adManager,
   ) {
-    // ... (로딩, 빈 리스트 UI 변경 없음) ...
     if (_isLoading) {
       return Center(
         child: CircularProgressIndicator(color: theme.primaryColor),
@@ -526,7 +526,6 @@ class _NewsListViewState extends State<NewsListView>
 
         if (shouldShowAds) {
           for (int i = 0; i < numberOfAdsToShow; i++) {
-            // _adDataIndices 범위 체크 추가
             if (i >= _adDataIndices.length) break;
             int adDataIndex = _adDataIndices[i];
             int adBuilderIndex = adDataIndex + i;
@@ -579,10 +578,8 @@ class _NewsListViewState extends State<NewsListView>
             );
           } else {
             if (!_loadedAds.containsKey(adBuilderIndex)) {
-              // 빌드 중에 setState나 광고 로드 직접 호출 방지
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 if (mounted && !_loadedAds.containsKey(adBuilderIndex)) {
-                  // 재확인
                   _requestAdLoad(adBuilderIndex);
                 }
               });
@@ -622,16 +619,10 @@ class _NewsListViewState extends State<NewsListView>
                 if (mounted) _checkBookmarkStatus(news.newsLink);
               });
             }
+            // [✅ 수정] onTap 핸들러 변경
             itemWidget = InkWell(
               key: ValueKey('news_${widget.category}_${news.newsLink}'),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => NewsDetailScreen(news: news),
-                  ),
-                );
-              },
+              onTap: () => _handleNewsItemTap(news),
               child: Padding(
                 padding: cardStyle.cardPadding,
                 child:
@@ -661,13 +652,11 @@ class _NewsListViewState extends State<NewsListView>
             );
           }
         }
-        // KeepAlive 적용
         return KeepAliveWrapper(child: itemWidget);
       },
     );
   }
 
-  // --- 나머지 메서드들 (변경 없음) ---
   Widget _buildTextOnlyLayout(
     News news,
     NewsCardStyleExtension cardStyle,
@@ -912,9 +901,8 @@ class _NewsListViewState extends State<NewsListView>
     }
     return description;
   }
-} // End of _NewsListViewState
+}
 
-// KeepAliveWrapper 위젯 (변경 없음)
 class KeepAliveWrapper extends StatefulWidget {
   final Widget child;
   const KeepAliveWrapper({Key? key, required this.child}) : super(key: key);
