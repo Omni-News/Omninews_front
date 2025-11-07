@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:omninews_flutter/models/app_setting.dart';
 import 'package:omninews_flutter/models/news.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
@@ -12,7 +11,6 @@ import 'package:omninews_flutter/services/news_bookmark_service.dart';
 import 'package:omninews_flutter/services/news_service.dart';
 import 'package:omninews_flutter/services/recently_read_service.dart'; // [✅ 추가]
 import 'package:omninews_flutter/theme/app_theme.dart';
-import 'package:omninews_flutter/utils/ad_manager.dart';
 import 'package:omninews_flutter/utils/url_launcher_helper.dart'; // [✅ 추가]
 import 'package:provider/provider.dart';
 
@@ -41,15 +39,7 @@ class _NewsListViewState extends State<NewsListView>
   bool _isLoadingMore = false;
   bool _hasMore = true;
   final ScrollController _scrollController = ScrollController();
-  final Random _random = Random();
 
-  // --- 광고 관련 상태 ---
-  final List<int> _adDataIndices = [];
-  static const int _initialAdCount = 1;
-  static const int _adsToAddPerPage = 1;
-  static const int _adMinIndex = 3;
-  final Map<int, NativeAd?> _loadedAds = {};
-  final List<NativeAd> _adsToDispose = [];
 
   // --- 스크롤 네비게이터 상태 ---
   final ValueNotifier<bool> _showScrollIndicatorNotifier = ValueNotifier<bool>(
@@ -57,7 +47,6 @@ class _NewsListViewState extends State<NewsListView>
   );
   Timer? _scrollIndicatorTimer;
 
-  late AdManager _adManager;
   static const double _estimatedItemHeight = 120.0;
 
   @override
@@ -66,7 +55,6 @@ class _NewsListViewState extends State<NewsListView>
   @override
   void initState() {
     super.initState();
-    _adManager = Provider.of<AdManager>(context, listen: false);
     _fetchInitialNews();
     _scrollController.addListener(_scrollListener);
   }
@@ -77,13 +65,6 @@ class _NewsListViewState extends State<NewsListView>
     _scrollController.dispose();
     _scrollIndicatorTimer?.cancel();
     _showScrollIndicatorNotifier.dispose();
-    // 광고 해제
-    for (var ad in _adsToDispose) {
-      ad.dispose();
-    }
-    _adsToDispose.clear();
-    _loadedAds.values.where((ad) => ad != null).forEach((ad) => ad!.dispose());
-    _loadedAds.clear();
     super.dispose();
   }
 
@@ -95,12 +76,6 @@ class _NewsListViewState extends State<NewsListView>
           _newsItems.clear();
           _currentPage = 1;
           _hasMore = true;
-          _adDataIndices.clear();
-          _loadedAds.clear();
-          for (var ad in _adsToDispose) {
-            ad.dispose();
-          }
-          _adsToDispose.clear();
           _showScrollIndicatorNotifier.value = false;
         });
       } else {
@@ -120,23 +95,13 @@ class _NewsListViewState extends State<NewsListView>
       final newItems = List<News>.from(fetchedNews);
       final newPage = 1;
       final newHasMore = fetchedNews.length >= 20;
-      final newAdIndices = <int>[];
-      if (newItems.isNotEmpty) {
-        _generateAdIndices(newItems.length, _initialAdCount, newAdIndices);
-      }
 
       setState(() {
         _newsItems.clear();
         _newsItems.addAll(newItems);
         _currentPage = newPage;
         _hasMore = newHasMore;
-        _adDataIndices.clear();
-        _adDataIndices.addAll(newAdIndices);
         _isLoading = false;
-      });
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) _requestAdsForCurrentIndices();
       });
     } catch (e) {
       if (!mounted) return;
@@ -186,23 +151,11 @@ class _NewsListViewState extends State<NewsListView>
         nextPage,
       );
       if (!mounted) return;
-      final startIndex = _newsItems.length;
-      final newlyAddedDataIndices = <int>[];
       _newsItems.addAll(fetchedNews);
       _currentPage = nextPage;
       _hasMore = fetchedNews.length >= 20;
-      if (fetchedNews.isNotEmpty) {
-        newlyAddedDataIndices.addAll(
-          _generateMoreAdIndices(startIndex, fetchedNews.length),
-        );
-      }
       if (mounted) {
         setState(() => _isLoadingMore = false);
-      }
-      if (newlyAddedDataIndices.isNotEmpty) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) _requestAdsForNewIndices(newlyAddedDataIndices);
-        });
       }
     } catch (e) {
       if (!mounted) return;
@@ -215,111 +168,7 @@ class _NewsListViewState extends State<NewsListView>
     }
   }
 
-  // 광고 인덱스 생성 (초기)
-  void _generateAdIndices(int listLength, int count, List<int> targetList) {
-    if (listLength <= _adMinIndex) return;
-    final availableIndices =
-        List.generate(
-          max(0, listLength - _adMinIndex),
-          (i) => i + _adMinIndex,
-        ).where((idx) => idx < listLength).toList();
-    availableIndices.shuffle(_random);
-    int numToAdd = min(count, availableIndices.length);
-    for (int i = 0; i < numToAdd; i++) {
-      targetList.add(availableIndices[i]);
-    }
-    targetList.sort();
-    debugPrint(
-      "[${widget.category}] Initial Ad Data indices generated: $targetList",
-    );
-  }
 
-  // 추가 광고 인덱스 생성
-  List<int> _generateMoreAdIndices(int startIndex, int newItemsCount) {
-    final newlyAddedDataIndices = <int>[];
-    int endIndex = startIndex + newItemsCount - 1;
-    int effectiveStartIndex = max(_adMinIndex, startIndex);
-    if (effectiveStartIndex > endIndex) return newlyAddedDataIndices;
-    final availableDataIndices = List.generate(
-      endIndex - effectiveStartIndex + 1,
-      (i) => effectiveStartIndex + i,
-    );
-    availableDataIndices.shuffle(_random);
-    int numToAdd = min(_adsToAddPerPage, availableDataIndices.length);
-    for (int i = 0; i < numToAdd; i++) {
-      int newIndex = availableDataIndices[i];
-      if (!_adDataIndices.contains(newIndex)) {
-        _adDataIndices.add(newIndex);
-        newlyAddedDataIndices.add(newIndex);
-      }
-    }
-    _adDataIndices.sort();
-    debugPrint(
-      "[${widget.category}] Added More Ad Data indices (range $startIndex-$endIndex): $newlyAddedDataIndices",
-    );
-    return newlyAddedDataIndices;
-  }
-
-  // 전체 광고 로드 요청
-  void _requestAdsForCurrentIndices() {
-    for (int i = 0; i < _adDataIndices.length; i++) {
-      int adDataIndex = _adDataIndices[i];
-      int adBuilderIndex = adDataIndex + i;
-      _requestAdLoad(adBuilderIndex);
-    }
-  }
-
-  // 새로 추가된 광고 로드 요청
-  void _requestAdsForNewIndices(List<int> newDataIndices) {
-    if (newDataIndices.isEmpty) return;
-    for (int newDataIndex in newDataIndices) {
-      int adOrderIndex = _adDataIndices.indexOf(newDataIndex);
-      if (adOrderIndex != -1) {
-        int adBuilderIndex = newDataIndex + adOrderIndex;
-        _requestAdLoad(adBuilderIndex);
-      }
-    }
-  }
-
-  // 개별 광고 로드 요청
-  Future<void> _requestAdLoad(int builderIndex) async {
-    if (_loadedAds.containsKey(builderIndex)) return;
-    if (!mounted) return;
-    if (mounted)
-      setState(() {
-        _loadedAds[builderIndex] = null;
-      });
-    try {
-      final NativeAd? loadedAd = await _adManager.loadNewNativeAd();
-      if (!mounted) {
-        loadedAd?.dispose();
-        return;
-      }
-      if (loadedAd != null) {
-        _adsToDispose.add(loadedAd);
-        if (mounted) {
-          setState(() {
-            _loadedAds[builderIndex] = loadedAd;
-          });
-        }
-      } else {
-        if (mounted) {
-          setState(() {
-            _loadedAds[builderIndex] = null;
-          });
-        }
-      }
-    } catch (e) {
-      debugPrint(
-        "[${widget.category}] Error loading ad for builderIndex $builderIndex: $e",
-      );
-      if (mounted) {
-        setState(() {
-          _loadedAds[builderIndex] = null;
-        });
-      }
-    }
-  }
 
   // [✅ 수정] 뉴스 클릭 핸들러 - 주요 카테고리는 설정값에 맞춰 URL 열기
   void _handleNewsItemTap(News news) {
@@ -438,7 +287,6 @@ class _NewsListViewState extends State<NewsListView>
             cardStyle,
             subscribeStyle,
             settings,
-            _adManager,
           ),
 
           Positioned(
@@ -470,7 +318,6 @@ class _NewsListViewState extends State<NewsListView>
     NewsCardStyleExtension cardStyle,
     SubscribeViewStyleExtension subscribeStyle,
     AppSettings settings,
-    AdManager adManager,
   ) {
     if (_isLoading) {
       return Center(
@@ -510,10 +357,8 @@ class _NewsListViewState extends State<NewsListView>
       );
     }
 
-    final bool shouldShowAds = adManager.showAds && _adDataIndices.isNotEmpty;
-    final int numberOfAdsToShow = shouldShowAds ? _adDataIndices.length : 0;
     final int totalItemCount =
-        _newsItems.length + numberOfAdsToShow + (_isLoadingMore ? 1 : 0);
+        _newsItems.length + (_isLoadingMore ? 1 : 0);
 
     return ListView.builder(
       controller: _scrollController,
@@ -521,23 +366,6 @@ class _NewsListViewState extends State<NewsListView>
       itemCount: totalItemCount,
       itemBuilder: (context, index) {
         Widget? itemWidget;
-        int adOffset = 0;
-        int? adDataIndexIfAd;
-
-        if (shouldShowAds) {
-          for (int i = 0; i < numberOfAdsToShow; i++) {
-            if (i >= _adDataIndices.length) break;
-            int adDataIndex = _adDataIndices[i];
-            int adBuilderIndex = adDataIndex + i;
-            if (index == adBuilderIndex) {
-              adDataIndexIfAd = adDataIndex;
-              break;
-            }
-            if (index > adBuilderIndex) {
-              adOffset++;
-            }
-          }
-        }
 
         // 1. 더보기 로딩
         if (_isLoadingMore && index == totalItemCount - 1) {
@@ -551,62 +379,9 @@ class _NewsListViewState extends State<NewsListView>
             ),
           );
         }
-        // 2. 광고
-        else if (adDataIndexIfAd != null) {
-          int adBuilderIndex = index;
-          final adState = _loadedAds[adBuilderIndex];
-
-          if (adState is NativeAd) {
-            itemWidget = Container(
-              key: ValueKey('ad_${widget.category}_$adBuilderIndex'),
-              height: 320,
-              margin: cardStyle.cardPadding.copyWith(top: 8, bottom: 8),
-              decoration: BoxDecoration(
-                color: theme.cardColor,
-                borderRadius: BorderRadius.circular(
-                  cardStyle.thumbnailBorderRadius,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: AdWidget(ad: adState),
-            );
-          } else {
-            if (!_loadedAds.containsKey(adBuilderIndex)) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted && !_loadedAds.containsKey(adBuilderIndex)) {
-                  _requestAdLoad(adBuilderIndex);
-                }
-              });
-            }
-            itemWidget = SizedBox(
-              key: ValueKey(
-                'ad_placeholder_${widget.category}_$adBuilderIndex',
-              ),
-              height: 320,
-              child: Container(
-                margin: cardStyle.cardPadding.copyWith(top: 8, bottom: 8),
-                alignment: Alignment.center,
-                color: theme.disabledColor.withOpacity(0.1),
-                child:
-                    _loadedAds.containsKey(adBuilderIndex)
-                        ? CircularProgressIndicator(
-                          color: theme.primaryColor,
-                          strokeWidth: 2,
-                        )
-                        : null,
-              ),
-            );
-          }
-        }
-        // 3. 뉴스
+        // 2. 뉴스
         else {
-          final newsIndex = index - adOffset;
+          final newsIndex = index;
           if (newsIndex >= _newsItems.length || newsIndex < 0) {
             itemWidget = const SizedBox.shrink();
           } else {

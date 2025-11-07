@@ -37,7 +37,7 @@ android {
     defaultConfig {
         applicationId = "com.kdh.omninews"
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+                        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -62,7 +62,7 @@ dependencies {
     val billing_version = "8.0.0"
     implementation("com.android.billingclient:billing:$billing_version")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-    
+    implementation("com.google.android.gms:play-services-ads:24.7.0")   
 }
 
 

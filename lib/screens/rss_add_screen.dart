@@ -318,7 +318,7 @@ class _RssAddScreenState extends State<RssAddScreen>
   // [✅ 추가] "RSS 추가하기" 버튼에 대한 광고 처리 래퍼
   Future<void> _handleAddRssWithAd() async {
     // 1. 로컬 구독 상태 확인
-    if (_subscriptionStatus?.isActive == true) {
+    if ((_subscriptionStatus?.isActive == true) && !Platform.isAndroid) {
       // 구독자는 광고 없이 바로 실행
       await _addRssToDb();
       return;
@@ -459,6 +459,50 @@ class _RssAddScreenState extends State<RssAddScreen>
       setState(() => _isGenerating = false);
     }
   }
+
+  Future<void> _handleGenerateRssByCssWithAd() async {
+    if ((_subscriptionStatus?.isActive == true) && !Platform.isAndroid) {
+      await _generateRssByCss();
+      return;
+    }
+
+    if (!mounted) return;
+    final adManager = Provider.of<AdManager>(context, listen: false);
+
+    await adManager.executeRewardedAction(
+      action: _generateRssByCss,
+      onAdDismissedWithoutReward: () {
+        if (!mounted) return;
+        _showSnackBar("광고 시청을 완료해야 RSS를 생성할 수 있습니다.");
+      },
+      onAdFailed: () {
+        if (!mounted) return;
+        _showSnackBar("광고를 준비 중입니다. RSS를 바로 생성합니다.");
+      },
+    );
+  }
+
+  Future<void> _handleGenerateRssWithAd() async {
+    if ((_subscriptionStatus?.isActive == true) && !Platform.isAndroid) {
+      await _generateRss();
+      return;
+    }
+
+    if (!mounted) return;
+    final adManager = Provider.of<AdManager>(context, listen: false);
+
+    await adManager.executeRewardedAction(
+      action: _generateRss,
+      onAdDismissedWithoutReward: () {
+        if (!mounted) return;
+        _showSnackBar("광고 시청을 완료해야 RSS를 생성할 수 있습니다.");
+      },
+      onAdFailed: () {
+        if (!mounted) return;
+        _showSnackBar("광고를 준비 중입니다. RSS를 바로 생성합니다.");
+      },
+    );
+  }
   // --- END: 실제 RSS 생성 로직 ---
 
   // --- Navigation & Snackbar (변경 없음) ---
@@ -563,25 +607,23 @@ class _RssAddScreenState extends State<RssAddScreen>
     ThemeData theme,
     TextTheme textTheme,
     ColorScheme colorScheme,
-    // AdManager 전달 제거
   ) {
     final isWebSelected = _selectedPlatform == "Web";
-    // [✅ 복원] 로컬 구독 상태 사용
     final bool isSubscribed = _subscriptionStatus?.isActive == true;
+    final bool isAndroid = Platform.isAndroid;
 
     return SingleChildScrollView(
       child: Padding(
         padding: const EdgeInsets.all(20.0),
         child:
-            _isLoadingSubscriptionStatus // [✅ 복원] 로컬 로딩 상태 사용
+            _isLoadingSubscriptionStatus
                 ? const Center(child: CircularProgressIndicator())
                 : Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildPremiumFeatureBanner(theme, textTheme),
                     const SizedBox(height: 20),
-                    // [✅ 복원] 로컬 구독 상태(isSubscribed)로 UI 분기
-                    if (isSubscribed) ...[
+                    if (isSubscribed || isAndroid) ...[ // Show feature if subscribed or on Android
                       // --- 구독자 UI ---
                       _buildPlatformSelectionSection(theme, textTheme),
                       const SizedBox(height: 24),
@@ -590,7 +632,7 @@ class _RssAddScreenState extends State<RssAddScreen>
                         _buildCssRssForm(
                           theme,
                           textTheme,
-                        ), // isSubscribed 전달 제거
+                        ),
                         if (_errorMessage != null && _tabController.index == 1)
                           _buildErrorMessage(colorScheme),
                         if (_previewChannel != null &&
@@ -598,7 +640,7 @@ class _RssAddScreenState extends State<RssAddScreen>
                           _buildPreviewSection(
                             theme,
                             textTheme,
-                          ), // AdManager 전달 제거
+                          ),
                         const SizedBox(height: 10),
                         Center(
                           child: TextButton(
@@ -624,7 +666,7 @@ class _RssAddScreenState extends State<RssAddScreen>
                         const SizedBox(height: 12),
                         _buildGenerateUrlInputField(
                           theme,
-                        ), // isSubscribed 전달 제거
+                        ),
                         if (_errorMessage != null && _tabController.index == 1)
                           _buildErrorMessage(colorScheme),
                         if (_previewChannel != null &&
@@ -632,7 +674,7 @@ class _RssAddScreenState extends State<RssAddScreen>
                           _buildPreviewSection(
                             theme,
                             textTheme,
-                          ), // AdManager 전달 제거
+                          ),
                         // CSS 폼으로 전환 버튼
                         if (isWebSelected)
                           Padding(
@@ -661,8 +703,7 @@ class _RssAddScreenState extends State<RssAddScreen>
                           ),
                       ],
                     ] else ...[
-                      // --- 비구독자 UI ---
-                      // "RSS 생성" 탭에서는 기능을 바로 보여주지 않고 구독 유도 프롬프트만 표시
+                      // --- 비구독자 UI (non-Android) ---
                       _buildSubscriptionPrompt(theme, textTheme),
                     ],
                     const SizedBox(height: 30),
@@ -680,9 +721,16 @@ class _RssAddScreenState extends State<RssAddScreen>
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
     );
 
-    // [✅ 복원] 버튼 텍스트/아이콘 고정 (광고 없음)
-    const String buttonText = 'CSS 요소로 RSS 생성';
-    const IconData buttonIcon = Icons.auto_awesome;
+    final bool isSubscribedUser = (_subscriptionStatus?.isActive == true) && !Platform.isAndroid;
+    final bool isRewardedAdLoaded = AdManager.isRewardedInterstitialAdLoaded;
+
+    String buttonText = isSubscribedUser ? 'CSS 요소로 RSS 생성' : '광고 보고 생성';
+    IconData buttonIcon = isSubscribedUser ? Icons.auto_awesome : Icons.ads_click;
+    VoidCallback? onPressedAction = _isCssGenerating ? null : (isSubscribedUser ? _generateRssByCss : _handleGenerateRssByCssWithAd);
+
+    if (!isSubscribedUser && !isRewardedAdLoaded) {
+      onPressedAction = null;
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -753,9 +801,7 @@ class _RssAddScreenState extends State<RssAddScreen>
         SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
-            // Use ElevatedButton.icon
-            // [✅ 복원] 광고 로직 없이 _generateRssByCss 직접 호출
-            onPressed: _isCssGenerating ? null : _generateRssByCss,
+            onPressed: onPressedAction,
             style: ElevatedButton.styleFrom(
               backgroundColor: theme.primaryColor, // 프리미엄 기능이므로 primaryColor 사용
               foregroundColor: Colors.white,
@@ -766,7 +812,7 @@ class _RssAddScreenState extends State<RssAddScreen>
               disabledBackgroundColor: theme.primaryColor.withOpacity(0.5),
             ),
             icon:
-                _isCssGenerating
+                _isCssGenerating || (!isSubscribedUser && !isRewardedAdLoaded)
                     ? const SizedBox(
                       width: 18,
                       height: 18,
@@ -777,7 +823,7 @@ class _RssAddScreenState extends State<RssAddScreen>
                     )
                     : Icon(buttonIcon, size: 18),
             label: Text(
-              _isCssGenerating ? '생성 중...' : buttonText,
+              _isCssGenerating ? '생성 중...' : (!isSubscribedUser && !isRewardedAdLoaded ? '광고 로딩 중...' : buttonText),
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
           ),
@@ -998,9 +1044,16 @@ class _RssAddScreenState extends State<RssAddScreen>
 
   // [✅ 복원] isSubscribed 매개변수 제거, 내부 버튼은 광고 로직 없음
   Widget _buildGenerateUrlInputField(ThemeData theme) {
-    // [✅ 복원] 버튼 텍스트/아이콘 고정 (광고 없음)
-    const String buttonText = 'RSS 생성하기';
-    const IconData buttonIcon = Icons.auto_awesome;
+    final bool isSubscribedUser = (_subscriptionStatus?.isActive == true) && !Platform.isAndroid;
+    final bool isRewardedAdLoaded = AdManager.isRewardedInterstitialAdLoaded;
+
+    String buttonText = isSubscribedUser ? 'RSS 생성하기' : '광고 보고 생성';
+    IconData buttonIcon = isSubscribedUser ? Icons.auto_awesome : Icons.ads_click;
+    VoidCallback? onPressedAction = _isGenerating ? null : (isSubscribedUser ? _generateRss : _handleGenerateRssWithAd);
+
+    if (!isSubscribedUser && !isRewardedAdLoaded) {
+      onPressedAction = null;
+    }
 
     return Container(
       decoration: BoxDecoration(
@@ -1019,7 +1072,6 @@ class _RssAddScreenState extends State<RssAddScreen>
         children: [
           TextField(
             controller: _generateUrlController,
-            // ...(TextField 설정 동일)...
             decoration: InputDecoration(
               hintText: _getUrlHintByPlatform(),
               hintStyle: TextStyle(color: theme.hintColor),
@@ -1047,16 +1099,13 @@ class _RssAddScreenState extends State<RssAddScreen>
               ),
             ),
             style: theme.textTheme.bodyLarge?.copyWith(fontSize: 16),
-            // [✅ 복원] 광고 로직 없이 _generateRss 직접 호출
-            onSubmitted: (_) => _generateRss,
+            onSubmitted: (_) => onPressedAction?.call(),
           ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              // Use ElevatedButton.icon
-              // [✅ 복원] 광고 로직 없이 _generateRss 직접 호출
-              onPressed: _isGenerating ? null : _generateRss,
+              onPressed: onPressedAction,
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green, // 생성 버튼 색상
                 foregroundColor: Colors.white,
@@ -1068,7 +1117,7 @@ class _RssAddScreenState extends State<RssAddScreen>
                 disabledBackgroundColor: Colors.green.withOpacity(0.5),
               ),
               icon:
-                  _isGenerating
+                  _isGenerating || (!isSubscribedUser && !isRewardedAdLoaded)
                       ? const SizedBox(
                         width: 20,
                         height: 20,
@@ -1079,7 +1128,7 @@ class _RssAddScreenState extends State<RssAddScreen>
                       )
                       : Icon(buttonIcon, size: 20),
               label: Text(
-                _isGenerating ? '생성 중...' : buttonText,
+                _isGenerating ? '생성 중...' : (!isSubscribedUser && !isRewardedAdLoaded ? '광고 로딩 중...' : buttonText),
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -1585,7 +1634,7 @@ class _RssAddScreenState extends State<RssAddScreen>
     // --- 추가 또는 구독 버튼 ---
     final bool addingNew = !_isExistingRss; // DB에 없는 새로운 RSS인가?
     // [✅ 수정] 로컬 구독 상태 사용
-    final bool isSubscribedUser = _subscriptionStatus?.isActive == true;
+    final bool isSubscribedUser = (_subscriptionStatus?.isActive == true) && !Platform.isAndroid;
     final bool isRewardedAdLoaded = AdManager.isRewardedInterstitialAdLoaded;
 
     // 버튼 텍스트와 아이콘 결정
