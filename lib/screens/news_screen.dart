@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:omninews_flutter/models/news.dart';
+
 import 'package:omninews_flutter/models/custom_news.dart';
 import 'package:omninews_flutter/screens/home_screen.dart';
 import 'package:omninews_flutter/services/news_service.dart';

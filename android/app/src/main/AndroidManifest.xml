@@ -1,7 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
-    <uses-permission android:name="com.google.android.gms.permission.AD_ID" tools:node="replace"/>
-    <uses-permission android:name="com.android.vending.BILLING" />
+
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
+
     <application
         android:label="omninews"
         android:name="${applicationName}"
@@ -55,7 +56,7 @@
         <!-- AdMob-->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-8274643755495491~2394129667"/>
+            android:value="ca-app-pub-8274643755495491~6681635051"/>
     </application>
     
     <queries>

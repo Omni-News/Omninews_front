@@ -11,19 +11,15 @@ class AdManager with ChangeNotifier {
 
   // --- 광고 단위 ID (Google 공식 테스트 ID) ---
   // [✅ 수정] iOS 보상형 전면 ID를 테스트 ID로 수정 (실제 ID는 필요시 적용)
-  final String _nativeAdUnitId =
-      Platform.isAndroid
-          ? 'ca-app-pub-8274643755495491/6309338228'
-          : 'ca-app-pub-8274643755495491/6309338228';
+
   final String _bannerAdUnitId =
       Platform.isAndroid
-          ? 'ca-app-pub-8274643755495491/8422310331'
+          ? 'ca-app-pub-8274643755495491/2347352963'
           : 'ca-app-pub-8274643755495491/8422310331';
   final String _rewardedInterstitialAdUnitId =
       Platform.isAndroid
-          ? 'ca-app-pub-8274643755495491/5204181676'
-          // : 'ca-app-pub-8274643755495491/2721488560'; // 실제 ID
-          : 'ca-app-pub-8274643755495491/5204181676'; // iOS 테스트 ID로 변경
+          ? 'ca-app-pub-8274643755495491/8370121247'
+          : 'ca-app-pub-8274643755495491/5204181676';
 
   // --- 배너 광고 위치 식별자 ---
   static const String newsScreenBannerPlacement = 'news_screen_banner';
@@ -51,7 +47,13 @@ class AdManager with ChangeNotifier {
   bool get isLoadingSubscriptionStatus => _isLoadingSubscriptionStatus;
   bool get isSubscribed => _isSubscribed;
   SubscriptionStatus? get subscriptionStatus => _status;
-  bool get showAds => !_isLoadingSubscriptionStatus && !_isSubscribed;
+  bool get showAds {
+    if (Platform.isAndroid) {
+      return true;
+    }
+    return !_isLoadingSubscriptionStatus && !_isSubscribed;
+  }
+
   BannerAd? getBannerAd(String placementId) => _bannerAds[placementId];
   bool isBannerAdLoaded(String placementId) =>
       _bannerAdLoadedStatus[placementId] ?? false;
@@ -103,7 +105,9 @@ class AdManager with ChangeNotifier {
         }
       } else {
         // 구독자가 되었으면 광고 제거
-        disposeAds(); // 광고 해제 함수 호출 (disposeAds 함수 추가 필요)
+        if (!Platform.isAndroid) {
+          disposeAds(); // 광고 해제 함수 호출 (disposeAds 함수 추가 필요)
+        }
       }
       notifyListeners();
     }
@@ -111,6 +115,9 @@ class AdManager with ChangeNotifier {
 
   // [✅ 추가] 광고만 해제하는 함수
   void disposeAds() {
+    if (Platform.isAndroid) {
+      return;
+    }
     _bannerAds.forEach((_, ad) {
       ad?.dispose();
     });
@@ -175,7 +182,7 @@ class AdManager with ChangeNotifier {
     required VoidCallback onAdFailed,
   }) async {
     // 1. 구독자인지 먼저 확인
-    if (isSubscribed) {
+    if (isSubscribed && !Platform.isAndroid) {
       debugPrint("AdManager: User is subscribed. Executing action directly.");
       await action();
       return;
@@ -297,57 +304,6 @@ class AdManager with ChangeNotifier {
         },
       ),
     )..load();
-  }
-
-  Future<NativeAd?> loadNewNativeAd() async {
-    if (!showAds) {
-      debugPrint("AdManager: Ads disabled. Skipping native ad load.");
-      return null;
-    }
-    final Completer<NativeAd?> completer = Completer<NativeAd?>();
-    debugPrint("AdManager: Attempting to load NativeAd ID: $_nativeAdUnitId");
-
-    NativeAd(
-      adUnitId: _nativeAdUnitId,
-      request: const AdRequest(),
-      listener: NativeAdListener(
-        onAdLoaded: (Ad ad) {
-          debugPrint('AdManager: New NativeAd loaded.');
-          // 로드 성공 후에도 광고 표시 상태(showAds) 재확인
-          if (showAds) {
-            if (!completer.isCompleted) {
-              completer.complete(ad as NativeAd);
-            } else {
-              ad.dispose(); // 이미 완료되었으면 즉시 해제
-            }
-          } else {
-            // 로드 중에 구독 상태 변경 시 광고 해제
-            ad.dispose();
-            if (!completer.isCompleted) completer.complete(null); // 실패로 완료
-            debugPrint(
-              'AdManager: Discarded loaded NativeAd as ads are no longer needed.',
-            );
-          }
-        },
-        onAdFailedToLoad: (Ad ad, LoadAdError error) {
-          debugPrint('AdManager: Failed to load new NativeAd: $error');
-          ad.dispose();
-          if (!completer.isCompleted) completer.complete(null);
-        },
-      ),
-      nativeTemplateStyle: NativeTemplateStyle(
-        templateType: TemplateType.medium,
-      ),
-    ).load();
-
-    return completer.future.timeout(
-      const Duration(seconds: 10), // 타임아웃 설정
-      onTimeout: () {
-        debugPrint("AdManager: NativeAd loading timed out.");
-        if (!completer.isCompleted) completer.complete(null);
-        return null;
-      },
-    );
   }
 
   @override
