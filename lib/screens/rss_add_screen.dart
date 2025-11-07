@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:omninews_flutter/models/omninews_subscription.dart'; // 구독 모델 필요
 import 'package:omninews_flutter/models/rss_channel.dart';
@@ -167,6 +168,14 @@ class _RssAddScreenState extends State<RssAddScreen>
 
   // 구독 페이지 이동 후, 로컬 상태 새로고침
   Future<void> _openSubscriptionAndRefresh() async {
+    if (Platform.isAndroid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('구독 정보는 서버에서 자동으로 관리됩니다.'),
+        ),
+      );
+      return;
+    }
     final changed = await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (context) => const SubscriptionHomePage()),
