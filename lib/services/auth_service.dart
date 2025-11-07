@@ -236,8 +236,6 @@ class AuthService {
   // Kakao 로그인
   Future<bool> signInWithKakao() async {
     try {
-      debugPrint('카카오 로그인 시작');
-
       if (await kakao.isKakaoTalkInstalled()) {
         try {
           await kakao.UserApi.instance.loginWithKakaoTalk();
@@ -263,6 +261,7 @@ class AuthService {
         'user_notification_push': true,
       };
 
+      debugPrint('카카오 로그인 시작');
       return await _authenticateWithServer(paramUser);
     } catch (e) {
       debugPrint('카카오 로그인 오류: $e');

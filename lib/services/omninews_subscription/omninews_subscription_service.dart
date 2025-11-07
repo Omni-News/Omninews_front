@@ -7,6 +7,7 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:omninews_flutter/models/omninews_subscription.dart';
 import 'package:omninews_flutter/services/auth_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 
 class PurchaseResult {
   final bool success;
@@ -53,6 +54,13 @@ class SubscriptionService {
   // 트랜잭션 리스너만 설정
   Future<void> setupListener() async {
     try {
+      // InAppPurchase 사용 가능 여부 체크
+      final bool isAvailable = await _inAppPurchase.isAvailable();
+      if (!isAvailable) {
+        debugPrint('인앱 구매를 사용할 수 없습니다.');
+        return;
+      }
+      
       if (_purchaseUpdateSubscription == null) {
         _setupTransactionListener();
         debugPrint('구독 트랜잭션 리스너 설정 완료');
@@ -193,16 +201,41 @@ class SubscriptionService {
   // 구독 플랜 로드
   Future<List<SubscriptionPlan>> loadSubscriptionPlans() async {
     try {
+      // InAppPurchase 사용 가능 여부 먼저 체크
+      final bool isAvailable = await _inAppPurchase.isAvailable();
+      if (!isAvailable) {
+        debugPrint('인앱 구매를 사용할 수 없습니다.');
+        return [];
+      }
+      
       Set<String> productIds;
       if (Platform.isAndroid) {
-        productIds = {'omninews-premium'};
+        // Android: 정기결제ID:기본요금제ID 형식
+        productIds = {'kdh.omninews.premium:omninews-premium'};
       } else if (Platform.isIOS) {
         productIds = {'kdh.omninews.premium'};
       } else {
         productIds = {};
       }
 
-      final response = await _inAppPurchase.queryProductDetails(productIds);
+      final response = await _inAppPurchase
+          .queryProductDetails(productIds)
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              debugPrint('상품 조회 타임아웃 (10초 초과)');
+              return ProductDetailsResponse(
+                productDetails: [],
+                notFoundIDs: productIds.toList(),
+                error: null,
+              );
+            },
+          );
+
+      if (response.error != null) {
+        debugPrint('상품 조회 에러: ${response.error!.message}');
+        return [];
+      }
 
       if (response.notFoundIDs.isNotEmpty) {
         debugPrint('스토어에서 찾지 못한 상품 IDs: ${response.notFoundIDs}');
