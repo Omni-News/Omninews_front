@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:html_unescape/html_unescape.dart';
 import 'package:intl/intl.dart';
-import 'package:omninews_flutter/models/app_setting.dart';
 import 'package:omninews_flutter/models/custom_news.dart';
 import 'package:omninews_flutter/models/news.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
