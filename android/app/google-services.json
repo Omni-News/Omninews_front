@@ -14,7 +14,7 @@
       },
       "oauth_client": [
         {
-          "client_id": "1008455298981-1c8cgj0efef1b119knk1levp2q1g9rnr.apps.googleusercontent.com",
+          "client_id": "1008455298981-p6dmmkptu303mkl3h69nnqke749ak54h.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.kdh.omninews",
@@ -22,19 +22,11 @@
           }
         },
         {
-          "client_id": "1008455298981-bekljb9f7r80nmhtdls3ve93i6navkhk.apps.googleusercontent.com",
+          "client_id": "1008455298981-pl8kfhc5vvudf34pkqp93h1kp9mm35hi.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.kdh.omninews",
             "certificate_hash": "84e612e841d92f4e3187a3dcfcfbea44ad92ee38"
-          }
-        },
-        {
-          "client_id": "1008455298981-et5bvrb90qthskca8khd7cap0j540l7n.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.kdh.omninews",
-            "certificate_hash": "b0684361ac85530013d00e50459a877b69b54628"
           }
         },
         {
