@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +11,7 @@ import 'package:omninews_flutter/firebase_options.dart';
 import 'package:omninews_flutter/provider/settings_provider.dart';
 import 'package:omninews_flutter/provider/subscription_provider.dart';
 import 'package:omninews_flutter/services/auth_service.dart';
+import 'package:omninews_flutter/services/notification_service.dart';
 import 'package:omninews_flutter/services/omninews_subscription/omninews_subscription_service.dart';
 import 'package:omninews_flutter/utils/ad_manager.dart';
 import 'package:provider/provider.dart';
@@ -50,6 +53,7 @@ void initStoreKit() {
 void main() async {
   // Flutter 위젯 바인딩 초기화
   WidgetsFlutterBinding.ensureInitialized();
+  var messagingReady = false;
 
   // env 세팅
   await dotenv.load();
@@ -59,6 +63,7 @@ void main() async {
   try {
     // Firebase 등 앱 초기화
     await _initializeApp();
+    messagingReady = true;
 
     // StoreKit 초기화 (필수 - 구독 서비스가 의존함)
     initStoreKit();
@@ -78,6 +83,9 @@ void main() async {
 
   // 앱 실행
   runApp(MyApp(subscriptionService: subscriptionService));
+  if (messagingReady) {
+    unawaited(NotificationService.instance.init());
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -108,6 +116,7 @@ class MyApp extends StatelessWidget {
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
           return MaterialApp(
+            navigatorKey: NotificationService.navigatorKey,
             debugShowCheckedModeBanner: false,
             title: 'Omninews',
             theme: themeProvider.currentTheme,

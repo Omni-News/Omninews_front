@@ -1,73 +1,69 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:omninews_flutter/models/rss_item.dart';
+import 'package:omninews_flutter/screens/rss_detail_screen.dart';
+import 'package:omninews_flutter/services/notification_navigation.dart';
+import 'package:omninews_flutter/services/recently_read_service.dart';
+import 'package:omninews_flutter/services/rss_service.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._();
   static NotificationService get instance => _instance;
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
 
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
-  String? _token;
+  bool _initialized = false;
 
   NotificationService._();
 
   Future<void> init() async {
-    // 알림 권한 요청 (iOS에서는 필수)
-    NotificationSettings settings = await _fcm.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-
-    print('User granted permission: ${settings.authorizationStatus}');
-
-    // FCM 토큰 가져오기
-    _token = await _fcm.getToken();
-    print("FCM 토큰: $_token");
-
-    // 토큰이 새로 생성될 때마다 서버에 업데이트하기 위한 리스너
-    _fcm.onTokenRefresh.listen((newToken) {
-      _token = newToken;
-      // 토큰 업데이트 - 서버에 새 토큰을 저장하는 함수 호출
-      _sendTokenToServer(newToken);
-    });
+    if (_initialized) return;
+    _initialized = true;
 
     // 로컬 알림 설정
-    _initLocalNotifications();
+    await _initLocalNotifications();
 
     // 포그라운드 알림 핸들링
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print("포그라운드 메시지 수신: ${message.notification?.title}");
+      debugPrint("포그라운드 메시지 수신: ${message.notification?.title}");
       _showLocalNotification(message);
     });
 
     // 앱이 백그라운드에서 알림을 통해 열렸을 때
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print("백그라운드 알림 클릭: ${message.notification?.title}");
-      // 알림 클릭시 특정 화면으로 이동하는 로직
-      _handleNotificationClick(message);
+      debugPrint("백그라운드 알림 클릭: ${message.notification?.title}");
+      _handleRemoteMessage(message);
     });
 
     // 앱이 종료된 상태에서 알림을 통해 열렸는지 확인
     RemoteMessage? initialMessage = await _fcm.getInitialMessage();
     if (initialMessage != null) {
-      print("종료 상태에서 알림 클릭: ${initialMessage.notification?.title}");
-      _handleNotificationClick(initialMessage);
+      debugPrint("종료 상태에서 알림 클릭: ${initialMessage.notification?.title}");
+      _handleRemoteMessage(initialMessage);
     }
   }
 
   Future<void> _initLocalNotifications() async {
+    if (kIsWeb) return;
+
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
     final DarwinInitializationSettings iosSettings =
         DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
+          requestAlertPermission: false,
+          requestBadgePermission: false,
+          requestSoundPermission: false,
+        );
 
     final InitializationSettings initSettings = InitializationSettings(
       android: androidSettings,
@@ -77,14 +73,15 @@ class NotificationService {
     await _flutterLocalNotificationsPlugin.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (NotificationResponse details) {
-        // 로컬 알림 클릭 처리
+        _handleLocalNotificationPayload(details.payload);
       },
     );
 
     // Android 채널 설정
     await _flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(
           const AndroidNotificationChannel(
             'high_importance_channel',
@@ -97,6 +94,8 @@ class NotificationService {
 
   // FCM 메시지를 로컬 알림으로 표시
   Future<void> _showLocalNotification(RemoteMessage message) async {
+    if (kIsWeb) return;
+
     RemoteNotification? notification = message.notification;
     AndroidNotification? android = message.notification?.android;
 
@@ -120,33 +119,50 @@ class NotificationService {
             presentSound: true,
           ),
         ),
-        payload: message.data.toString(),
+        payload: jsonEncode(message.data),
       );
     }
   }
 
-  // 알림 클릭 처리
-  void _handleNotificationClick(RemoteMessage message) {
-    // 알림의 데이터를 이용하여 특정 화면으로 라우팅하는 로직
-    // 예: 새 글 알림이면 해당 글 상세 페이지로 이동
-    if (message.data.containsKey('postId')) {
-      // 게시글 페이지로 이동하는 로직
-      print('게시글 ID: ${message.data['postId']}로 이동');
+  void _handleRemoteMessage(RemoteMessage message) {
+    _handleNotificationData(message.data);
+  }
+
+  void _handleLocalNotificationPayload(String? payload) {
+    if (payload == null || payload.isEmpty) return;
+
+    try {
+      final decoded = jsonDecode(payload);
+      if (decoded is Map<String, dynamic>) {
+        _handleNotificationData(decoded);
+      }
+    } catch (e) {
+      debugPrint('알림 payload 파싱 실패: $e');
     }
   }
 
-  // 서버에 FCM 토큰 전송
-  Future<void> _sendTokenToServer(String token) async {
-    // 서버 API를 호출하여 토큰을 저장하는 로직
-    // 예: 사용자 인증 정보와 함께 토큰을 서버에 저장
-    print('토큰을 서버에 전송: $token');
+  void _handleNotificationData(Map<dynamic, dynamic> data) {
+    final payload = NotificationRssPayload.fromData(data);
+    if (payload == null) return;
 
-    // 실제 구현에서는 HTTP 요청을 사용하여 서버에 토큰을 전송
-    // 예: dio 또는 http 패키지 사용
+    _openRssDetail(payload.item);
   }
 
-  // 현재 토큰 가져오기 (서버에 전송하기 위해)
-  String? getToken() {
-    return _token;
+  void _openRssDetail(RssItem item) {
+    RecentlyReadService.addRssItem(item);
+    unawaited(RssService.updateRssRank(item.rssId));
+
+    void pushDetail() {
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(builder: (_) => RssDetailScreen(rssItem: item)),
+      );
+    }
+
+    if (navigatorKey.currentState == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => pushDetail());
+      return;
+    }
+
+    pushDetail();
   }
 }
